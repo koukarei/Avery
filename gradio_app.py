@@ -4,6 +4,10 @@ from engine.game.round import Round
 
 cur_round=Round()
 
+from engine.function.gen_sentence import genSentences
+
+
+
 with gr.Blocks() as demo:
     img=gr.Image(value=f"demo/Test Picture/sddefault.jpg",label="Original Picture",interactive=True)
     
@@ -33,40 +37,39 @@ with gr.Blocks() as demo:
                 remove_btn.click(remove_keyword,None,[keywords])
 
     get_sentences_btn=gr.Button("Get Sentences",scale=0)
-    sentences=gr.State([])
-    sentence_txtbox_group=gr.Group()
-    
-    def get_sentences(sentences):
+    sentence_txtbox_group=gr.Group(visible=False)
+    choose_btn_group=gr.Group(visible=False)
+
+    @get_sentences_btn.click(inputs=None,outputs=sentence_txtbox_group.children)
+    def get_sentences():
         cur_round.set_original_picture(img.value)
         cur_round.set_keyword(keywords.value)
-        from engine.function.gen_sentence import generateSentence
-        if not sentences:
-            sentence_list=[]
-            for i in range(3):
-                sentence_list.append({
-                    "name":f"sentence{i}",
-                    "sentence":generateSentence(cur_round.keyword).content
-                })
-        sentences=gr.State(sentence_list)
-        for sentence in sentence_list:
-            with gr.Row():
-                sentence_txtbox=gr.Textbox(sentence['sentence'],show_label=False,container=False)
-                sentence_txtbox_group.add_child(sentence_txtbox)
-                regenerate_btn=gr.Button("Regenerate",scale=0)
-                
-                def regenerate_sentence(sentence):
-                    sentence.change(generateSentence,cur_round.keyword)
-                regenerate_btn.click(regenerate_sentence,sentence_txtbox,None)
-               
 
-    get_sentences_btn.click(get_sentences,[sentences],[sentences])
-    test_txtbox=gr.Textbox()
-    def on_select(evt: gr.SelectData):
-        return f"You selected {evt.value} at {evt.index} from {evt.target}"
+        from engine.function.gen_sentence import genSentences
+
+        return genSentences(cur_round.keyword)
     
-    for sentence_txtbox in sentence_txtbox_group.children:
-        print(type(sentence_txtbox))
-        sentence_txtbox.select(on_select,None,test_txtbox)
+    for i in range(3):
+        with gr.Row():
+            sentence_txtbox=gr.Textbox("",show_label=False,container=False)
+            regenerate_btn=gr.Button("Regenerate",scale=0)
+            sentence_txtbox_group.add_child(sentence_txtbox)
+            choose_btn_group.add_child(gr.Button("Choose",scale=0))
+
+            @regenerate_btn.click(outputs=[sentence_txtbox])
+            def regenerate_sentence():
+                from engine.function.gen_sentence import generateSentence
+                sentence_txtbox.value=generateSentence(cur_round.keyword).content
+                return generateSentence(cur_round.keyword).content
+            
+            
+    answer_txtbox=gr.Textbox("",interactive=True,label="Your Answer",autofocus=True)
+    for choose_btn in choose_btn_group.children:
+        @choose_btn.click(inputs=[choose_btn.parent.children[0]],outputs=[answer_txtbox])
+        def update_answer(answer):
+            return answer
+        
+
 
 
 

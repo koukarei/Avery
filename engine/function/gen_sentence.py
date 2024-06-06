@@ -12,8 +12,8 @@ def generateSentence(keywords):
 
   return completion.choices[0].message
 
-def genSentences(keywords):
+def genSentences(keywords,amt=3):
     gen_Sentences=[]
-    for i in range(10):
+    for i in range(amt):
         gen_Sentences.append(generateSentence(keywords).content)
     return gen_Sentences

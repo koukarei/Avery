@@ -7,6 +7,9 @@ class Round():
         timestamp = str(int(time.time()))
         unique_id = uuid.uuid4().hex
         self.id=f"ID-{timestamp}-{unique_id}"
+        self.original_picture=None
+        self.keyword=[]
+        self.sentence=None
 
     def set_original_picture(self,img):
         self.original_picture = img
