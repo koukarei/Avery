@@ -70,10 +70,31 @@ with gr.Blocks() as demo:
             return answer
         
     from engine.function.gen_image import gen_image
-    answer_txtbox.submit(gen_image,[answer_txtbox],[gr.Image()])
+    described_image=gr.Image(label="Generated Image",interactive=False)
+    answer_txtbox.submit(gen_image,[answer_txtbox],[described_image])
 
+    get_description_btn=gr.Button("Get generated image",scale=0)
+    get_description_btn.click(gen_image,[answer_txtbox],[described_image])
+
+    submit_btn=gr.Button("Submit and start scoring",scale=0)
+    scoring=gr.Textbox(0,label="Scoring",interactive=False)
+    @submit_btn.click(inputs=[img,described_image],outputs=[scoring])
+    def scoring(original_img,described_img):
+        if described_img is None:
+            return "Please generate an image first."
+        elif original_img is None:
+            return "Please provide an original image first."
+        import cv2
+        from sewar.full_ref import ssim
+        original2=cv2.resize(
+            original_img,
+            (described_img.shape[1],described_img.shape[0]),
+            interpolation=cv2.INTER_AREA
+        )
+        return ssim(original2,described_img)[0]
 
 
 
 if __name__ == "__main__":
+    #demo.launch()
     demo.launch(share=True)
