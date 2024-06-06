@@ -69,9 +69,11 @@ with gr.Blocks() as demo:
         def update_answer(answer):
             return answer
         
+    from engine.function.gen_image import gen_image
+    answer_txtbox.submit(gen_image,[answer_txtbox],[gr.Image()])
 
 
 
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(share=True)
