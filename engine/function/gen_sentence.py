@@ -6,7 +6,7 @@ def generateSentence(keywords):
     model="gpt-4o",
     messages=[
       {"role": "system", "content": "You are going to write a sentence by keywords given by the user."},
-      {"role": "user", "content": f"Here are some keywords: {keywords}."}
+      {"role": "user", "content": f"Here are some keywords: {keywords}."},
     ]
   )
 
