@@ -1,7 +1,0 @@
-!! Traceback (most recent call last):
-!!   File "/Users/carlywong/ICCE2024/main.py", line 12, in <module>
-    game.Game(main_dir)
-!!   File "/Users/carlywong/ICCE2024/engine/game/game.py", line 69, in __init__
-    if current_screen["exit"]:
-!! TypeError: 'SelectPhotoScreen' object is not subscriptable
-
