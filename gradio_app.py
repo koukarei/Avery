@@ -1,23 +1,24 @@
 import gradio as gr
 from engine.game.round import Round
+from typing import List
 
+testing=False
 
 cur_round=Round()
-
-from engine.function.gen_sentence import genSentences
-
-
 
 with gr.Blocks() as demo:
     img=gr.Image(value=f"demo/Test Picture/sddefault.jpg",label="Original Picture",interactive=True)
     
-    keywords=gr.State([])
-    keywords=gr.State([
-        {"name":"A sloth","remove":False},
-        {"name":"red car","remove":False},
-        {"name":"driving","remove":False},
-        {"name":"teasing","remove":False},
-    ])
+    if testing:
+        keywords=gr.State([
+            {"name":"A sloth","remove":False},
+            {"name":"red car","remove":False},
+            {"name":"driving","remove":False},
+            {"name":"teasing","remove":False},
+        ])
+    else:
+        keywords=gr.State([])
+
 
     new_keyword=gr.Textbox(label="Keyword",autofocus=True)
 
@@ -40,10 +41,10 @@ with gr.Blocks() as demo:
     sentence_txtbox_group=gr.Group(visible=False)
     choose_btn_group=gr.Group(visible=False)
 
-    @get_sentences_btn.click(inputs=None,outputs=sentence_txtbox_group.children)
-    def get_sentences():
+    @get_sentences_btn.click(inputs=keywords,outputs=sentence_txtbox_group.children)
+    def get_sentences(keyword_list):
         cur_round.set_original_picture(img.value)
-        cur_round.set_keyword(keywords.value)
+        cur_round.set_keyword(keyword_list)
 
         from engine.function.gen_sentence import genSentences
 
@@ -96,5 +97,5 @@ with gr.Blocks() as demo:
 
 
 if __name__ == "__main__":
-    #demo.launch()
-    demo.launch(share=True)
+    demo.launch(share=not testing)
+    
