@@ -1,54 +1,24 @@
 import gradio as gr
-from engine.game.round import Round
+from engine.models.round import Round
 from typing import List
 
-testing=False
+testing=True
 
 cur_round=Round()
 
 with gr.Blocks() as demo:
-    img=gr.Image(value=f"demo/Test Picture/sddefault.jpg",label="Original Picture",interactive=True)
-    
-    if testing:
-        keywords=gr.State([
-            {"name":"A sloth","remove":False},
-            {"name":"red car","remove":False},
-            {"name":"driving","remove":False},
-            {"name":"teasing","remove":False},
-        ])
-    else:
-        keywords=gr.State([])
 
+    from ui.ui_gallery import Gallery
+    gallery=Gallery()
+    with gr.Row():
+        gallery.create_gallery()
 
-    new_keyword=gr.Textbox(label="Keyword",autofocus=True)
+    @gallery.submit_btn.click(inputs=[gallery.image],outputs=None)
+    def submit_picture(image):
+        gallery.hide_gallery()
+        cur_round.set_original_picture(image)
+        return None
 
-    def add_keyword(keywords,new_keyword):
-        return keywords+[{"name":new_keyword,"remove":False}],""
-    new_keyword.submit(add_keyword,[keywords,new_keyword],[keywords,new_keyword])
-    
-    @gr.render(inputs=keywords)
-    def render_keywords(keyword_list):
-        for keyword in keyword_list:
-            with gr.Row():
-                gr.Textbox(keyword['name'],show_label=False,container=False)
-                remove_btn=gr.Button("Remove",scale=0)
-                def remove_keyword(keyword=keyword):
-                    keyword_list.remove(keyword)
-                    return keyword_list
-                remove_btn.click(remove_keyword,None,[keywords])
-
-    get_sentences_btn=gr.Button("Get Sentences",scale=0)
-    sentence_txtbox_group=gr.Group(visible=False)
-    choose_btn_group=gr.Group(visible=False)
-
-    @get_sentences_btn.click(inputs=keywords,outputs=sentence_txtbox_group.children)
-    def get_sentences(keyword_list):
-        cur_round.set_original_picture(img.value)
-        cur_round.set_keyword(keyword_list)
-
-        from engine.function.gen_sentence import genSentences
-
-        return genSentences(cur_round.keyword)
     
     for i in range(3):
         with gr.Row():
@@ -59,7 +29,7 @@ with gr.Blocks() as demo:
 
             @regenerate_btn.click(outputs=[sentence_txtbox])
             def regenerate_sentence():
-                from engine.function.gen_sentence import generateSentence
+                from engine.function.sentence import generateSentence
                 sentence_txtbox.value=generateSentence(cur_round.keyword).content
                 return generateSentence(cur_round.keyword).content
             
@@ -79,7 +49,7 @@ with gr.Blocks() as demo:
 
     submit_btn=gr.Button("Submit and start scoring",scale=0)
     scoring=gr.Textbox(0,label="Scoring",interactive=False)
-    @submit_btn.click(inputs=[img,described_image],outputs=[scoring])
+    @submit_btn.click(inputs=[gallery.image,described_image],outputs=[scoring])
     def scoring(original_img,described_img):
         if described_img is None:
             return "Please generate an image first."
