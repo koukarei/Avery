@@ -1,0 +1,7 @@
+services:
+  gradio:
+    build: .
+    command: python3 gradio_app.py
+    ports:
+      - "7861:7861"
+    tty: true

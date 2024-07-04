@@ -1,71 +1,132 @@
 import gradio as gr
-from engine.models.round import Round
 from typing import List
 
-testing=True
+from ui.ui_gallery import Gallery
+from ui.ui_keywords import Keywords
+from ui.ui_sentence import Sentence
+from ui.ui_interpreted_image import InterpretedImage
+from ui.ui_result import Result
 
-cur_round=Round()
+testing=False
+
+step_list= [
+    {"name":"Select/Upload Image","Interactive":False},
+    {"name":"Type keywords","Interactive":False},
+    {"name":"Sentence","Interactive":False},
+    {"name":"Verify","Interactive":False},
+    {"name":"Results","Interactive":False},
+    {"name":"Leaderboard","Interactive":False},
+    ]
 
 with gr.Blocks() as demo:
 
-    from ui.ui_gallery import Gallery
+    steps=gr.State([])
     gallery=Gallery()
+    keywords=Keywords()
+    sentence=Sentence()
+    interpreted_image=InterpretedImage()
+    result=Result()
     with gr.Row():
-        gallery.create_gallery()
+        with gr.Column():
+            from ui.ui_init import Guidance
+            guidance=Guidance()
+            guidance.create_guidance()
 
-    @gallery.submit_btn.click(inputs=[gallery.image],outputs=None)
-    def submit_picture(image):
-        gallery.hide_gallery()
-        cur_round.set_original_picture(image)
-        return None
+            @guidance.start_btn.click(inputs=[steps],outputs=[steps])
+            def start(step_list): 
+                step_list=globals()['step_list']
+                step_list[0]['Interactive'] = True
+                return step_list
 
-    
-    for i in range(3):
-        with gr.Row():
-            sentence_txtbox=gr.Textbox("",show_label=False,container=False)
-            regenerate_btn=gr.Button("Regenerate",scale=0)
-            sentence_txtbox_group.add_child(sentence_txtbox)
-            choose_btn_group.add_child(gr.Button("Choose",scale=0))
+        with gr.Column():
+            @gr.render(inputs=steps)
+            def render_steps(step_list):
+                step_list=globals()['step_list'].copy()
+                for step in step_list:
+                    with gr.Tab(step['name'],interactive=step['Interactive']):
+                        if step['name']=="Select/Upload Image":
+                            
+                            gallery.create_gallery()
+                            
+                            def submit_image(step_list):
+                                if gallery.image:
+                                    step_list[0]['Interactive'] = False
+                                    step_list[1]['Interactive'] = True
 
-            @regenerate_btn.click(outputs=[sentence_txtbox])
-            def regenerate_sentence():
-                from engine.function.sentence import generateSentence
-                sentence_txtbox.value=generateSentence(cur_round.keyword).content
-                return generateSentence(cur_round.keyword).content
-            
-            
-    answer_txtbox=gr.Textbox("",interactive=True,label="Your Answer",autofocus=True)
-    for choose_btn in choose_btn_group.children:
-        @choose_btn.click(inputs=[choose_btn.parent.children[0]],outputs=[answer_txtbox])
-        def update_answer(answer):
-            return answer
-        
-    from engine.function.gen_image import gen_image
-    described_image=gr.Image(label="Generated Image",interactive=False)
-    answer_txtbox.submit(gen_image,[answer_txtbox],[described_image])
+                                    #ai_image=result.ssim_ai_behavior(gallery.selected)
+                                    return step_list
+                                else:
+                                    gr.Warning("Please select an image.")
+                            
+                            gr.on(triggers=[gallery.submit_btn.click],fn=submit_image,inputs=[steps],outputs=[steps])
+                        elif step['name']=="Type keywords" and step['Interactive']:
+                            
+                            keywords.create_keyword_tab(gallery.selected,testing)
+                            
+                            def submit_keywords(step_list):
+                                step_list[0]['Interactive'] = False
+                                step_list[1]['Interactive'] = False
+                                step_list[2]['Interactive'] = True
+                                return step_list
+                            
+                            gr.on(triggers=[keywords.submit_btn.click],fn=submit_keywords,inputs=[steps],outputs=[steps])
 
-    get_description_btn=gr.Button("Get generated image",scale=0)
-    get_description_btn.click(gen_image,[answer_txtbox],[described_image])
+                        elif step['name']=="Sentence":
+                            sentence.create_sentence()
+                            if testing:
+                                sentence.sentence.value="A cat with brown collar and long whiskers was shocked."
+                            def verify_page(step_list,keyword_list):
+                                keywords.keyword_list=keyword_list
+                                if sentence.checked_value:
+                                    step_list[0]['Interactive'] = False
+                                    step_list[1]['Interactive'] = False
+                                    step_list[2]['Interactive'] = False
+                                    step_list[3]['Interactive'] = True
+                                    return step_list,[]
+                                    
+                                else:
+                                    gr.Warning("Please check the sentence.")
+                            
+                            gr.on(triggers=[sentence.submit_btn.click],fn=verify_page,inputs=[steps,keywords.keywords],outputs=[steps,keywords.keywords])
 
-    submit_btn=gr.Button("Submit and start scoring",scale=0)
-    scoring=gr.Textbox(0,label="Scoring",interactive=False)
-    @submit_btn.click(inputs=[gallery.image,described_image],outputs=[scoring])
-    def scoring(original_img,described_img):
-        if described_img is None:
-            return "Please generate an image first."
-        elif original_img is None:
-            return "Please provide an original image first."
-        import cv2
-        from sewar.full_ref import ssim
-        original2=cv2.resize(
-            original_img,
-            (described_img.shape[1],described_img.shape[0]),
-            interpolation=cv2.INTER_AREA
-        )
-        return ssim(original2,described_img)[0]
+                        elif step['name']=="Verify" and step['Interactive']:
+                            interpreted_image.create_interpreted_image(keywords.image.value['path'],sentence.checked_value)
+                            def scoring_page(step_list):
+                                if interpreted_image.submit_btn.click:
+                                    step_list[0]['Interactive'] = False
+                                    step_list[1]['Interactive'] = False
+                                    step_list[2]['Interactive'] = False
+                                    step_list[3]['Interactive'] = False
+                                    step_list[4]['Interactive'] = True
+                                    return step_list
+                            interpreted_image.submit_btn.click(scoring_page,inputs=[steps],outputs=[steps])
+                        elif step['name']=="Results" and step['Interactive']:
+                            leaderboard=gr.Textbox(value='Release soon...?',interactive=False)
+                            # result.create_result(
+                            #     original_img=gallery.selected,
+                            #     checked_img=interpreted_image.image.value['path'],
+                            #     keywords=keywords.keyword_list,
+                            #     original_sentence=sentence.original_sentence,
+                            #     checked_sentence=sentence.checked_value
+                            # )
+                            result.leaderboard_btn=gr.Button("Leaderboard",scale=0)
+                            def go_leaderboard(step_list):
+                                step_list[0]['Interactive'] = False
+                                step_list[1]['Interactive'] = False
+                                step_list[2]['Interactive'] = False
+                                step_list[3]['Interactive'] = False
+                                step_list[4]['Interactive'] = False
+                                step_list[5]['Interactive'] = True
+                                return step_list
+                            
+                            gr.on(triggers=[result.leaderboard_btn.click],fn=go_leaderboard,inputs=[steps],outputs=[steps])
+                        elif step['name']=="Leaderboard":
+                            leaderboard=gr.Textbox(value='Release soon...?',interactive=False)
 
-
+            @gr.render(inputs=[keywords.keywords])
+            def render_keywords(keyword_list):
+                keywords.render_keywords(keyword_list)
 
 if __name__ == "__main__":
-    demo.launch(share=not testing)
+    demo.launch(share=not testing,server_name="0.0.0.0",server_port=7861)
     

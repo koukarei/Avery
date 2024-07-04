@@ -4,3 +4,5 @@ icce24/*
 .env
 fastText
 fastText/*
+*.pyc
+__pycache__/

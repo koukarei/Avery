@@ -13,3 +13,4 @@ profanity-check
 alt-profanity-check
 scikit-learn
 joblib
+python-dotenv

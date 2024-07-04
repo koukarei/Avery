@@ -1,6 +1,7 @@
 # Create docker
-docker build -t avery-app .
+docker-compose build
 
 # Run docker
-docker run -dp 127.0.0.1:3100:7860 avery-app
+docker-compose up
+
 
