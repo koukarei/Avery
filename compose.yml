@@ -1,6 +1,8 @@
 services:
   gradio:
-    build: .
+    build:
+      context: gradio-project
+      dockerfile: Dockerfile
     command: python3 gradio_app.py
     ports:
       - "7861:7861"
