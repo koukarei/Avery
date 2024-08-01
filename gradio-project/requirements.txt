@@ -14,3 +14,6 @@ alt-profanity-check
 scikit-learn
 joblib
 python-dotenv
+google-generativeai==0.7.2
+pytextrank
+spacy

@@ -12,8 +12,20 @@ class Sentence:
         self.checked_sentence=None
         self.submit_btn=None
         self.checked_value=None
+        self.image=None
 
-    def create_sentence(self):
+    def create_image(self,image):
+        if isinstance(image,gr.components.Image):
+            from PIL import Image as Im
+            image=Im.fromarray(image.value)
+        self.image=gr.Image(
+            image,
+            label="Type sentence to describe the image.",
+            interactive=False,
+        )
+
+    def create_sentence(self,image_path):
+        self.create_image(image_path)
         self.sentence=gr.Textbox(label='Sentence',interactive=True)
         self.check_btn=gr.Button("Check",scale=0)
 

@@ -5,5 +5,7 @@ services:
       dockerfile: Dockerfile
     command: python3 gradio_app.py
     ports:
-      - "7861:7861"
+      - "7870:7860"
     tty: true
+    volumes:
+      - ./gradio-project:/app
