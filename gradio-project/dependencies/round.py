@@ -35,9 +35,13 @@ class Round():
 
     def set_original_picture(self,img_path:str,testing=False):
         if testing:
+            self.original_picture_path=img_path
             self.original_picture = PIL.Image.open(img_path)
         else:
             image_path = "https:"+img_path.split("https:")[1]
+            self.original_picture_path=image_path
+            b=io.BytesIO(requests.get(image_path).content)
+            base64_image = base64.b64encode(b.read()).decode('utf-8')
             self.original_picture = PIL.Image.open(io.BytesIO(requests.get(image_path).content))
 
     def set_interpreted_picture(self,img):
@@ -68,7 +72,7 @@ class Round():
 
         # テキストの読み込みと前処理
         target_text = clip.tokenize([self.corrected_sentence]).to(device)
-        ai_play = genSentences(self.original_picture)
+        ai_play = genSentences(self.original_picture_path)
         phrase_text = clip.tokenize(ai_play).to(device)
         
 
@@ -79,7 +83,7 @@ class Round():
             
             similarity = (image_features @ text_features.T)
 
-            target_text_features = model.encode_text(clip.tokenize(["a cat on a table"]).to(device))
+            target_text_features = model.encode_text(target_text)
             
             target_similarity = (image_features @ target_text_features.T)
             normalized_similarity = target_similarity / similarity.norm(dim=-1, keepdim=True)

@@ -59,6 +59,9 @@ class GenerateOriginalImage:
             Select 5 to 10 phrases in the phrase list below.
             Your selection can refer to the rank of the phrases and the visionary of the phrases.
             Generate a realistic image based on the selected phrases.
+            The image should include one or more characters.
+            The scene can be a landscape, a cityscape, or a room.
+            For example, the image can be a person standing in a room, a cat playing in a garden, or a car driving on a road.
             The image must not contain any text, wording or sentence.
             The image must not be a collage. The image must be a single image.
             Phrase: Rank

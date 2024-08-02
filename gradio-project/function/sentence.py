@@ -1,22 +1,28 @@
 from openai import OpenAI
 import base64
+import io
 
 def encode_image(image):
-  return base64.b64encode(image).decode('utf-8')
+  b=io.BytesIO(image)
+  return base64.b64encode(b).decode('utf-8')
 
 def generateSentence(image):
-  base64_image = encode_image(image)
+  #base64_image = encode_image(image)
   client=OpenAI()
   completion = client.chat.completions.create(
     model="gpt-4o",
     messages=[
-      {"role": "system", "content": "You must descibe the image given by the user."},
+      {"role": "system", "content": """
+        You must descibe the image given by the user. 
+        Your output must be winthin 3 sentences. 
+        Total length of the output must be less than 200 characters.
+       """},
       {"role": "user", "content": [
         # {"type": "text", "text": "What’s in this image?"},
         {
           "type": "image_url",
           "image_url": {
-            "url": f"data:image/jpeg;base64,{base64_image}",
+            "url": image,
           },
         },
       ]
