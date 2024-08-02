@@ -24,6 +24,7 @@ RUN cd ..
 
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
+RUN pip install git+https://github.com/openai/CLIP.git
 RUN python -m spacy download en_core_web_sm
 EXPOSE 7861
 # ENV GRADIO_SERVER_NAME="0.0.0.0"

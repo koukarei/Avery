@@ -1,9 +1,10 @@
 import gradio as gr
 import os
+from dependencies.round import Round
 from function.gen_image import GenerateOriginalImage
 import random
 
-def generate_images(directory,n=1):
+def generate_images(directory,round:Round,n=1):
     files = os.listdir(directory)
     files = random.sample(files,n)
     contents=""
@@ -14,10 +15,16 @@ def generate_images(directory,n=1):
                 content=txt_file.read()
             contents+=content
     gen_image=GenerateOriginalImage(contents)
-    images=gen_image.get_original_images()
+    images=gen_image.get_original_images(round)
     for image in images:
         yield image
             
+
+def loop_files(directory="data/Public picture"):
+    for filename in os.listdir(directory):
+        file_path = os.path.join(directory, filename)
+        if os.path.isfile(file_path):
+            yield file_path
 
 class Gallery:
     """Create a gallery object for the user interface."""
@@ -29,11 +36,15 @@ class Gallery:
         self.submit_btn = None
         self.selected=None
         self.ai_img=None
+        self.transform_img=None
     
-    def create_gallery(self):
+    def create_gallery(self,round:Round,testing=False):
         with gr.Column(elem_classes="gallery"):
             self.image = gr.Image(value=None, label="Original Picture", interactive=False, visible=False)
-            self.gallery = gr.Gallery(generate_images(self.text_file_path), label="Original", interactive=True)
+            if testing:
+                self.gallery = gr.Gallery(loop_files(), label="Original", interactive=True)
+            else:
+                self.gallery = gr.Gallery(generate_images(self.text_file_path,round=round), label="Original", interactive=True)
             self.submit_btn = gr.Button("Submit", scale=0)
             self.ai_img = gr.Image(value=None, label="AI Picture", interactive=False, visible=False)
 

@@ -1,4 +1,7 @@
 import gradio as gr
+from PIL import Image
+import requests
+import io
 
 class InterpretedImage:
     def __init__(self):
@@ -8,8 +11,14 @@ class InterpretedImage:
 
     def create_interpreted_image(self,image,sentence:str):
         self.image=gr.Image(value=image,label='Image', interactive=False)
-        from function.gen_image import gen_image
-        image_url=gen_image(sentence)
-        self.interpreted_image=gr.Image(value=image_url,label='Interpreted Image', interactive=False)
-        
-        self.submit_btn=gr.Button("Recover Avery",scale=0)
+        from function.gen_image import generate_interpretion
+        image_url=generate_interpretion(sentence)
+        self.interpreted_img_content=Image.open(io.BytesIO(requests.get(image_url).content))
+        self.interpreted_image=gr.Image(value=self.interpreted_img_content,label='Interpreted Image', interactive=False)
+        with gr.Row():
+            self.regen_btn=gr.Button("Regenerate",scale=0)
+            @self.regen_btn.click(outputs=[self.interpreted_image])
+            def regenerate_image():
+                image_url=generate_interpretion(sentence)
+                return image_url
+            self.submit_btn=gr.Button("Recover",scale=0)

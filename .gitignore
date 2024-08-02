@@ -6,3 +6,4 @@ fastText
 fastText/*
 *.pyc
 __pycache__/
+gradio-project/data/*

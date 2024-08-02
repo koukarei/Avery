@@ -56,7 +56,7 @@ class Hint_Chatbot:
         self.model=model
         self.chat=model.start_chat(history=[])
 
-    def add_image(self, img):
+    def add_image(self, img,testing=False):
         messages=[]
         if img:
             if isinstance(img, list):
@@ -64,7 +64,10 @@ class Hint_Chatbot:
                     pilImage = PIL.Image.open(io.BytesIO(requests.get(i).content))
                     messages.append(pilImage)
             else:
-                pilImage = PIL.Image.open(io.BytesIO(requests.get(img).content))
+                if testing:
+                    pilImage = PIL.Image.open(img)
+                else:
+                    pilImage = PIL.Image.open(io.BytesIO(requests.get(img).content))
                 messages.append(pilImage)
             self.chat.send_message(messages)
             return
@@ -88,7 +91,6 @@ class Hint_Chatbot:
     def interpretion(self, sentence, image):
         messages=[]
         messages.append(sentence)
-        image=PIL.Image.open(io.BytesIO(requests.get(image).content))
         messages.append(image)
 
         if len(messages)==0:
@@ -119,12 +121,13 @@ class Guidance:
             greetingmsg="""
                 Greetings, human. 🤖 I am Robot Avery. 📸
 
-                Camera malfunction detected. Assistance required. 🛠️
+                The memory of my friend, Robot Skyler, is damaged. 
+                You can help it to back to normal! 🛠️
 
                 1. Select image. 🖼️
                 2. Use complete sentence to describe the image. 🗣️
-                3. I will process and respond. Verify my output. ✅
-                4. Contribution to system will be calculated. 📊
+                3. Skyler will process and generate an interpretion. Verify its output. ✅
+                4. Recovery point will be calculated by vocabulary and grammar. 📊
                 """
             self.chat=gr.Chatbot(value=[[None,greetingmsg]])
             self.msg=gr.Textbox(placeholder="Type your message here.",label="Message")
@@ -133,13 +136,15 @@ class Guidance:
             self.submit=gr.Button("Submit")
             self.submit.click(self.chatbot.slow_echo,[self.msg,self.chat],[self.msg,self.chat])
 
-    def set_image(self, img):
-        self.chatbot.add_image(img)
+    def set_image(self, img,testing=False):
+        self.chatbot.add_image(img,testing=testing)
         self.chat.value.append([None,"The image is imported to my system. You can ask me for a hint."])
+        return self.chat.value
 
     def set_interpreted_image(self,sentence,interpreted_image):
         response = self.chatbot.interpretion(sentence, interpreted_image)
         self.chat.value.append([None,response])
+        return self.chat.value
 
     def history(self):
         return self.chat.value

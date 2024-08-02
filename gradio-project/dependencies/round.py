@@ -7,30 +7,18 @@ from sklearn.metrics.pairwise import cosine_similarity
 import time
 import uuid
 import base64
+import PIL.Image
+import io
+import requests
+import Levenshtein
+from function.sentence import genSentences
 
-from engine.models.score import Score
-from engine.function.sentence import checkSentence
-from engine.function.gen_image import gen_image
+import torch
+import clip
 
 def encode_image(image_path):
-  with open(image_path, "rb") as image_file:
-    return base64.b64encode(image_file.read()).decode('utf-8')
-
-class Keyword():
-
-    def __init__(self,original:str,spell_checked:str,source:Literal["AI","User"]):
-        self.original=original
-        self.spell_checked=spell_checked
-        self.source=source
-
-    def discount(self):
-        if self.source=="AI":
-            return 0.5
-        elif self.original==self.spell_checked:
-            return 1
-        else:
-            return 0.75
-
+    pilImage = PIL.Image.open(io.BytesIO(requests.get(image_path).content))
+    return pilImage
 
 class Round():
 
@@ -40,73 +28,92 @@ class Round():
         self.id=f"ID-{timestamp}-{unique_id}"
         self.leaderboardId=leaderboardId
         self.original_picture=None
-        self.keywords=List[Keyword]
         self.sentence=None
-        self.score=Score()
+        self.corrected_sentence=None
         self.is_draft=True
+        self.phrases=None
 
-    def set_original_picture(self,img_path:str):
-        self.original_picture = encode_image(img_path)
-        if self.leaderboardId is not None:
-            self.score.ssim_ai_behavior(self.original_picture)
+    def set_original_picture(self,img_path:str,testing=False):
+        if testing:
+            self.original_picture = PIL.Image.open(img_path)
+        else:
+            image_path = "https:"+img_path.split("https:")[1]
+            self.original_picture = PIL.Image.open(io.BytesIO(requests.get(image_path).content))
 
-    def add_keyword(self,new_keyword: str,spell_checked: str,source:Literal["AI","User"]):
+    def set_interpreted_picture(self,img):
+        if isinstance(img,str):
+            self.interpreted_picture = PIL.Image.open(img)
+        else:
+            self.interpreted_picture = img
 
-        # foul language check
-        if predict([spell_checked])[0]:
-            return "Please do not use foul language."
+    def set_chat_history(self,chat:str):
+        self.chat_history=chat
 
-        keyword=Keyword(
-            original=new_keyword,
-            spell_checked=spell_checked,
-            source=source
-        )
-
-        self.keywords.append(keyword)
-        return None
-    
-    def get_keywords(self):
-        return [i.spell_checked for i in self.keywords]
-
-    def calculate_vocabulary_score(self):
-        used_keywords=[]
-        for k in self.keywords:
-            if k.spell_checked in self.corrected_sentence:
-                used_keywords.append(k)
-            else:
-                # check whether the tense changed
-                with open("data/verb.csv","r") as f:
-                    pass
-
-        self.score.set_Vocabulary(used_keywords)
-
-    def set_sentence(self,sentence):
-        # language check
-        lang=detect(sentence)
-        if lang['lang']!="en":
-            return "Please enter an English sentence."
-        elif lang['score']<0.9:
-            return "Please enter a valid English sentence."
-        elif predict_prob([sentence])>0.5:
-            return "Please avoid offensive language."
+    def set_sentence(self,sentence:str,corrected_sentence:str):
         self.sentence=sentence
-        self.corrected_sentence=checkSentence(self.sentence)
-        self.calculate_vocabulary_score()
-        self.score.set_Grammar(self.sentence,self.corrected_sentence)
-        self.interpreted_img=gen_image(self.corrected_sentence)
+        self.corrected_sentence=corrected_sentence
 
-    def get_score(self):
-        self.score.set_EffectiveCom()
+    def semantic_similarity(self):
+        return Levenshtein.ratio(self.sentence,self.corrected_sentence)
+
+    def cosine_similarity(self):
+        # デバイスの指定
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        # CLIPモデルの読み込み
+        model, preprocess = clip.load("ViT-B/32", device=device)
+
+        # 画像の読み込みと前処理
+        image = preprocess(self.original_picture).unsqueeze(0).to(device)
+
+        # テキストの読み込みと前処理
+        target_text = clip.tokenize([self.corrected_sentence]).to(device)
+        ai_play = genSentences(self.original_picture)
+        phrase_text = clip.tokenize(ai_play).to(device)
+        
+
+        # 画像とテキストの類似度を計算
+        with torch.no_grad():
+            image_features = model.encode_image(image)
+            text_features = model.encode_text(phrase_text)
+            
+            similarity = (image_features @ text_features.T)
+
+            target_text_features = model.encode_text(clip.tokenize(["a cat on a table"]).to(device))
+            
+            target_similarity = (image_features @ target_text_features.T)
+            normalized_similarity = target_similarity / similarity.norm(dim=-1, keepdim=True)
+            result=normalized_similarity.tolist()[0][0]
+
+        return result
+
+    def vocab_difficulty(self):
+        return 0
+
+    def total_score(self):
+        cosine_similarity=self.cosine_similarity()
+        semantic_similarity=self.semantic_similarity()
+        vocab_difficulty=self.vocab_difficulty()
+        total_score=(cosine_similarity+semantic_similarity+vocab_difficulty)/3
+        return total_score
+
+    def rank(self):
+        total_score=self.total_score()
+        if total_score>0.8:
+            return "A"
+        elif total_score>0.6:
+            return "B"
+        elif total_score>0.4:
+            return "C"
+        elif total_score>0.2:
+            return "D"
+        else:
+            return "F"
 
     def save(self,share=False):
         if share:
             pass
         else:
             pass
-
-
-    
-
-    
 
 

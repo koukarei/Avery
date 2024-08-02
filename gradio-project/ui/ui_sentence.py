@@ -36,7 +36,14 @@ class Sentence:
                 from function.sentence import checkSentence
                 self.original_sentence=sentence
                 self.checked_value=checkSentence(sentence)
-                return self.checked_value
+                if self.checked_value== "Please enter an English sentence.":
+                    gr.Info("Please enter an English sentence.")
+                elif self.checked_value== "Please enter a valid English sentence.":
+                    gr.Info("Please enter a valid English sentence.")
+                elif self.checked_value== "Please avoid offensive language.":
+                    gr.Info("Please avoid offensive language.")
+                else:
+                    return self.checked_value
             else:
                 gr.Warning("Please type a sentence.")
         self.check_btn.click(check_sentence,[self.sentence],[self.checked_sentence])
