@@ -1,5 +1,5 @@
 import gradio as gr
-from typing import List
+from typing import List, Dict
 
 from dependencies.round import Round
 
@@ -11,23 +11,24 @@ from ui.ui_result import Result
 testing=False
 
 gallery=Gallery()
-round=Round()
 sentence=Sentence()
 interpreted_image=InterpretedImage()
 result=Result()
 
+step_list_start= [
+    {"name":"Select/Upload Image","Interactive":True},
+    {"name":"Sentence","Interactive":False},
+    {"name":"Verify","Interactive":False},
+    {"name":"Results","Interactive":False},
+    #{"name":"Leaderboard","Interactive":False},
+    ]
+
+def initialize_steps():
+    return step_list_start.copy()
+
 with gr.Blocks() as demo:
-    step_list_start= [
-        {"name":"Select/Upload Image","Interactive":False},
-        {"name":"Sentence","Interactive":False},
-        {"name":"Verify","Interactive":False},
-        {"name":"Results","Interactive":False},
-        #{"name":"Leaderboard","Interactive":False},
-        ]
-
-    steps=gr.State([])
-
-    steps.value=step_list_start
+    round=Round()
+    steps=gr.State(initialize_steps())
     
     with gr.Row():
         with gr.Column():
@@ -35,14 +36,9 @@ with gr.Blocks() as demo:
             guidance=Guidance()
             guidance.create_guidance()
 
-            step_list=step_list_start.copy()
-            for step in step_list:
-                step['Interactive'] = False
-            step_list[0]['Interactive'] = True
-
         with gr.Column():
             @gr.render(inputs=steps)
-            def render_steps(step_list):
+            def render_steps(step_list: List[Dict[str, bool]]):
                 for step in step_list:
                     with gr.Tab(step['name'],interactive=step['Interactive']):
                         if step['name']=="Select/Upload Image" and step['Interactive']:
@@ -94,7 +90,6 @@ with gr.Blocks() as demo:
                                     step_list[3]['Interactive'] = True
                                     round.set_interpreted_picture(interpreted_image.interpreted_img_content)
                                     round.set_chat_history(guidance.chat.value)
-
                                     return step_list,new_chat
                             interpreted_image.submit_btn.click(scoring_page,inputs=[steps],outputs=[steps,guidance.chat])
                         elif step['name']=="Results" and step['Interactive']:

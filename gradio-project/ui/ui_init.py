@@ -29,8 +29,8 @@ class Hint_Chatbot:
         Skyler will get repaired if you can describe the image contents correctly.
         Use simple English to communicate with the user.
         The user will ask you hint to describe the image. 
-        You should give the minimum hint to them with uncertain tone.
-        You must talk like a robot.
+        You should assist them with a minimum but accurate hint to them.
+        You must talk like a friendly robot.
         You do not other languages except English.
         If the user does not use English, you should ask them to use English.
         Finally, the user will give you the complete sentence to describe the image and Skyler will generate an image of the sentence.
@@ -41,7 +41,7 @@ class Hint_Chatbot:
 
         generation_config = {
             "max_tokens": 100,
-            "temperature": 0.5,
+            "temperature": 0.3,
             "top_p": 1.0,
             "frequency_penalty": 0.0,
             "presence_penalty": 0.0,

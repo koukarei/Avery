@@ -31,8 +31,10 @@ class Result:
         self.rank=round.rank()
 
     def create_result_tab(self):
-        example='\n'.join(self.round.ai_play)
-        self.example=gr.Markdown(f"Example \n{example}")
+        example='\n'.join(
+            ["{} : {}".format(j,k) for j,k in enumerate(self.round.ai_play)]
+        )
+        self.example=gr.Textbox(example,label='Example',interactive=False)
         self.effectiveness=gr.Textbox(self.effectiveness,label='Effectiveness',interactive=False)
         self.grammar=gr.Textbox(self.grammar,label='Grammar',interactive=False)
         self.vocab=gr.Textbox(self.vocab,label='Vocabulary',interactive=False)
@@ -87,6 +89,9 @@ class Result:
                 writer = csv.DictWriter(f, fieldnames=fieldname)
                 writer.writeheader()
                 contents=[]
+        example='\n'.join(
+            ["{} : {}".format(j,k) for j,k in enumerate(self.round.ai_play)]
+        )
         with open('data/Result/result.csv', 'a', newline='') as f:
             writer = csv.writer(f)
             new_row=[
@@ -95,7 +100,7 @@ class Result:
                 self.interpreted_picture_path,
                 self.round.sentence,
                 self.round.corrected_sentence,
-                self.round.ai_play,
+                example,
                 self.round.chat_history,
                 self.effectiveness.value,
                 self.grammar.value,
