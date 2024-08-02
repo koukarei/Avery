@@ -105,10 +105,10 @@ class Hint_Chatbot:
             print(f"Messages: {messages}")
             return {}
 
-    def slow_echo(self,message, history):
-        hint=self.nextResponse(message)
-        history.append((message, hint))
-        return "", history
+    # def slow_echo(self,message, history):
+    #     hint=self.nextResponse(message)
+    #     history.append((message, hint))
+    #     return "", history
 
 class Guidance:
     """"Create a guidance object for the user interface."""
@@ -131,10 +131,10 @@ class Guidance:
                 """
             self.chat=gr.Chatbot(value=[[None,greetingmsg]])
             self.msg=gr.Textbox(placeholder="Type your message here.",label="Message")
-            self.msg.submit(self.chatbot.slow_echo,[self.msg,self.chat],[self.msg,self.chat])
+            self.msg.submit(self.slow_echo,[self.msg,self.chat],[self.msg,self.chat])
 
             self.submit=gr.Button("Submit")
-            self.submit.click(self.chatbot.slow_echo,[self.msg,self.chat],[self.msg,self.chat])
+            self.submit.click(self.slow_echo,[self.msg,self.chat],[self.msg,self.chat])
 
     def set_image(self, img,testing=False):
         self.chatbot.add_image(img,testing=testing)
@@ -149,5 +149,10 @@ class Guidance:
     def history(self):
         return self.chat.value
 
+    def slow_echo(self,message, history):
+        hint=self.chatbot.nextResponse(message)
+        history.append((message, hint))
+        self.chat.value=history
+        return "", history
             
         
