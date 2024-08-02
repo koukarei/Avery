@@ -31,6 +31,9 @@ class Result:
         self.rank=round.rank()
 
     def create_result_tab(self):
+        example='\n'.join(self.round.ai_play)
+        self.example=gr.Markdown(f"""## Example
+                                 {example}""")
         self.effectiveness=gr.Textbox(self.effectiveness,label='Effectiveness',interactive=False)
         self.grammar=gr.Textbox(self.grammar,label='Grammar',interactive=False)
         self.vocab=gr.Textbox(self.vocab,label='Vocabulary',interactive=False)
@@ -42,7 +45,11 @@ class Result:
         quality=95
         optimize=True
         progressive=True
+        
         self.original_picture_path='data/Original Picture/'+self.round.id+'.jpg'
+        if os.path.exists(self.original_picture_path):
+            self.round.set_id()
+            self.original_picture_path='data/Original Picture/'+self.round.id+'.jpg'
         self.interpreted_picture_path='data/Interpreted Picture/'+self.round.id+'.jpg'
 
         self.round.original_picture.save(
@@ -66,6 +73,7 @@ class Result:
             'interpreted_picture_path',
             'sentence',
             'corrected_sentence',
+            'ai_play',
             'chat_history',
             'effectiveness',
             'grammar',
@@ -88,6 +96,7 @@ class Result:
                 self.interpreted_picture_path,
                 self.round.sentence,
                 self.round.corrected_sentence,
+                self.round.ai_play,
                 self.round.chat_history,
                 self.effectiveness.value,
                 self.grammar.value,

@@ -12,6 +12,7 @@ import io
 import requests
 import Levenshtein
 from function.sentence import genSentences
+import os
 
 import torch
 import clip
@@ -23,15 +24,18 @@ def encode_image(image_path):
 class Round():
 
     def __init__(self,leaderboardId:Union[str,None]=None):
-        timestamp = str(int(time.time()))
-        unique_id = uuid.uuid4().hex
-        self.id=f"ID-{timestamp}-{unique_id}"
+        self.set_id()
         self.leaderboardId=leaderboardId
         self.original_picture=None
         self.sentence=None
         self.corrected_sentence=None
         self.is_draft=True
         self.phrases=None
+
+    def set_id(self):
+        timestamp = str(int(time.time()))
+        unique_id = uuid.uuid4().hex
+        self.id=f"ID-{timestamp}-{unique_id}"
 
     def set_original_picture(self,img_path:str,testing=False):
         if testing:
@@ -74,6 +78,7 @@ class Round():
         target_text = clip.tokenize([self.corrected_sentence]).to(device)
         ai_play = genSentences(self.original_picture_path)
         phrase_text = clip.tokenize(ai_play).to(device)
+        self.ai_play=ai_play
         
 
         # 画像とテキストの類似度を計算
