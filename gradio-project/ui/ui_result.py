@@ -32,8 +32,7 @@ class Result:
 
     def create_result_tab(self):
         example='\n'.join(self.round.ai_play)
-        self.example=gr.Markdown(f"""## Example
-                                 {example}""")
+        self.example=gr.Markdown(f"Example \n{example}")
         self.effectiveness=gr.Textbox(self.effectiveness,label='Effectiveness',interactive=False)
         self.grammar=gr.Textbox(self.grammar,label='Grammar',interactive=False)
         self.vocab=gr.Textbox(self.vocab,label='Vocabulary',interactive=False)
