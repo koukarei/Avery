@@ -109,5 +109,5 @@ with gr.Blocks() as demo:
                             leaderboard=gr.Textbox(value='Release soon...?',interactive=False)
             
 if __name__ == "__main__":
-    demo.launch(share=not testing,server_name="0.0.0.0",server_port=7860)
+    demo.launch(share=False,server_name="0.0.0.0",server_port=7860)
     
