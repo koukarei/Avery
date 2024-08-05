@@ -131,7 +131,7 @@ class Guidance:
                 3. Skyler will process and generate an interpretion. Verify its output. ✅
                 4. Recovery point will be calculated by vocabulary and grammar. 📊
                 """
-            self.chat=gr.Chatbot(value=[[None,greetingmsg]])
+            self.chat=gr.Chatbot(value=[[None,greetingmsg]],label="Chat with Avery")
             self.msg=gr.Textbox(placeholder="Type your message here.",label="Message")
             self.msg.submit(self.slow_echo,[self.msg,self.chat],[self.msg,self.chat])
 
