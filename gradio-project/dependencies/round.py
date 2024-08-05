@@ -40,6 +40,7 @@ class Round():
         self.original_picture=None
         self.sentence=None
         self.corrected_sentence=None
+        self.ai_play=None
         self.is_draft=True
         self.phrases=None
         self.semantic_score=None

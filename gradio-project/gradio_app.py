@@ -42,6 +42,7 @@ with gr.Blocks() as demo:
                 for step in step_list:
                     with gr.Tab(step['name'],interactive=step['Interactive']):
                         if step['name']=="Select/Upload Image" and step['Interactive']:
+                            round.reset()
                             gallery.create_gallery(round=round)
                             def submit_image(step_list):
                                 if gallery.image:
@@ -54,7 +55,6 @@ with gr.Blocks() as demo:
                                     return step_list,chat_history
                                 else:
                                     gr.Warning("Please select an image.")
-                                round.reset()
                             gr.on(triggers=[gallery.submit_btn.click],fn=submit_image,inputs=[steps],outputs=[steps,guidance.chat])
                         elif step['name']=="Sentence" and step['Interactive']:
 

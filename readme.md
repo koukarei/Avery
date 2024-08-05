@@ -6,3 +6,6 @@
 
 # Rebuild and run docker
 ```docker-compose down && docker-compose build --no-cache && docker-compose up -d```
+
+# Rerun docker
+```docker-compose down && docker-compose up -d```
