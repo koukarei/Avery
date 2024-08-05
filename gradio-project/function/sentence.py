@@ -2,9 +2,9 @@ from openai import OpenAI
 import base64
 import io
 
-def encode_image(image):
-  b=io.BytesIO(image)
-  return base64.b64encode(b).decode('utf-8')
+def encode_image(image_path):
+  with open(image_path, "rb") as image_file:
+    return base64.b64encode(image_file.read()).decode('utf-8')
 
 def generateSentence(image):
   #base64_image = encode_image(image)
@@ -34,6 +34,8 @@ def generateSentence(image):
 
 def genSentences(image,amt=3):
     gen_Sentences=[]
+    if "http" not in image:
+       image="data:image/jpeg;base64,{}".format(encode_image(image))
     for i in range(amt):
         gen_Sentences.append(generateSentence(image).content)
     return gen_Sentences

@@ -9,3 +9,14 @@ services:
     tty: true
     volumes:
       - ./gradio-project:/app
+
+  cefr:
+    build: 
+      context: cefr-predictor
+      dockerfile: Dockerfile
+    command: python3 cefr_app.py
+    ports:
+      - "7871:8080"
+    tty: true
+    volumes:
+      - ./cefr-predictor:/app

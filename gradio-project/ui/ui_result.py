@@ -32,7 +32,7 @@ class Result:
 
     def create_result_tab(self):
         example='\n'.join(
-            ["{} : {}".format(j,k) for j,k in enumerate(self.round.ai_play)]
+            ["{} : {}".format(j+1,k) for j,k in enumerate(self.round.ai_play)]
         )
         self.example=gr.Textbox(example,label='Example',interactive=False)
         self.effectiveness=gr.Textbox(self.effectiveness,label='Effectiveness',interactive=False)

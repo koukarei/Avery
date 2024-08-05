@@ -56,7 +56,7 @@ class GenerateOriginalImage:
             phrases = self.select_phrases()
             str_phrases = "\n".join([f"{phrase.text}: {phrase.rank}" for phrase in phrases])
             prompt = """
-            Select 5 to 10 phrases in the phrase list below.
+            Select 2 to 7 phrases in the phrase list below.
             Your selection can refer to the rank of the phrases and the visionary of the phrases.
             Generate a realistic image based on the selected phrases.
             The image should include one or more characters.

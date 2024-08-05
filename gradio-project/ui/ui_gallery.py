@@ -38,13 +38,14 @@ class Gallery:
         self.ai_img=None
         self.transform_img=None
     
-    def create_gallery(self,round:Round,testing=False):
+    def create_gallery(self,round:Round):
         with gr.Column(elem_classes="gallery"):
             self.image = gr.Image(value=None, label="Original Picture", interactive=False, visible=False)
-            if testing:
-                self.gallery = gr.Gallery(loop_files(), label="Original", interactive=True)
-            else:
-                self.gallery = gr.Gallery(generate_images(self.text_file_path,round=round), label="Original", interactive=True)
+            # if testing:
+            #     self.gallery = gr.Gallery(loop_files(), label="Original", interactive=True)
+            # else:
+            #     self.gallery = gr.Gallery(generate_images(self.text_file_path,round=round), label="Original", interactive=True)
+            self.gallery = gr.Gallery(loop_files(), label="Original", interactive=True)
             self.submit_btn = gr.Button("Submit", scale=0)
             self.ai_img = gr.Image(value=None, label="AI Picture", interactive=False, visible=False)
 

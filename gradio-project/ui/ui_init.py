@@ -56,7 +56,7 @@ class Hint_Chatbot:
         self.model=model
         self.chat=model.start_chat(history=[])
 
-    def add_image(self, img,testing=False):
+    def add_image(self, img):
         messages=[]
         if img:
             if isinstance(img, list):
@@ -64,10 +64,10 @@ class Hint_Chatbot:
                     pilImage = PIL.Image.open(io.BytesIO(requests.get(i).content))
                     messages.append(pilImage)
             else:
-                if testing:
-                    pilImage = PIL.Image.open(img)
-                else:
+                try:
                     pilImage = PIL.Image.open(io.BytesIO(requests.get(img).content))
+                except:
+                    pilImage = PIL.Image.open(img)
                 messages.append(pilImage)
             self.chat.send_message(messages)
             return
@@ -136,8 +136,8 @@ class Guidance:
             self.submit=gr.Button("Submit")
             self.submit.click(self.slow_echo,[self.msg,self.chat],[self.msg,self.chat])
 
-    def set_image(self, img,testing=False):
-        self.chatbot.add_image(img,testing=testing)
+    def set_image(self, img):
+        self.chatbot.add_image(img)
         self.chat.value.append([None,"The image is imported to my system. You can ask me for a hint."])
         return self.chat.value
 

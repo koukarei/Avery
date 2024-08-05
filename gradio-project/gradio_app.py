@@ -42,19 +42,19 @@ with gr.Blocks() as demo:
                 for step in step_list:
                     with gr.Tab(step['name'],interactive=step['Interactive']):
                         if step['name']=="Select/Upload Image" and step['Interactive']:
-                            gallery.create_gallery(round=round,testing=testing)
+                            gallery.create_gallery(round=round)
                             def submit_image(step_list):
                                 if gallery.image:
                                     step_list=step_list_start.copy()
                                     for step in step_list:
                                         step['Interactive'] = False
                                     step_list[1]['Interactive'] = True
-                                    chat_history=guidance.set_image(gallery.selected,testing=testing)
-                                    round.set_original_picture(gallery.selected,testing=testing)
+                                    chat_history=guidance.set_image(gallery.selected)
+                                    round.set_original_picture(gallery.selected)
                                     return step_list,chat_history
                                 else:
                                     gr.Warning("Please select an image.")
-                            
+                                round.reset()
                             gr.on(triggers=[gallery.submit_btn.click],fn=submit_image,inputs=[steps],outputs=[steps,guidance.chat])
                         elif step['name']=="Sentence" and step['Interactive']:
 
