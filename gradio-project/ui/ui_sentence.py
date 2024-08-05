@@ -26,8 +26,8 @@ class Sentence:
 
     def create_sentence(self,image_path):
         self.create_image(image_path)
-        self.sentence=gr.Textbox(label='Sentence',interactive=True)
-        self.check_btn=gr.Button("Check",scale=0)
+        self.sentence=gr.Textbox(label='Your Sentence',interactive=True)
+        self.check_btn=gr.Button("Check your sentence",scale=0)
 
         self.checked_sentence=gr.Textbox(label='Checked Sentence',interactive=False)
 
@@ -47,6 +47,6 @@ class Sentence:
             else:
                 gr.Warning("Please type a sentence.")
         self.check_btn.click(check_sentence,[self.sentence],[self.checked_sentence])
-        self.submit_btn=gr.Button("Get Interpretation",scale=0)
+        self.submit_btn=gr.Button("Send to Skyler",scale=0)
         
     

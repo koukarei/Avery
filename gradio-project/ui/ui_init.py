@@ -132,7 +132,7 @@ class Guidance:
                 4. Recovery point will be calculated by vocabulary and grammar. 📊
                 """
             self.chat=gr.Chatbot(value=[[None,greetingmsg]],label="Chat with Avery")
-            self.msg=gr.Textbox(placeholder="Type your message here.",label="Message")
+            self.msg=gr.Textbox(placeholder="Type your message to Avery here.",label=None)
             self.msg.submit(self.slow_echo,[self.msg,self.chat],[self.msg,self.chat])
 
             self.submit=gr.Button("Submit")
