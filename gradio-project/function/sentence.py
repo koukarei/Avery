@@ -10,7 +10,7 @@ def generateSentence(image):
   #base64_image = encode_image(image)
   client=OpenAI()
   completion = client.chat.completions.create(
-    model="gpt-4o",
+    model="gpt-4o-mini",
     messages=[
       {"role": "system", "content": """
         You must descibe the image given by the user. 
@@ -40,7 +40,7 @@ def genSentences(image,amt=3):
         gen_Sentences.append(generateSentence(image).content)
     return gen_Sentences
 
-def checkSentence(sentence,temp=0.5):
+def checkSentence(sentence,temp=0.3):
   client=OpenAI()
   completion = client.chat.completions.create(
     model="gpt-4o",

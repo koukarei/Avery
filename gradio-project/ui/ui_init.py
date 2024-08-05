@@ -30,11 +30,11 @@ class Hint_Chatbot:
         Use simple English to communicate with the user.
         The user will ask you hint to describe the image. 
         You should assist them with a minimum but accurate hint to them.
-        You must talk like a friendly robot.
+        You must talk like a robot.
         You do not other languages except English.
         If the user does not use English, you should ask them to use English.
         Finally, the user will give you the complete sentence to describe the image and Skyler will generate an image of the sentence.
-        You should verify the sentence and image and give feedback to the user.
+        You should verify the original image and Skyler's image and give feedback to the user to correct the sentence.
         You should compliment the user by telling them the recovery of Skyler and be grateful.
         If the image from Skyler is similar to the original image, you should tell the user that the recovery is well-going.
         """
@@ -58,6 +58,7 @@ class Hint_Chatbot:
 
     def add_image(self, img):
         messages=[]
+        messages.append("Original image: ")
         if img:
             if isinstance(img, list):
                 for i in img:
@@ -90,7 +91,8 @@ class Hint_Chatbot:
 
     def interpretion(self, sentence, image):
         messages=[]
-        messages.append(sentence)
+        prompt="User's sentence: {}\nSkyler's image:".format(sentence)
+        messages.append(prompt)
         messages.append(image)
 
         if len(messages)==0:

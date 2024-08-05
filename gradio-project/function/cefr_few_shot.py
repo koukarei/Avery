@@ -42,7 +42,7 @@ Your answer only needs to be the CEFR level (A1, A2, B1, B2, C1, C2).
 
     try:
         completion = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o",
             messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": f"{text}"}
