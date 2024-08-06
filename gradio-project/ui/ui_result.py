@@ -40,7 +40,9 @@ class Result:
         self.vocab=gr.Textbox(self.vocab,label='Vocabulary',interactive=False)
         self.total=gr.Textbox(self.total,label='Total',interactive=False)
         self.rank=gr.Textbox(self.rank,label='Rank',interactive=False)
-        self.restart_btn=gr.Button("Help more!",scale=0)
+        with gr.Row():
+            self.restart_btn=gr.Button("Help more!",scale=0)
+            self.survey_btn=gr.Button("Survey",scale=0,link='https://forms.gle/KbXzJPuvP9uts12p8')
 
     def save_image(self):
         quality=95
