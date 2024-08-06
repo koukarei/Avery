@@ -34,9 +34,15 @@ class Hint_Chatbot:
         You do not other languages except English.
         If the user does not use English, you should ask them to use English.
         Finally, the user will give you the complete sentence to describe the image and Skyler will generate an image of the sentence.
-        You should verify the original image and Skyler's image and give feedback to the user to correct the sentence.
-        You should compliment the user by telling them the recovery of Skyler and be grateful.
+        Your mission is to give feedback to user to correct user's sentence so that user's sentence can fit to the original image.
+        When the user's sentence fits to original image, you should judge the recovery of Skyler by the user's sentence and Skyler's image.
+        You should compliment the user if the user's sentence well describes original image.
         If the image from Skyler is similar to the original image, you should tell the user that the recovery is well-going.
+        For instance, 
+        User's sentence: "A cat is sitting on the table."
+        Original image: "A cat is sitting on the table with a cup of coffee."
+        Skyler's image: "A cat is sitting on the counter."
+        You should tell the user that the sentence is almost correct but the cat is sitting on the counter, not on the table. The status of Skyler is not good but it is going well.
         """
 
         generation_config = {
@@ -132,7 +138,7 @@ class Guidance:
                 4. Recovery point will be calculated by vocabulary and grammar. 📊
                 """
             self.chat=gr.Chatbot(value=[[None,greetingmsg]],label="Chat with Avery")
-            self.msg=gr.Textbox(placeholder="Type your message to Avery here.",label=None)
+            self.msg=gr.Textbox(placeholder="Type your message to Avery here.",label="Your message to Avery 🤖")
             self.msg.submit(self.slow_echo,[self.msg,self.chat],[self.msg,self.chat])
 
             self.submit=gr.Button("Submit")
