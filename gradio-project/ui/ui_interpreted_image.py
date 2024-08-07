@@ -16,9 +16,9 @@ class InterpretedImage:
         self.interpreted_img_content=Image.open(io.BytesIO(requests.get(image_url).content))
         self.interpreted_image=gr.Image(value=self.interpreted_img_content,label='Interpreted Image', interactive=False)
         with gr.Row():
-            self.regen_btn=gr.Button("Regenerate",scale=0)
+            self.regen_btn=gr.Button("Regenerate image",scale=0)
             @self.regen_btn.click(outputs=[self.interpreted_image])
             def regenerate_image():
                 image_url=generate_interpretion(sentence)
                 return image_url
-            self.submit_btn=gr.Button("Recover",scale=0)
+            self.submit_btn=gr.Button("Recover Skyler",scale=0)

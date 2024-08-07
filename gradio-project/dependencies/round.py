@@ -1,5 +1,6 @@
 from typing import List,Literal,Union
 from enum import Enum
+import gradio as gr
 
 from ftlangdetect import detect
 from profanity_check import predict, predict_prob
@@ -25,6 +26,7 @@ class Round():
 
     def __init__(self,leaderboardId:Union[str,None]=None):
         self.set_id()
+        self.cur_step=gr.State(0)
         self.leaderboardId=leaderboardId
         self.original_picture=None
         self.sentence=None
@@ -37,6 +39,7 @@ class Round():
 
     def reset(self):
         self.set_id()
+        self.cur_step=gr.State(0)
         self.original_picture=None
         self.sentence=None
         self.corrected_sentence=None

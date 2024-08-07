@@ -25,12 +25,15 @@ step_list_start= [
 
 def initialize_steps():
     return step_list_start.copy()
+def initialize_cur_step():
+    return 0
 
 with gr.Blocks() as demo:
     round=Round()
+    round.cur_step=gr.State(initialize_cur_step())
     steps=gr.State(initialize_steps())
     
-    with gr.Row():
+    with gr.Row(equal_height=True):
         with gr.Column():
             from ui.ui_init import Guidance
             guidance=Guidance()
@@ -43,6 +46,7 @@ with gr.Blocks() as demo:
                     with gr.Tab(step['name'],interactive=step['Interactive']):
                         if step['name']=="Select/Upload Image" and step['Interactive']:
                             round.reset()
+                            guidance.reset()
                             gallery.create_gallery(round=round)
                             def submit_image(step_list):
                                 if gallery.image:
@@ -57,7 +61,6 @@ with gr.Blocks() as demo:
                                     gr.Warning("Please select an image.")
                             gr.on(triggers=[gallery.submit_btn.click],fn=submit_image,inputs=[steps],outputs=[steps,guidance.chat])
                         elif step['name']=="Sentence" and step['Interactive']:
-
                             sentence.create_sentence(gallery.selected)
                             def verify_page(step_list):
                                 
@@ -69,32 +72,38 @@ with gr.Blocks() as demo:
                                         sentence=sentence.original_sentence,
                                         corrected_sentence=sentence.checked_value
                                     )
-                                    return step_list
                                 
                                 else:
                                     gr.Warning("Please check the sentence.")
+                                return step_list
                             
                             gr.on(triggers=[sentence.submit_btn.click],fn=verify_page,inputs=[steps],outputs=[steps])
 
                         elif step['name']=="Verify" and step['Interactive']:
                             interpreted_image.create_interpreted_image(sentence.image.value['path'],sentence.checked_value)
                             
-                            new_chat=guidance.set_interpreted_image(
-                                sentence=sentence.checked_value,
-                                interpreted_image=interpreted_image.interpreted_img_content
-                            )
                             def scoring_page(step_list):
                                 if interpreted_image.submit_btn.click:
                                     for step in step_list:
                                         step['Interactive'] = False
                                     step_list[3]['Interactive'] = True
-                                    round.set_interpreted_picture(interpreted_image.interpreted_img_content)
-                                    round.set_chat_history(guidance.chat.value)
-                                    return step_list,new_chat
+                                    result.get_params(round)
+                                    scoring="Effectiveness score: {}\nVocabulary score: {}".format(
+                                        round.effectiveness_score,
+                                        round.vocab_score
+                                    )
+                                    guidance.set_interpreted_image(
+                                        sentence=sentence.checked_value,
+                                        interpreted_image=interpreted_image.interpreted_img_content,
+                                        scoring=scoring
+                                    )
+                                    return step_list,guidance.history()
                             interpreted_image.submit_btn.click(scoring_page,inputs=[steps],outputs=[steps,guidance.chat])
                         elif step['name']=="Results" and step['Interactive']:
-                            result.get_params(round)
                             result.create_result_tab()
+                            round.set_interpreted_picture(interpreted_image.interpreted_img_content)
+                            round.set_chat_history(guidance.history())
+                            
                             result.save_image()
                             result.log_result()
 
@@ -102,9 +111,12 @@ with gr.Blocks() as demo:
                                 for step in step_list:
                                     step['Interactive'] = False
                                 step_list[0]['Interactive'] = True
+                                guidance.chat.value=[]
                                 return step_list
                             
                             gr.on(triggers=[result.restart_btn.click],fn=restart,inputs=[steps],outputs=[steps])
+
+                            
                         elif step['name']=="Leaderboard":
                             leaderboard=gr.Textbox(value='Release soon...?',interactive=False)
             

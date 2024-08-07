@@ -22,13 +22,13 @@ class Result:
         # self.leaderboard_btn=None
         pass
         
-    def get_params(self,round:Round):
-        self.round=round
-        self.effectiveness=round.cosine_similarity()*100
-        self.grammar=round.semantic_similarity()*100
-        self.vocab=round.vocab_difficulty()*100
-        self.total=round.total_score()*100
-        self.rank=round.rank()
+    def get_params(self,cur_round:Round):
+        self.round=cur_round
+        self.effectiveness=round(cur_round.cosine_similarity()*100)
+        self.grammar=round(cur_round.semantic_similarity()*100)
+        self.vocab=round(cur_round.vocab_difficulty()*100)
+        self.total=round(cur_round.total_score()*100)
+        self.rank=cur_round.rank()
 
     def create_result_tab(self):
         example='\n'.join(
@@ -111,7 +111,7 @@ class Result:
                 self.rank.value
             ]
             writer.writerow(new_row)
-
+        
 
     # def ssim_ai_behavior(self,img):
     #     self.score.ssim_ai_behavior(img=img)
