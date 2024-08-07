@@ -28,20 +28,48 @@ def initialize_steps():
 def initialize_cur_step():
     return 0
 
-with gr.Blocks() as demo:
+css="""
+.bot {
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.chat {
+  height: 80%; /* Ensures the height respects the max-height constraint */
+  box-sizing: border-box; /* Includes padding and border in the element's total width and height */
+}
+
+.interactive {
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.whole {
+    display: flex;
+}
+
+.bot, .interactive {
+    flex: 1;
+}
+"""
+
+with gr.Blocks(css=css) as demo:
     round=Round()
     round.cur_step=gr.State(initialize_cur_step())
     steps=gr.State(initialize_steps())
-    
-    with gr.Row(equal_height=True):
-        with gr.Column():
-            from ui.ui_init import Guidance
-            guidance=Guidance()
-            guidance.create_guidance()
+    from ui.ui_init import Guidance
+    guidance=Guidance()
 
-        with gr.Column():
-            @gr.render(inputs=steps)
-            def render_steps(step_list: List[Dict[str, bool]]):
+    @gr.render(inputs=steps)
+    def render_steps(step_list: List[Dict[str, bool]]):
+        with gr.Row(equal_height=True,show_progress=True,elem_classes='whole'):
+            with gr.Column(min_width=200,elem_classes='bot'):
+                if guidance.history:
+                    guidance.create_guidance(greeting=False)
+                else:
+                    guidance.create_guidance(greeting=True)
+
+            with gr.Column(min_width=300,elem_classes='interactive'):
                 for step in step_list:
                     with gr.Tab(step['name'],interactive=step['Interactive']):
                         if step['name']=="Select/Upload Image" and step['Interactive']:
@@ -97,12 +125,12 @@ with gr.Blocks() as demo:
                                         interpreted_image=interpreted_image.interpreted_img_content,
                                         scoring=scoring
                                     )
-                                    return step_list,guidance.history()
+                                    return step_list,guidance.history
                             interpreted_image.submit_btn.click(scoring_page,inputs=[steps],outputs=[steps,guidance.chat])
                         elif step['name']=="Results" and step['Interactive']:
                             result.create_result_tab()
                             round.set_interpreted_picture(interpreted_image.interpreted_img_content)
-                            round.set_chat_history(guidance.history())
+                            round.set_chat_history(guidance.history)
                             
                             result.save_image()
                             result.log_result()

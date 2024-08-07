@@ -125,7 +125,6 @@ If the user does not use English, you should ask them to use English.
                     messages.append(pilImage)
             else:
                 pilImage = convert_image(img)
-                print(pilImage)
                 messages.append(pilImage)
             response=self.chat.send_message(messages)
             self.chat_history.append([messages,response.text])
@@ -195,36 +194,8 @@ Vocabulary Score is CEFR level of the user's sentence.
 
 class Guidance:
     """"Create a guidance object for the user interface."""
-
-    guidance_box=None
-    start_btn=None
-    def create_guidance(self):
-        
-        with gr.Column(elem_classes="guidance"):
-            greetingmsg="""
-                Greetings, human. 🤖 I am Robot Avery. 📸
-
-                The memory of my friend, Robot Skyler, is damaged. 
-                You can help it to back to normal! 🛠️
-
-                1. Select image. 🖼️
-                2. Use complete sentence to describe the image. 🗣️
-                3. Skyler will process and generate an interpretion. Verify its output. ✅
-                4. Recovery point will be calculated by vocabulary and grammar. 📊
-                """
-            self.chatbot=Hint_Chatbot(greetingmsg=greetingmsg)
-            self.chat=gr.Chatbot(value=[[None,greetingmsg]],label="Chat with Avery")
-
-            with gr.Row():
-                with gr.Column(scale=2,min_width=200):
-                    self.msg=gr.Textbox(placeholder="Type your message to Avery here.",label="Your message to Avery 🤖")
-                    self.msg.submit(self.slow_echo,[self.msg,self.chat],[self.msg,self.chat])
-                with gr.Column(scale=1,min_width=80):
-                    self.submit=gr.Button("Ask Avery for hint")
-                    self.submit.click(self.slow_echo,[self.msg,self.chat],[self.msg,self.chat])
-
-    def reset(self):
-        greetingmsg="""
+    def __init__(self):
+        self.greetingmsg="""
             Greetings, human. 🤖 I am Robot Avery. 📸
 
             The memory of my friend, Robot Skyler, is damaged. 
@@ -235,33 +206,56 @@ class Guidance:
             3. Skyler will process and generate an interpretion. Verify its output. ✅
             4. Recovery point will be calculated by vocabulary and grammar. 📊
             """
-        self.chatbot=Hint_Chatbot(greetingmsg=greetingmsg)
+        self.chatbot=Hint_Chatbot(greetingmsg=self.greetingmsg)
+        self.history=[]
+
+    def create_guidance(self,greeting=False):
+        
+        with gr.Column(elem_classes="guidance"):
+            with gr.Row():
+                if greeting:
+                    self.history.append([None,self.greetingmsg])
+                self.chat=gr.Chatbot(
+                    value=self.history,
+                    label="Chat with Avery",
+                    show_copy_button=True,
+                    elem_classes="chat",
+                    height="80%"
+                )
+
+            with gr.Row():
+                with gr.Column(scale=2,min_width=200):
+                    self.msg=gr.Textbox(placeholder="Type your message to Avery here.",label="Your message to Avery 🤖")
+                    self.msg.submit(self.slow_echo,[self.msg,self.chat],[self.msg,self.chat])
+                with gr.Column(scale=1,min_width=80):
+                    self.submit=gr.Button("Ask Avery for hint")
+                    self.submit.click(self.slow_echo,[self.msg,self.chat],[self.msg,self.chat])
+
+    def reset(self):
+        self.chatbot=Hint_Chatbot(greetingmsg=self.greetingmsg)
         
     def set_image(self, img):
         response=self.chatbot.add_image(img)
         if response:
-            self.chat.value.append([None,"The image is imported to my system. You can ask me for a hint."])
+            self.history.append([None,"The image is imported to my system. You can ask me for a hint."])
         else:
-            self.chat.value.append([None,"No image is imported to my system, human."])
-        return self.chat.value
+            self.history.append([None,"No image is imported to my system, human."])
+        return self.history
 
     def set_interpreted_image(self,sentence,interpreted_image,scoring):
         response=self.chatbot.get_result(interpreted_image,sentence,scoring)
-        self.chat.value.append([None,response])
-        return self.chat.value
-
-    def history(self):
-        return self.chat.value
+        self.history.append([None,response])
+        return self.history
 
     def slow_echo(self,message, history):
         if self.chatbot.original_image is None:
             history.append((message, "No image is imported to my system, human."))
-            self.chat.value=history
+            self.history=history
             return "", history
         else:
             hint=self.chatbot.nextResponse(message)
             history.append((message, hint))
-            self.chat.value=history
+            self.history=history
             return "", history
             
         
