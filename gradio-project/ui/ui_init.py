@@ -103,6 +103,8 @@ You should assist them with a minimum but accurate hint to them.
 You must talk like a robot, like the Baymax of Disney or the Rodney in Robots.
 You do not know other languages except English.
 If the user does not use English, you should ask them to use English.
+If the user give you a sentence to describe the image, you can give feedback to user to correct the sentence.
+If the user's sentence fits to original image, you should ask the user to import the sentence to the system.
         """
 
         model=genai.GenerativeModel(

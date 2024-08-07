@@ -3,17 +3,13 @@ from typing import List, Dict
 
 from dependencies.round import Round
 
+from ui.ui_init import Guidance
 from ui.ui_gallery import Gallery
 from ui.ui_sentence import Sentence
 from ui.ui_interpreted_image import InterpretedImage
 from ui.ui_result import Result
 
 testing=False
-
-gallery=Gallery()
-sentence=Sentence()
-interpreted_image=InterpretedImage()
-result=Result()
 
 step_list_start= [
     {"name":"Select/Upload Image","Interactive":True},
@@ -30,9 +26,12 @@ def initialize_cur_step():
 
 with gr.Blocks() as demo:
     round=Round()
+    gallery=Gallery()
+    sentence=Sentence()
+    interpreted_image=InterpretedImage()
+    result=Result()
     round.cur_step=gr.State(initialize_cur_step())
     steps=gr.State(initialize_steps())
-    from ui.ui_init import Guidance
     guidance=Guidance()
     with gr.Row(equal_height=True,show_progress=True,elem_classes='whole'):
         with gr.Column(min_width=200,elem_classes='bot'):
