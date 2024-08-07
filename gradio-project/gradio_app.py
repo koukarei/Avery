@@ -34,16 +34,15 @@ with gr.Blocks() as demo:
     steps=gr.State(initialize_steps())
     from ui.ui_init import Guidance
     guidance=Guidance()
+    with gr.Row(equal_height=True,show_progress=True,elem_classes='whole'):
+        with gr.Column(min_width=200,elem_classes='bot'):
+            if guidance.history:
+                guidance.create_guidance(greeting=False)
+            else:
+                guidance.create_guidance(greeting=True)
 
-    @gr.render(inputs=steps)
-    def render_steps(step_list: List[Dict[str, bool]]):
-        with gr.Row(equal_height=True,show_progress=True,elem_classes='whole'):
-            with gr.Column(min_width=200,elem_classes='bot'):
-                if guidance.history:
-                    guidance.create_guidance(greeting=False)
-                else:
-                    guidance.create_guidance(greeting=True)
-
+        @gr.render(inputs=steps)
+        def render_steps(step_list: List[Dict[str, bool]]):
             with gr.Column(min_width=300,elem_classes='interactive'):
                 for step in step_list:
                     with gr.Tab(step['name'],interactive=step['Interactive']):
