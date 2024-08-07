@@ -215,12 +215,13 @@ class Guidance:
             with gr.Row():
                 if greeting:
                     self.history.append([None,self.greetingmsg])
+
                 self.chat=gr.Chatbot(
                     value=self.history,
                     label="Chat with Avery",
                     show_copy_button=True,
                     elem_classes="chat",
-                    height="80%"
+                    height="600px"
                 )
 
             with gr.Row():

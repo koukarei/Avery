@@ -28,32 +28,7 @@ def initialize_steps():
 def initialize_cur_step():
     return 0
 
-css="""
-.bot {
-    height: 100%;
-    box-sizing: border-box;
-}
-
-.chat {
-  height: 80%; /* Ensures the height respects the max-height constraint */
-  box-sizing: border-box; /* Includes padding and border in the element's total width and height */
-}
-
-.interactive {
-    height: 100%;
-    box-sizing: border-box;
-}
-
-.whole {
-    display: flex;
-}
-
-.bot, .interactive {
-    flex: 1;
-}
-"""
-
-with gr.Blocks(css=css) as demo:
+with gr.Blocks() as demo:
     round=Round()
     round.cur_step=gr.State(initialize_cur_step())
     steps=gr.State(initialize_steps())
