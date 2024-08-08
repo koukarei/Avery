@@ -14,8 +14,8 @@ def generateSentence(image,story):
     messages=[
       {"role": "system", "content": """
         You must descibe the image given by the user. 
-        Your output must be winthin 3 sentences. 
-        Total length of the output must be less than 200 characters. 
+        Your output must be winthin 2 sentences. 
+        Total length of the output must be less than 150 characters. 
         You can make reference to the story given by the user.
        """},
       {"role": "user", "content": [
