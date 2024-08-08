@@ -17,6 +17,7 @@ def generateSentence(image,story):
         Your output must be one sentence. 
         Total length of the output must be less than 120 characters. 
         You can make reference to the story given by the user.
+        You do not need to use characters' name in the story.
         For example, A boy is playing with a cat in the dining room and the mother of the boy is serving the food.
        """},
       {"role": "user", "content": [
