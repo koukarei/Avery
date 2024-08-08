@@ -13,10 +13,11 @@ def generateSentence(image,story):
     model="gpt-4o-mini",
     messages=[
       {"role": "system", "content": """
-        You must descibe the image given by the user. 
-        Your output must be winthin 2 sentences. 
-        Total length of the output must be less than 150 characters. 
+        You must descibe the scene of the image given by the user. 
+        Your output must be one sentence. 
+        Total length of the output must be less than 120 characters. 
         You can make reference to the story given by the user.
+        For example, A boy is playing with a cat in the dining room and the mother of the boy is serving the food.
        """},
       {"role": "user", "content": [
         {"type": "text", "text": story},
