@@ -20,7 +20,7 @@ class Result:
         # self.total=None
         # self.rank=None
         # self.leaderboard_btn=None
-        pass
+        pass   
         
     def get_params(self,cur_round:Round):
         self.round=cur_round
@@ -111,7 +111,7 @@ class Result:
                 self.rank.value
             ]
             writer.writerow(new_row)
-        
+
 
     # def ssim_ai_behavior(self,img):
     #     self.score.ssim_ai_behavior(img=img)

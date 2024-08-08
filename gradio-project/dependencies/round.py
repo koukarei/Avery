@@ -13,10 +13,10 @@ import requests
 import Levenshtein
 from function.sentence import genSentences
 from function.cefr_few_shot import predict_cefr_en_level
+from function.get_embedding import get_embedding,cosine_similarity
 import os
 
-import torch
-import clip
+import numpy as np
 
 def encode_image(image_path):
     pilImage = PIL.Image.open(io.BytesIO(requests.get(image_path).content))
@@ -29,6 +29,7 @@ class Round():
         self.cur_step=gr.State(0)
         self.leaderboardId=leaderboardId
         self.original_picture=None
+        self.story=None
         self.sentence=None
         self.corrected_sentence=None
         self.is_draft=True
@@ -41,6 +42,7 @@ class Round():
         self.set_id()
         self.cur_step=gr.State(0)
         self.original_picture=None
+        self.story=None
         self.sentence=None
         self.corrected_sentence=None
         self.ai_play=None
@@ -65,6 +67,8 @@ class Round():
         else:
             self.original_picture_path=img_path
             self.original_picture = PIL.Image.open(img_path)
+            with open(os.path.join('data','text_files','01_The tale of two bad mice.txt'),'r') as f:
+                self.story=f.read()
 
     def set_interpreted_picture(self,img):
         if isinstance(img,str):
@@ -86,36 +90,21 @@ class Round():
         return self.semantic_score
 
     def cosine_similarity(self):
+        
         if self.effectiveness_score is not None:
             return self.effectiveness_score
-        # デバイスの指定
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-
-        # CLIPモデルの読み込み
-        model, preprocess = clip.load("ViT-B/32", device=device)
-
-        # 画像の読み込みと前処理
-        image = preprocess(self.original_picture).unsqueeze(0).to(device)
-
-        # テキストの読み込みと前処理
-        target_text = clip.tokenize([self.corrected_sentence]).to(device)
-        ai_play = genSentences(self.original_picture_path)
-        phrase_text = clip.tokenize(ai_play).to(device)
-        self.ai_play=ai_play
         
+        ai_play = genSentences(self.original_picture_path,self.story)
+        self.ai_play=ai_play
+        avg_embedding = lambda list: np.mean(list, axis=0)
 
-        # 画像とテキストの類似度を計算
-        with torch.no_grad():
-            image_features = model.encode_image(image)
-            text_features = model.encode_text(phrase_text)
-            
-            similarity = (image_features @ text_features.T)
+        user_embedding = get_embedding(self.corrected_sentence)
 
-            target_text_features = model.encode_text(target_text)
-            
-            target_similarity = (image_features @ target_text_features.T)
-            normalized_similarity = target_similarity / similarity.norm(dim=-1, keepdim=True)
-            result=normalized_similarity.tolist()[0][0]
+        result=cosine_similarity(
+            user_embedding,
+            avg_embedding([get_embedding(i) for i in ai_play])
+        )
+
         self.effectiveness_score=result
         return self.effectiveness_score
 

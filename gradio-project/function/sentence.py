@@ -6,7 +6,7 @@ def encode_image(image_path):
   with open(image_path, "rb") as image_file:
     return base64.b64encode(image_file.read()).decode('utf-8')
 
-def generateSentence(image):
+def generateSentence(image,story):
   #base64_image = encode_image(image)
   client=OpenAI()
   completion = client.chat.completions.create(
@@ -15,10 +15,11 @@ def generateSentence(image):
       {"role": "system", "content": """
         You must descibe the image given by the user. 
         Your output must be winthin 3 sentences. 
-        Total length of the output must be less than 200 characters.
+        Total length of the output must be less than 200 characters. 
+        You can make reference to the story given by the user.
        """},
       {"role": "user", "content": [
-        # {"type": "text", "text": "What’s in this image?"},
+        {"type": "text", "text": story},
         {
           "type": "image_url",
           "image_url": {
@@ -29,15 +30,14 @@ def generateSentence(image):
       }
     ]
   )
-
   return completion.choices[0].message
 
-def genSentences(image,amt=3):
+def genSentences(image,story,amt=3):
     gen_Sentences=[]
     if "http" not in image:
        image="data:image/jpeg;base64,{}".format(encode_image(image))
     for i in range(amt):
-        gen_Sentences.append(generateSentence(image).content)
+        gen_Sentences.append(generateSentence(image,story).content)
     return gen_Sentences
 
 def checkSentence(sentence,temp=0.3):

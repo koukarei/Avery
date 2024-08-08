@@ -55,8 +55,9 @@ with gr.Blocks() as demo:
                                     for step in step_list:
                                         step['Interactive'] = False
                                     step_list[1]['Interactive'] = True
-                                    chat_history=guidance.set_image(gallery.selected)
+                                    
                                     round.set_original_picture(gallery.selected)
+                                    chat_history=guidance.set_image(gallery.selected,round.story)
                                     return step_list,chat_history
                                 else:
                                     gr.Warning("Please select an image.")
@@ -73,12 +74,15 @@ with gr.Blocks() as demo:
                                         sentence=sentence.original_sentence,
                                         corrected_sentence=sentence.checked_value
                                     )
-                                
+                                    chat_history=guidance.set_sentence(
+                                        sentence=sentence.checked_value
+                                    )
                                 else:
                                     gr.Warning("Please check the sentence.")
-                                return step_list
+                                    chat_history=guidance.history
+                                return step_list,chat_history
                             
-                            gr.on(triggers=[sentence.submit_btn.click],fn=verify_page,inputs=[steps],outputs=[steps],concurrency_limit=1)
+                            gr.on(triggers=[sentence.submit_btn.click],fn=verify_page,inputs=[steps],outputs=[steps,guidance.chat],concurrency_limit=1)
 
                         elif step['name']=="Verify" and step['Interactive']:
                             interpreted_image.create_interpreted_image(sentence.image.value['path'],sentence.checked_value)
