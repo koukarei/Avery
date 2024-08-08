@@ -60,7 +60,7 @@ with gr.Blocks() as demo:
                                     return step_list,chat_history
                                 else:
                                     gr.Warning("Please select an image.")
-                            gr.on(triggers=[gallery.submit_btn.click],fn=submit_image,inputs=[steps],outputs=[steps,guidance.chat])
+                            gr.on(triggers=[gallery.submit_btn.click],fn=submit_image,inputs=[steps],outputs=[steps,guidance.chat],concurrency_limit=1)
                         elif step['name']=="Sentence" and step['Interactive']:
                             sentence.create_sentence(gallery.selected)
                             def verify_page(step_list):
@@ -78,7 +78,7 @@ with gr.Blocks() as demo:
                                     gr.Warning("Please check the sentence.")
                                 return step_list
                             
-                            gr.on(triggers=[sentence.submit_btn.click],fn=verify_page,inputs=[steps],outputs=[steps])
+                            gr.on(triggers=[sentence.submit_btn.click],fn=verify_page,inputs=[steps],outputs=[steps],concurrency_limit=1)
 
                         elif step['name']=="Verify" and step['Interactive']:
                             interpreted_image.create_interpreted_image(sentence.image.value['path'],sentence.checked_value)
@@ -99,7 +99,7 @@ with gr.Blocks() as demo:
                                         scoring=scoring
                                     )
                                     return step_list,guidance.history
-                            interpreted_image.submit_btn.click(scoring_page,inputs=[steps],outputs=[steps,guidance.chat])
+                            interpreted_image.submit_btn.click(scoring_page,inputs=[steps],outputs=[steps,guidance.chat],concurrency_limit=1)
                         elif step['name']=="Results" and step['Interactive']:
                             result.create_result_tab()
                             round.set_interpreted_picture(interpreted_image.interpreted_img_content)
@@ -115,7 +115,7 @@ with gr.Blocks() as demo:
                                 guidance.chat.value=[]
                                 return step_list
                             
-                            gr.on(triggers=[result.restart_btn.click],fn=restart,inputs=[steps],outputs=[steps])
+                            gr.on(triggers=[result.restart_btn.click],fn=restart,inputs=[steps],outputs=[steps],concurrency_limit=1)
 
                             
                         elif step['name']=="Leaderboard":
