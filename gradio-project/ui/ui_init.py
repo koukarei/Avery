@@ -269,7 +269,7 @@ Sentence: {}
             history.append(new)
             game_data['chat_history'].append(new)
             
-        elif message is not None:
+        elif message is not None and message!="":
             hint=self.chatbot.nextResponse(message,history,game_data['original_picture'])
             history.append((message, hint))
             game_data['chat_history'].append((message, hint))
