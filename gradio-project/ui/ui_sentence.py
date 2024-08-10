@@ -6,12 +6,10 @@ class Sentence:
     """
 
     def __init__(self):
-        self.original_sentence=None
         self.sentence=None
         self.check_btn=None
         self.checked_sentence=None
         self.submit_btn=None
-        self.checked_value=None
         self.image=None
 
     def create_image(self,image):
@@ -30,23 +28,7 @@ class Sentence:
         self.check_btn=gr.Button("Check your sentence",scale=0)
 
         self.checked_sentence=gr.Textbox(label='Checked Sentence',interactive=False)
-
-        def check_sentence(sentence):
-            if sentence:
-                from function.sentence import checkSentence
-                self.original_sentence=sentence
-                self.checked_value=checkSentence(sentence)
-                if self.checked_value== "Please enter an English sentence.":
-                    gr.Info("Please enter an English sentence.")
-                elif self.checked_value== "Please enter a valid English sentence.":
-                    gr.Info("Please enter a valid English sentence.")
-                elif self.checked_value== "Please avoid offensive language.":
-                    gr.Info("Please avoid offensive language.")
-                else:
-                    return self.checked_value
-            else:
-                gr.Warning("Please type a sentence.")
-        self.check_btn.click(check_sentence,[self.sentence],[self.checked_sentence])
+        
         self.submit_btn=gr.Button("Send to Skyler",scale=0)
         
     

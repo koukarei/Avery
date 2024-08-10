@@ -9,7 +9,13 @@ class InterpretedImage:
         self.interpreted_image=None
         self.submit_btn=None
 
+    def set_sentence(self,sentence:str):
+        self.sentence=sentence
+
     def create_interpreted_image(self,image,sentence:str):
+        if sentence is None:
+            gr.Info("Please enter a sentence.")
+            return None
         self.image=gr.Image(value=image,label='Image', interactive=False)
         from function.gen_image import generate_interpretion
         image_url=generate_interpretion(sentence)

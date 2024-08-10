@@ -24,117 +24,77 @@ def encode_image(image_path):
 
 class Round():
 
-    def __init__(self,leaderboardId:Union[str,None]=None):
-        self.set_id()
-        self.cur_step=gr.State(0)
-        self.leaderboardId=leaderboardId
-        self.original_picture=None
-        self.story=None
-        self.sentence=None
-        self.corrected_sentence=None
-        self.is_draft=True
-        self.phrases=None
-        self.semantic_score=None
-        self.vocab_score=None
-        self.effectiveness_score=None
-
-    def reset(self):
-        self.set_id()
-        self.cur_step=gr.State(0)
-        self.original_picture=None
-        self.story=None
-        self.sentence=None
-        self.corrected_sentence=None
-        self.ai_play=None
-        self.is_draft=True
-        self.phrases=None
-        self.semantic_score=None
-        self.vocab_score=None
-        self.effectiveness_score=None
-
     def set_id(self):
         timestamp = str(int(time.time()))
         unique_id = uuid.uuid4().hex
         self.id=f"ID-{timestamp}-{unique_id}"
+        return self.id
 
     def set_original_picture(self,img_path:str):
         if "https:" in img_path:
             image_path = "https:"+img_path.split("https:")[1]
-            self.original_picture_path=image_path
+            original_picture_path=image_path
             b=io.BytesIO(requests.get(image_path).content)
             base64_image = base64.b64encode(b.read()).decode('utf-8')
-            self.original_picture = PIL.Image.open(io.BytesIO(requests.get(image_path).content))
+            original_picture = PIL.Image.open(io.BytesIO(requests.get(image_path).content))
         else:
-            self.original_picture_path=img_path
-            self.original_picture = PIL.Image.open(img_path)
+            original_picture_path=img_path
+            original_picture = PIL.Image.open(img_path)
             with open(os.path.join('data','text_files','01_The tale of two bad mice.txt'),'r') as f:
-                self.story=f.read()
+                story=f.read()
+        return original_picture_path,original_picture,story
 
     def set_interpreted_picture(self,img):
         if isinstance(img,str):
-            self.interpreted_picture = PIL.Image.open(img)
+            interpreted_picture = PIL.Image.open(img)
         else:
-            self.interpreted_picture = img
+            interpreted_picture = img
+        return interpreted_picture
 
-    def set_chat_history(self,chat:str):
-        self.chat_history=chat
+    def semantic_similarity(self,sentence:str,corrected_sentence:str):
+        semantic_score=Levenshtein.ratio(sentence,corrected_sentence)
+        return semantic_score
 
-    def set_sentence(self,sentence:str,corrected_sentence:str):
-        self.sentence=sentence
-        self.corrected_sentence=corrected_sentence
-
-    def semantic_similarity(self):
-        if self.semantic_score is not None:
-            return self.semantic_score
-        self.semantic_score=Levenshtein.ratio(self.sentence,self.corrected_sentence)
-        return self.semantic_score
-
-    def cosine_similarity(self):
+    def cosine_similarity(self,original_picture_path:str,story:str,corrected_sentence:str):
         
-        if self.effectiveness_score is not None:
-            return self.effectiveness_score
+        ai_play = genSentences(original_picture_path,story)
         
-        ai_play = genSentences(self.original_picture_path,self.story)
-        self.ai_play=ai_play
         avg_embedding = lambda list: np.mean(list, axis=0)
 
-        user_embedding = get_embedding(self.corrected_sentence)
+        user_embedding = get_embedding(corrected_sentence)
 
         result=cosine_similarity(
             user_embedding,
             avg_embedding([get_embedding(i) for i in ai_play])
         )
 
-        self.effectiveness_score=result
-        return self.effectiveness_score
+        return result,ai_play
 
-    def vocab_difficulty(self):
-        if self.vocab_score is not None:
-            return self.vocab_score
-        few_shot=predict_cefr_en_level(self.corrected_sentence)
+    def vocab_difficulty(self,corrected_sentence:str):
+        few_shot=predict_cefr_en_level(corrected_sentence)
         if few_shot == "A1":
-            self.vocab_score=0.1
+            vocab_score=0.1
         elif few_shot == "A2":
-            self.vocab_score=0.3
+            vocab_score=0.3
         elif few_shot == "B1":
-            self.vocab_score=0.5
+            vocab_score=0.5
         elif few_shot == "B2":
-            self.vocab_score=0.7
+            vocab_score=0.7
         elif few_shot == "C1":
-            self.vocab_score=0.9
+            vocab_score=0.9
         elif few_shot == "C2":
-            self.vocab_score=1.0
-        return self.vocab_score
+            vocab_score=1.0
+        return vocab_score
 
-    def total_score(self):
-        cosine_similarity=self.cosine_similarity()
-        semantic_similarity=self.semantic_similarity()
-        vocab_difficulty=self.vocab_difficulty()
+    def total_score(self,sentence:str,corrected_sentence:str,original_picture_path:str,story:str):
+        cosine_similarity,ai_example=self.cosine_similarity(original_picture_path,story,corrected_sentence)
+        semantic_similarity=self.semantic_similarity(sentence,corrected_sentence)
+        vocab_difficulty=self.vocab_difficulty(corrected_sentence)
         total_score=(cosine_similarity+semantic_similarity+vocab_difficulty)/3
-        return total_score
+        rank=self.rank(total_score)
+        return cosine_similarity,semantic_similarity,vocab_difficulty,total_score,rank,ai_example
 
-    def rank(self):
-        total_score=self.total_score()
+    def rank(self,total_score):
         if total_score>0.8:
             return "A"
         elif total_score>0.6:

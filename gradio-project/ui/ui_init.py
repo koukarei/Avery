@@ -8,6 +8,7 @@ import requests
 import base64
 import PIL.Image
 from PIL.PngImagePlugin import PngImageFile
+from PIL.JpegImagePlugin import JpegImageFile
 import os
 from dotenv import load_dotenv
 import datetime
@@ -22,6 +23,8 @@ def convert_image(img):
     if img:
         if isinstance(img, PngImageFile):
             return img
+        elif isinstance(img, JpegImageFile):
+            return img
         try:
             pilImage = PIL.Image.open(io.BytesIO(requests.get(img).content))
         except:
@@ -29,66 +32,79 @@ def convert_image(img):
         return pilImage
     return None
 
-def convert_history(history):
+def convert_history(original):
     # raw history format=[[None, "Hello"], [None, "How are you?"]]
     # new converted history format=[
     #     {"parts": [{"text": "Hello"}]},
     #     {"parts": [{"text": "How are you?"}]}
     # ]
-    converted_history = []
-    for i in history:
-        # Skip None messages
-        if i[0] is not None:
-            if isinstance(i[0], list):
-                for j in i[0]:
-                    if isinstance(j, str):
-                        converted_history.append({
-                            "role": "user",
-                            "parts": [{"text": j}]
-                        })
-                    elif isinstance(j, PIL.Image.Image):
-                        # Handle image object
-                        buffered = io.BytesIO()
-                        j.save(buffered, format="PNG")
-                        img_str = base64.b64encode(buffered.getvalue()).decode()
-                        converted_history.append({
-                            "role": "user",
-                            "parts": [{
-                                "mime_type": "image/png", 
-                                "data": img_str,
-                            }]
-                        })
-                    elif isinstance(j, genlang_content.Content):
-                        if j.parts.text:
-                            converted_history.append({
-                                "role": "user",
-                                "parts": [{"text": part.text} for part in j.parts if part.text]
-                            })
-                        elif j.parts.inline_data:
-                            converted_history.append({
-                                "role": "user",
-                                "inline_data": {"mime_type": j.parts.mime_type, "data": j.parts.inline_data.data}
-                            })
-                        converted_history.append(j)
-                    else:
-                        if j.parts.text:
-                            converted_history.append({"role":"user","parts": [{"text": part.text} for part in j.parts if part.text]})
-                        elif j.parts.inline_data:
-                            converted_history.append({"inline_data": {"mime_type": j.parts.mime_type, "data": j.parts.inline_data.data}})
-                        converted_history.append(j)
+
+    target = {
+        "contents": [],
+    }
+    
+    # Extract data from the original format
+    for entry in original:
+        if entry[0]:
+            
+            if isinstance(entry[0], str):  # Text entry
+                role = "user"
+                target["contents"].append({
+                    "role": role,
+                    "parts": [{
+                        "text": entry[1]
+                    }]
+                })
+            elif isinstance(entry[0], list):  # File entry
+                mime_type = entry[0][0]
+                file_uri = entry[0][1]
+                target["contents"].append({
+                    "role": "user",
+                    "parts": [{
+                        "fileData": {
+                            "mimeType": mime_type,
+                            "fileUri": file_uri
+                        }
+                    }]
+                })
+            elif isinstance(entry[0],PngImageFile):
+                target["contents"].append({
+                    "role": "user",
+                    "parts": [{
+                        "fileData": {
+                            "mimeType": "image/png",
+                            "fileUri": "data:image/png;base64," + base64.b64encode(io.BytesIO(entry[0]).read()).decode()
+                        }
+                    }]
+                })
+            elif isinstance(entry[0],JpegImageFile):  # Image entry
+                target["contents"].append({
+                    "role": "user",
+                    "parts": [{
+                        "fileData": {
+                            "mimeType": "image/jpeg",
+                            "fileUri": "data:image/jpeg;base64," + base64.b64encode(io.BytesIO(entry[0]).read()).decode()
+                        }
+                    }]
+                })
             else:
-                converted_history.append({"parts": [{"text": i[0]}]})
-        if i[1] is not None:
-            converted_history.append({
+                raise ValueError("Unknown entry type")
+        
+        if entry[1]:
+            target["contents"].append({
                 "role": "model",
-                "parts": [{"text": i[1]}]
+                "parts": [{
+                    "text": entry[1]
+                }]
             })
-    return converted_history
+    
+    return target['contents']
+        
 
 class Hint_Chatbot:
-    def __init__(self,greetingmsg):
+    def __init__(self):
         genai.configure(api_key=GENAI_API_KEY)
-        self.chat_history=[[None,greetingmsg]]
+        
         system_prompt = f"""
 Your name is Avery. 
 You are a robot. 
@@ -115,14 +131,14 @@ If the user's sentence fits to original image, you should ask the user to import
         )
 
         self.model=model
-        self.chat=model.start_chat(history=[])
-        self.original_image=None
 
-    def add_image(self, img,story):
+    def add_image(self, img,story,chat_history):
+        chat=self.model.start_chat(history=convert_history(chat_history))
         messages=[]
         messages.append(story)
+        #messages.append({'role':'user','Content':{'parts':[{'text':story}]}})
         if img:
-            self.original_image=img
+            
             if isinstance(img, list):
                 for i in img:
                     pilImage = convert_image(i)
@@ -130,13 +146,13 @@ If the user's sentence fits to original image, you should ask the user to import
             else:
                 pilImage = convert_image(img)
                 messages.append(pilImage)
-            response=self.chat.send_message(messages)
-            self.chat_history.append([messages,response.text])
+            response=chat.send_message(messages)
             return response.text
         return ''
     
-    def nextResponse(self, ask_for_hint):
+    def nextResponse(self, ask_for_hint,chat_history,original_image):
         messages=[]
+        messages.append(convert_image(original_image))
         messages.append(ask_for_hint)
 
         if len(messages)==0:
@@ -144,8 +160,8 @@ If the user's sentence fits to original image, you should ask the user to import
             return {}
 
         try:
-            response=self.chat.send_message(messages)
-            self.chat_history.append([messages,response.text])
+            chat=self.model.start_chat(history=convert_history(chat_history))
+            response=chat.send_message(messages)
             return response.text
         except Exception as e:
             print(f"Error: {e}")
@@ -153,7 +169,7 @@ If the user's sentence fits to original image, you should ask the user to import
             return {}
         
 
-    def get_result(self,generated_image, sentence,scoring):
+    def get_result(self,generated_image, sentence,scoring,original_image,chat_history):
         system_prompt = f"""
 Your name is Avery. 
 You are a robot. 
@@ -185,14 +201,14 @@ Vocabulary Score is CEFR level of the user's sentence.
             model_name="models/gemini-1.5-flash",
             system_instruction=system_prompt,
         )
-        converted_history=convert_history(self.chat_history)
+        converted_history=convert_history(chat_history)
         chat=model.start_chat(history=converted_history)
         messages=[]
         prompt="User's sentence: {}\nSkyler's image:".format(sentence)
         messages.append(prompt)
         messages.append(convert_image(generated_image))
         messages.append("Original image: ")
-        messages.append(convert_image(self.original_image))
+        messages.append(convert_image(original_image))
         messages.append("Scoring: {}".format(scoring))
         response=chat.send_message(messages)
         return response.text
@@ -200,28 +216,14 @@ Vocabulary Score is CEFR level of the user's sentence.
 class Guidance:
     """"Create a guidance object for the user interface."""
     def __init__(self):
-        self.greetingmsg="""
-            Greetings, human. 🤖 I am Avery the Robot. 📸
+        self.chatbot=Hint_Chatbot()
 
-            Let's try to select an image and get the best scoring! 🛠️
-
-            1. Select image. 🖼️
-            2. Use complete sentence to describe the image. 🗣️
-            3. Skyler the Robot will process and generate an image based on your sentence. Verify its output. ✅
-            4. Your sentences will be scored by relevance, vocabulary and grammar. 📊
-            """
-        self.chatbot=Hint_Chatbot(greetingmsg=self.greetingmsg)
-        self.history=[]
-
-    def create_guidance(self,greeting=False):
+    def create_guidance(self,chat_history):
         
         with gr.Column(elem_classes="guidance"):
             with gr.Row():
-                if greeting:
-                    self.history.append([None,self.greetingmsg])
-
                 self.chat=gr.Chatbot(
-                    value=self.history,
+                    value=chat_history,
                     label="Chat with Avery",
                     show_copy_button=True,
                     elem_classes="chat",
@@ -231,44 +233,46 @@ class Guidance:
             with gr.Row():
                 with gr.Column(scale=2,min_width=200):
                     self.msg=gr.Textbox(placeholder="Type your message to Avery here.",label="Your message to Avery 🤖")
-                    self.msg.submit(self.slow_echo,[self.msg,self.chat],[self.msg,self.chat])
+                    
                 with gr.Column(scale=1,min_width=80):
                     self.submit=gr.Button("Ask Avery for hint")
-                    self.submit.click(self.slow_echo,[self.msg,self.chat],[self.msg,self.chat])
+                  
 
     def reset(self):
-        self.chatbot=Hint_Chatbot(greetingmsg=self.greetingmsg)
+        self.chatbot=Hint_Chatbot()
         
-    def set_image(self, img,story):
-        response=self.chatbot.add_image(img,story)
+    def set_image(self, img,story,chat_history):
+        response=self.chatbot.add_image(img,story,chat_history)
         if response:
-            self.history.append([None,"The image is imported to my system. You can ask me for a hint."])
+            chat_history.append([None,"The image is imported to my system. You can ask me for a hint."])
         else:
-            self.history.append([None,"No image is imported to my system, human."])
-        return self.history
+            chat_history.append([None,"No image is imported to my system, human."])
+        self.chat.value=chat_history
+        return chat_history
 
-    def set_sentence(self, sentence):
+    def set_sentence(self, sentence,chat_history):
         new_message="""
 We input the sentence into Skyler's system. 📝
 Sentence: {}
 """.format(sentence)
-        self.history.append([None,new_message])
-        return self.history
+        chat_history.append([None,new_message])
+        return chat_history
 
-    def set_interpreted_image(self,sentence,interpreted_image,scoring):
-        response=self.chatbot.get_result(interpreted_image,sentence,scoring)
-        self.history.append([None,response])
-        return self.history
+    def set_interpreted_image(self,sentence,interpreted_image,scoring,original_image,chat_history):
+        response=self.chatbot.get_result(interpreted_image,sentence,scoring,original_image,chat_history)
+        chat_history.append([None,response])
+        return chat_history
 
-    def slow_echo(self,message, history):
-        if self.chatbot.original_image is None:
-            history.append((message, "No image is imported to my system, human.\nI cannot provide you with a hint."))
-            self.history=history
-            return "", history
-        else:
-            hint=self.chatbot.nextResponse(message)
+    def slow_echo(self,message, history,game_data):
+        if game_data['original_picture'] is None:
+            new=[message,"No image is imported to my system, human.\nI cannot provide you with a hint."]
+            history.append(new)
+            game_data['chat_history'].append(new)
+            
+        elif message is not None:
+            hint=self.chatbot.nextResponse(message,history,game_data['original_picture'])
             history.append((message, hint))
-            self.history=history
-            return "", history
+            game_data['chat_history'].append((message, hint))
+        return "", history,game_data
             
         

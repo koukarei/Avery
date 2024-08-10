@@ -38,7 +38,7 @@ class Gallery:
         self.ai_img=None
         self.transform_img=None
     
-    def create_gallery(self,round:Round):
+    def create_gallery(self):
         with gr.Column(elem_classes="gallery"):
             self.image = gr.Image(value=None, label="Original Picture", interactive=False, visible=False)
             # if testing:
@@ -60,18 +60,3 @@ class Gallery:
         self.selected=evt.value['image']['path']
         return evt.value['image']['path']
         
-    def hide_gallery(self):
-        self.gallery.visible=False
-        self.submit_btn.visible=False
-
-    def show_gallery(self):
-        self.gallery.visible=True
-        self.submit_btn.visible=True
-
-    def get_selected_image(self):
-        self.image.visible=True
-        return self.image
-
-    def remove_selected_image(self):
-        self.image.visible=False
-        return self.image
