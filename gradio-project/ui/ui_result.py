@@ -50,8 +50,8 @@ class Result:
         )
         self.example=gr.Textbox(example,label='Example',interactive=False)
         self.effectiveness=gr.Textbox(self.effectiveness_score,label='Effectiveness',interactive=False)
-        self.grammar=gr.Textbox(self.grammar_score,interactive=False)
-        self.vocab=gr.Textbox(self.vocab_score,interactive=False)
+        self.grammar=gr.Textbox(self.grammar_score,label='Grammar',interactive=False)
+        self.vocab=gr.Textbox(self.vocab_score,label='Vocabulary',interactive=False)
         self.total=gr.Textbox(self.total_score,label='Total',interactive=False)
         self.rank=gr.Textbox(self.rank_level,label='Rank',interactive=False)
         with gr.Row():
