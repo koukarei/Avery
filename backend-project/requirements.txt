@@ -1,0 +1,8 @@
+fastapi[standard]
+sqlalchemy
+psycopg2-binary
+pymysql
+pydantic 
+databases
+pydantic[email]
+cryptography

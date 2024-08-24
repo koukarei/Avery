@@ -8,4 +8,41 @@ services:
       - "7870:7860"
     tty: true
     volumes:
-      - ./gradio-project:/app
+      - ./gradio-project:/app/gradio
+      
+  backend-project:
+    build:
+      context: backend-project
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend-project:/backend
+    command: fastapi dev --host 0.0.0.0 --port 8000 /backend/main.py
+    ports:
+      - "7871:8000"
+    tty: true
+    environment:
+      DATABASE_URL: mysql+pymysql://user:password@mysql:3306/avery_db
+
+  db:
+    build:
+      context: db-project
+      dockerfile: Dockerfile
+    container_name: mysql
+    command: mysqld --character-set-server=utf8 --collation-server=utf8_unicode_ci
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: hogehoge
+      MYSQL_DATABASE: avery_db
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+      TZ: 'Asia/Tokyo'
+    ports:
+        - 7872:3306
+    volumes:
+        - db-store:/var/lib/mysql
+        - ./conf/my.cnf:/etc/mysql/conf.d/my.cnf
+        # ★ ローカルのscriptディレクトリにマウントします
+        - ./db-project/init:/docker-entrypoint-initdb.d 
+volumes:
+  db-store:
+

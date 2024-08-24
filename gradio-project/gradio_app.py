@@ -58,7 +58,6 @@ Let's try to select an image and get the best scoring! 🛠️
         else:
             initial_data["chat_history"]=[[None,greetingmsg]]
         initial_data["round_id"]=rd.set_id()
-        print("new round id: ",initial_data["round_id"])
         return initial_data.copy()
     cur_round=Round()
     gallery=Gallery()
