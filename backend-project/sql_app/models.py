@@ -167,11 +167,17 @@ class InterpretedImage(Base):
 
     round = relationship("Round", back_populates="interpreted_image")
 
-class GoodImage(Base):
-    __tablename__ = "good_images"
+class GoodOriginal(Base):
+    __tablename__ = "good_originals"
 
     player = Column(Integer, ForeignKey("users.id"),primary_key=True)
-    image = Column(Integer, ForeignKey("images.id"),primary_key=True)
+    original = Column(Integer, ForeignKey("original_images.id"),primary_key=True)
+
+class GoodInterpreted(Base):
+    __tablename__ = "good_interpreteds"
+
+    player = Column(Integer, ForeignKey("users.id"),primary_key=True)
+    interpreted = Column(Integer, ForeignKey("interpreted_images.id"),primary_key=True)
 
 class GoodRound(Base):
     __tablename__ = "good_rounds"

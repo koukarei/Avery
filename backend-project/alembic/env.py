@@ -8,9 +8,9 @@ from sqlalchemy import pool
 
 from alembic import context
 
-database_url = os.environ.get('DATABASE_URL')
+database_url = os.environ.get('ROOT_DATABASE_URL')
 if database_url is None:
-    raise ValueError("DATABASE_URL environment variable is not set")
+    raise ValueError("ROOT_DATABASE_URL environment variable is not set")
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

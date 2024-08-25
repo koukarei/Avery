@@ -5,8 +5,16 @@ import datetime
 class ImageBase(BaseModel):
     image_path: str
 
-class Image(ImageBase):
+class OriginalImage(ImageBase):
     id: int
+    leaderboard_id: int
+
+    class Config:
+        orm_mode = True
+
+class InterpretedImage(ImageBase):
+    id: int
+    round_id: int
 
     class Config:
         orm_mode = True
@@ -55,9 +63,9 @@ class UserProfileBase(BaseModel):
 
 class LeaderboardBase(BaseModel):
     title: str
-    original_image_id: int
-    scene_id: int
-    story_id: int
+    original_image: int
+    scene: int
+    story: int
     story_extract: str
 
 class VocabularyBase(BaseModel):
@@ -80,9 +88,9 @@ class Leaderboard(LeaderboardBase):
 
 
 class RoundBase(BaseModel):
-    user_id: int
-    leaderboards_id: int
-    chat_history_id: int
+    player_id: int
+    leaderboards: int
+    chat_history: int
 
 class Round(RoundBase):
     id: int
@@ -103,7 +111,7 @@ class RoundCorrectSentence(RoundSentence):
         orm_mode = True
 
 class RoundInterpretation(RoundCorrectSentence):
-    interpreted_image_id: int
+    interpreted_image: int
 
 class RoundComplete(RoundInterpretation):
     grammar_score: int
