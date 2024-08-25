@@ -1,2 +1,1 @@
 FROM mysql:8
-

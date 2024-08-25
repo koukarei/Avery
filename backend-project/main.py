@@ -5,7 +5,7 @@ from sql_app.main import app as subapi
 
 app = FastAPI()
 
-app.mount("/subapi", subapi)
+app.mount("/sqlapp", subapi)
 
 @app.get("/")
 def read_root():

@@ -1,8 +1,9 @@
-fastapi[standard]
-sqlalchemy
-psycopg2-binary
-pymysql
-pydantic 
-databases
-pydantic[email]
-cryptography
+fastapi[standard]==0.112.1
+pydantic[email]==2.8.2
+cryptography==43.0.0
+databases==0.9.0
+psycopg2-binary==2.9.9
+PyMySQL==1.1.1
+SQLAlchemy==2.0.32
+uvicorn==0.30.6
+alembic==1.13.2
