@@ -63,9 +63,9 @@ class UserProfileBase(BaseModel):
 
 class LeaderboardBase(BaseModel):
     title: str
-    original_image: int
-    scene: int
-    story: int
+    original_image_id: int
+    scene_id: int
+    story_id: int
     story_extract: str
 
 class VocabularyBase(BaseModel):
@@ -89,7 +89,7 @@ class Leaderboard(LeaderboardBase):
 
 class RoundBase(BaseModel):
     player_id: int
-    leaderboards: int
+    leaderboard: int
     chat_history: int
 
 class Round(RoundBase):
@@ -111,7 +111,7 @@ class RoundCorrectSentence(RoundSentence):
         orm_mode = True
 
 class RoundInterpretation(RoundCorrectSentence):
-    interpreted_image: int
+    interpreted_image_id: int
 
 class RoundComplete(RoundInterpretation):
     grammar_score: int
@@ -124,7 +124,6 @@ class RoundComplete(RoundInterpretation):
 
 class UserProfile(UserProfileBase):
     id: int
-    user_id: int
 
     rounds: list[Round]=[]
 
@@ -141,8 +140,8 @@ class User(UserBase):
 
 class StoryBase(BaseModel):
     title: str
-    content: str
-    scene_id: int
+    textfile_path: str
+    scene: int
 
 class Story(StoryBase):
     id: int
@@ -153,7 +152,7 @@ class Story(StoryBase):
 class PersonalDictionaryBase(BaseModel):
     user_id: int
     vocabulary_id: int
-    save_at_round: int
+    save_at_round_id: int
 
 class PersonalDictionaryCreate(PersonalDictionaryBase):
     id: int
@@ -178,6 +177,14 @@ class PersonalDictionary(PersonalDictionaryBase):
 class GoodImage(BaseModel):
     player_id: int
     image_id: int
+
+class GoodOriginal(BaseModel):
+    player: int
+    original: int
+
+class GoodInterpreted(BaseModel):
+    player: int
+    interpreted: int
 
 class GoodRound(BaseModel):
     player_id: int

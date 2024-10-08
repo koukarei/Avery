@@ -45,7 +45,7 @@ class Story(Base):
 
     id = Column(Integer, primary_key=True)
     title = Column(String(255), index=True)
-    content = Column(TEXT(65535), index=True)
+    textfile_path = Column(String(255), index=True)
     scene=Column(Integer,ForeignKey("scenes.id"))
     
     vocabularies = relationship("Vocabulary",secondary="story_vocabulary", back_populates="stories")
@@ -107,7 +107,7 @@ class Message(Base):
 
     id = Column(Integer, primary_key=True)
     chat_id = Column(Integer, ForeignKey("chats.id"))
-    content = Column(TEXT(1023), index=True)
+    content = Column(String(255), index=True)
     sender = Column(String(50), index=True)
 
     chat = relationship("Chat", back_populates="messages")

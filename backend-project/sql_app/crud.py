@@ -31,6 +31,12 @@ def create_user(db: Session, user: schemas.UserCreate):
 def get_leaderboards(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Leaderboard).offset(skip).limit(limit).all()
 
+def create_leaderboard(db: Session, leaderboard: schemas.LeaderboardCreate):
+    db_leaderboard = models.Leaderboard(**leaderboard.dict())
+    db.add(db_leaderboard)
+    db.commit()
+    db.refresh(db_leaderboard)
+    return db_leaderboard
 
 def create_round(db: Session, leaderboard_id:int, user_id: int):
     db_chat=models.Chat()
