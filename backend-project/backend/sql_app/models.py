@@ -14,13 +14,14 @@ class User(Base):
     username = Column(String(100), unique=True, index=True)
     hashed_password = Column(String(255))
     is_active = Column(Boolean, default=True)
+    profile_id = Column(Integer, ForeignKey("user_profiles.id"))
 
     profiles = relationship("UserProfile", back_populates="user")
 
 class UserProfile(Base):
     __tablename__ = "user_profiles"
 
-    id = Column(Integer, ForeignKey("users.id"),primary_key=True)
+    id = Column(Integer, primary_key=True)
     display_name = Column(String(100), index=True)
     bio = Column(String(255))
     avatar = Column(String(255))
@@ -29,6 +30,7 @@ class UserProfile(Base):
 
     user = relationship("User", back_populates="profiles")
 
+    leaderboards = relationship("Leaderboard", back_populates="created_by")
     rounds = relationship("Round", back_populates="player")
 
 class Scene(Base):
@@ -38,6 +40,7 @@ class Scene(Base):
     name = Column(String(100), index=True)
     prompt = Column(String(255), index=True)
 
+    stories = relationship("Story", back_populates="scene")
     leaderboards = relationship("Leaderboard", back_populates="scene")
 
 class Story(Base):
@@ -46,8 +49,10 @@ class Story(Base):
     id = Column(Integer, primary_key=True)
     title = Column(String(255), index=True)
     textfile_path = Column(String(255), index=True)
-    scene=Column(Integer,ForeignKey("scenes.id"))
+    scene_id=Column(Integer,ForeignKey("scenes.id"))
     
+    scene = relationship("Scene", back_populates="stories")
+
     vocabularies = relationship("Vocabulary",secondary="story_vocabulary", back_populates="stories")
     leaderboards = relationship("Leaderboard", back_populates="story")
 
@@ -61,7 +66,8 @@ class Leaderboard(Base):
     story_id=Column(Integer,ForeignKey("stories.id"))
     story_extract=Column(String(255), index=True)
 
-    created_by = Column(Integer, ForeignKey("users.id"))
+    created_by_id = Column(Integer, ForeignKey("user_profiles.id"))
+    created_by = relationship("UserProfile", back_populates="leaderboards")
 
     original_image = relationship("OriginalImage", back_populates="leaderboard",foreign_keys=[original_image_id])
     scene = relationship("Scene", back_populates="leaderboards",foreign_keys=[scene_id])
@@ -158,7 +164,7 @@ class OriginalImage(Base):
     image_path = Column(String(255), index=True)
 
     leaderboard = relationship("Leaderboard", back_populates="original_image")
-
+    
 class InterpretedImage(Base):
     __tablename__ = "interpreted_images"
 

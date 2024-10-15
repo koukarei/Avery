@@ -7,7 +7,6 @@ class ImageBase(BaseModel):
 
 class OriginalImage(ImageBase):
     id: int
-    leaderboard_id: int
 
     class Config:
         orm_mode = True
@@ -35,8 +34,6 @@ class Chat(ChatBase):
     class Config:
         orm_mode = True
 
-
-
 class SceneBase(BaseModel):
     name: str
     prompt: str
@@ -53,20 +50,38 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+    display_name: str
+
+    class Config:
+        orm_mode = True
 
 class UserProfileBase(BaseModel):
     display_name: str
     bio: str
     avatar: str
+
+class UserProfileOut(BaseModel):
+    display_name: str
+    level:int
+
+class UserExp(BaseModel):
     level: int
     xp: int
 
+class UserOut(BaseModel):
+    id: int
+    display_name: str
+    level: int
+
 class LeaderboardBase(BaseModel):
     title: str
-    original_image_id: int
+    story_extract: str
+
+class LeaderboardCreate(LeaderboardBase):
     scene_id: int
     story_id: int
-    story_extract: str
+    original_image_id: int
+    created_by_id: int
 
 class VocabularyBase(BaseModel):
     word: str
@@ -78,14 +93,14 @@ class Vocabulary(VocabularyBase):
     class Config:
         orm_mode = True
 
-class Leaderboard(LeaderboardBase):
+class Leaderboard(LeaderboardCreate):
     id: int
+    original_image_id: int
     created_by: int
     vocabularies: list[Vocabulary]=[]
 
     class Config:
         orm_mode = True
-
 
 class RoundBase(BaseModel):
     player_id: int
@@ -94,6 +109,7 @@ class RoundBase(BaseModel):
 
 class Round(RoundBase):
     id: int
+    created_at: datetime.datetime
 
     class Config:
         orm_mode = True
@@ -122,6 +138,19 @@ class RoundComplete(RoundInterpretation):
     duration: int
     is_completed: bool
 
+class RoundOut(BaseModel):
+    id: int
+    player: UserOut
+    interpreted_image: InterpretedImage
+    sentence: str
+    correct_sentence: str
+    total_score: int
+    rank: str
+    duration: int
+
+    class Config:
+        orm_mode = True
+
 class UserProfile(UserProfileBase):
     id: int
 
@@ -133,18 +162,30 @@ class UserProfile(UserProfileBase):
 class User(UserBase):
     id: int
     is_active: bool
-    userprofile: UserProfile
+    profiles: UserProfile
 
     class Config:
         orm_mode = True
 
 class StoryBase(BaseModel):
     title: str
+    scene_id: int
+
+class StoryCreate(StoryBase):
     textfile_path: str
-    scene: int
 
 class Story(StoryBase):
     id: int
+    textfile_path: str
+
+    class Config:
+        orm_mode = True
+
+class StoryOut(BaseModel):
+    id: int
+    title: str
+    scene: Scene
+    textfile_path: str
 
     class Config:
         orm_mode = True
@@ -189,3 +230,15 @@ class GoodInterpreted(BaseModel):
 class GoodRound(BaseModel):
     player_id: int
     round_id: int
+
+
+class LeaderboardOut(LeaderboardBase):
+    id: int
+    original_image: OriginalImage
+    scene: Scene
+    story: Story
+    created_by: UserOut
+    vocabularies: list[Vocabulary]=[]
+
+    class Config:
+        orm_mode = True

@@ -1,5 +1,8 @@
 services:
   gradio:
+    env_file:
+      - gradio-project/.env
+    container_name: frontend
     build:
       context: gradio-project
       dockerfile: Dockerfile
@@ -10,22 +13,6 @@ services:
     volumes:
       - ./gradio-project:/app/gradio
       
-  backend-project:
-    env_file:
-      - backend-project/.env
-    build:
-      context: backend-project
-      dockerfile: Dockerfile
-    volumes:
-      - ./backend-project:/backend
-      - media:/media
-    command: fastapi dev --host 0.0.0.0 --port 8000 /backend/main.py
-    ports:
-      - "7871:8000"
-    tty: true
-    networks:
-      - backend-network
-
   db:
     build:
       context: db-project
@@ -45,6 +32,25 @@ services:
     tty: true
     networks:
       - backend-network
+      
+  backend-project:
+    env_file:
+      - backend-project/.env
+    container_name: backend
+    restart: always
+    build:
+      context: backend-project
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend-project/backend:/backend
+      - ./backend-project/media:/media
+    command: fastapi dev --host 0.0.0.0 --port 8000 /backend/main.py
+    ports:
+      - "7871:8000"
+    tty: true
+    networks:
+      - backend-network
+
 volumes:
   db-store:
   media:
