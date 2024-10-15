@@ -85,8 +85,8 @@ def create_story(
     
     timestamp = str(int(time.time()))
     shortenfilename=".".join(story_content_file.filename.split(".")[:-1])[:20]
-    fileattr = story_content_file.filename.split(".")[-1:]
-    filename = f"s_{timestamp}_{shortenfilename}_{fileattr}"
+    fileattr = story_content_file.filename.split(".")[-1:][0]
+    filename = f"s_{timestamp}_{shortenfilename}.{fileattr}"
     textfile_path = media_dir / "stories" / filename
     
     try:
@@ -124,6 +124,7 @@ def create_leaderboard(
     user_id: Annotated[int, Form()],
     db: Session = Depends(get_db),
 ):
+    
     timestamp = str(int(time.time()))
     shortenfilename=".".join(original_image.filename.split(".")[:-1])[:20]
     fileattr = original_image.filename.split(".")[-1:][0]
@@ -157,7 +158,7 @@ def create_leaderboard(
         scene_id=scene_id,
         story_id=story_id,
         original_image_id=db_original_image.id,
-        created_by=user_id
+        created_by_id=user_id
     )
     
     return crud.create_leaderboard(
@@ -165,7 +166,14 @@ def create_leaderboard(
         leaderboard=db_leaderboard,
     )
 
-@app.get("/rounds/by_leaderboard/", response_model=list[schemas.RoundOut])
+@app.get("/leaderboards/{leaderboard_id}", response_model=schemas.LeaderboardOut)
+def read_leaderboard(leaderboard_id: int, db: Session = Depends(get_db)):
+    db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
+    if db_leaderboard is None:
+        raise HTTPException(status_code=404, detail="Leaderboard not found")
+    return db_leaderboard
+
+@app.get("/leaderboards/{leaderboard_id}/rounds/", response_model=list[schemas.RoundOut])
 def get_rounds_by_leaderboard(
     leaderboard_id: int,
     db: Session = Depends(get_db),

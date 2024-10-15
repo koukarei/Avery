@@ -119,7 +119,7 @@ def get_round(db: Session, round_id: int):
 
 def get_rounds(db: Session, skip: int = 0, limit: int = 100, is_completed: bool = True, leaderboard_id: int = None):
     if leaderboard_id:
-        return db.query(models.Round).filter(models.Round.is_completed == is_completed).filter(models.Round.leaderboards_id == leaderboard_id).offset(skip).limit(limit).all()
+        return db.query(models.Round).filter(models.Round.is_completed == is_completed).filter(models.Round.leaderboard == leaderboard_id).offset(skip).limit(limit).all()
     else:
         return db.query(models.Round).filter(models.Round.is_completed == is_completed).offset(skip).limit(limit).all()
 
