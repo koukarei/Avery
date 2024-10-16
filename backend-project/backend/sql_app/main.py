@@ -7,7 +7,7 @@ from PIL import Image
 from . import crud, models, schemas
 from .database import SessionLocal, engine
 
-from .dependencies import sentence, gen_image, score, dictionary
+from .dependencies import sentence, gen_image, score, dictionary, chatbot
 
 from typing import Union, List, Annotated, Optional
 from datetime import timezone
@@ -50,8 +50,129 @@ def generateDescription(db: Session, leaderboard_id: int, image: str, story: Opt
         
         db_descriptions.append(db_description)
     
+    db_leaderboard = crud.update_leaderboard_difficulty(
+        db=db,
+        leaderboard_id=leaderboard_id,
+        difficulty_level=len(contents)
+    )
+
     return db_descriptions
 
+def calculate_score(
+    db: Session,
+    thisround: schemas.RoundCompleteCreate,
+    is_completed: bool=False
+):
+
+    db_round = crud.get_round(db, thisround.id)
+    if db_round is None:
+        raise HTTPException(status_code=404, detail="Round not found")
+    
+    if db_round.duration==0 or db_round.total_score==0:
+
+        ai_play = crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
+
+        if not ai_play:
+            story_path=db_round.leaderboard.story.textfile_path
+            story=Path(story_path).read_text()
+            
+            ai_play = generateDescription(
+                db=db,
+                leaderboard_id=db_round.leaderboard_id, 
+                image=str(db_round.leaderboard.original_image.image_path), 
+                story=story, 
+                model_name="gpt-4o-mini"
+            )
+
+
+        effective_score = score.cosine_similarity_to_ai(
+            ai_play=[ai.content for ai in ai_play],
+            corrected_sentence=db_round.correct_sentence,
+        )
+
+        grammar_score = score.semantic_similarity(
+            sentence=db_round.sentence,
+            corrected_sentence=db_round.correct_sentence,
+        )
+
+        vocab_score = score.vocab_difficulty(
+            corrected_sentence=db_round.correct_sentence,
+        )
+
+        total_score = (effective_score+grammar_score+vocab_score)/3
+
+        if is_completed:
+            thisround_aware = thisround.at.replace(tzinfo=timezone.utc)
+            db_round_aware = db_round.created_at.replace(tzinfo=timezone.utc)
+            duration = (thisround_aware - db_round_aware).seconds
+        else: 
+            duration = 0
+
+        round_com = schemas.RoundComplete(
+            id=db_round.id,
+            grammar_score=int(grammar_score*100),
+            vocabulary_score=int(vocab_score*100),
+            effectiveness_score=int(effective_score*100),
+            total_score=int(total_score*100),
+            rank=score.rank(total_score),
+            duration=duration,
+            is_completed=is_completed
+        )
+    else:
+
+        thisround_aware = thisround.at.replace(tzinfo=timezone.utc)
+        db_round_aware = db_round.created_at.replace(tzinfo=timezone.utc)
+        duration = (thisround_aware - db_round_aware).seconds
+
+        round_com = schemas.RoundComplete(
+            id=db_round.id,
+            grammar_score=db_round.grammar_score,
+            vocabulary_score=db_round.vocabulary_score,
+            effectiveness_score=db_round.effectiveness_score,
+            total_score=db_round.total_score,
+            rank=db_round.rank,
+            duration=duration,
+            is_completed=is_completed
+        )
+
+
+    return crud.update_round4(
+        db=db,
+        round_id=thisround.id,
+        round=round_com,
+    )
+
+def update_vocab_used_time(
+        db: Session,
+        sentence: str,
+        user_id: int,
+):
+    updated_vocab = []
+    doc = dictionary.get_sentence_nlp(sentence)
+    for token in doc:
+        db_vocab = crud.get_vocabulary(
+            db=db,
+            vocabulary=token.lemma_,
+            part_of_speech=token.pos_
+        )
+        if db_vocab:
+            db_personal_dictionary = crud.get_personal_dictionary(
+                db=db,
+                player_id=user_id,
+                vocabulary_id=db_vocab.id
+            )
+            if db_personal_dictionary:
+                updated_vocab.append(
+                    crud.update_personal_dictionary_used(
+                        db=db,
+                        dictionary=schemas.PersonalDictionaryId(
+                            player=user_id,
+                            vocabulary=db_vocab
+                        )
+                    )
+                )
+    return updated_vocab
+            
 
 @app.post("/users/", tags=["User"], response_model=schemas.User)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
@@ -231,7 +352,7 @@ def create_round(
     player_id: int,
     db: Session = Depends(get_db),
 ):
-    return crud.create_round(
+    db_round = crud.create_round(
         db=db,
         leaderboard_id=thisround.leaderboard_id,
         user_id=player_id,
@@ -239,10 +360,23 @@ def create_round(
         created_at=thisround.created_at,
     )
 
+    crud.create_message(
+        db=db,
+        message=schemas.MessageBase(
+            content="The image is imported to my system. You can ask me for a hint.",
+            sender="model"
+        ),
+        chat_id=db_round.chat_history
+    )
+
+    return db_round
+
+
 @app.put("/round/{round_id}", tags=["Round"], response_model=schemas.RoundCorrectSentence)
 def get_user_answer(
     round_id: int,
     thisround: schemas.RoundSentence,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     db_round = crud.update_round1(
@@ -256,6 +390,13 @@ def get_user_answer(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     
+    background_tasks.add_task(
+        update_vocab_used_time,
+        db=db,
+        sentence=db_round.sentence,
+        user_id=db_round.player_id
+    )
+
     return crud.update_round2(
         db=db,
         round_id=round_id,
@@ -269,6 +410,7 @@ def get_user_answer(
 def get_interpretation(
     round_id: int,
     thisround: schemas.RoundCorrectSentence,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     interpreted_image_url = gen_image.generate_interpretion(
@@ -315,6 +457,32 @@ def get_interpretation(
         ),
     )
 
+    thisround_complete = schemas.RoundCompleteCreate(
+        id=round_id,
+        at=db_round.created_at
+    )
+
+    background_tasks.add_task(
+        calculate_score,
+        db=db,
+        thisround=thisround_complete,
+        is_completed=False
+    )
+
+    new_message="""
+We input the sentence into Skyler's system. 📝
+Sentence: {}
+""".format(thisround.correct_sentence)
+
+    crud.create_message(
+        db=db,
+        message=schemas.MessageBase(
+            content=new_message,
+            sender="model"
+        ),
+        chat_id=db_round.chat_history
+    )
+
     return db_round
 
 @app.put("/round/{round_id}/complete", tags=["Round"], response_model=schemas.RoundComplete)
@@ -323,46 +491,29 @@ def complete_round(
     db: Session = Depends(get_db),
 ):
     db_round = crud.get_round(db, thisround.id)
-    if db_round is None:
-        raise HTTPException(status_code=404, detail="Round not found")
-    
-    ai_play = crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
-
-    effective_score = score.cosine_similarity_to_ai(
-        ai_play=[ai.content for ai in ai_play],
-        corrected_sentence=db_round.correct_sentence,
+    db_chat = crud.get_chat(db=db,chat_id=db_round.chat_history)
+    cb=chatbot.Hint_Chatbot()
+    evaluation = cb.get_result(
+        generated_image=db_round.interpreted_image.image_path,
+        sentence=db_round.correct_sentence,
+        scoring="Effectiveness Score: %d Vocabulary Score: %d".format(db_round.effectiveness_score,db_round.vocabulary_score),
+        original_image=db_round.leaderboard.original_image.image_path,
+        chat_history=db_chat.messages,
     )
 
-    grammar_score = score.semantic_similarity(
-        sentence=db_round.sentence,
-        corrected_sentence=db_round.correct_sentence,
-    )
-
-    vocab_score = score.vocab_difficulty(
-        corrected_sentence=db_round.correct_sentence,
-    )
-
-    total_score = (effective_score+grammar_score+vocab_score)/3
-
-    thisround_aware = thisround.at.replace(tzinfo=timezone.utc)
-    db_round_aware = db_round.created_at.replace(tzinfo=timezone.utc)
-    duration = (thisround_aware - db_round_aware).seconds
-
-    round_com = schemas.RoundComplete(
-        id=db_round.id,
-        grammar_score=int(grammar_score*100),
-        vocabulary_score=int(vocab_score*100),
-        effectiveness_score=int(effective_score*100),
-        total_score=int(total_score*100),
-        rank=score.rank(total_score),
-        duration=duration,
-        is_completed=True
-    )
-
-    return crud.update_round4(
+    crud.create_message(
         db=db,
-        round_id=thisround.id,
-        round=round_com,
+        message=schemas.MessageBase(
+            content=evaluation,
+            sender="model"
+        ),
+        chat_id=db_round.chat_history
+    )
+
+    return calculate_score(
+        db=db,
+        thisround=thisround,
+        is_completed=True
     )
 
 @app.get("/personal_dictionaries/", tags=["Personal Dictionary"], response_model=list[schemas.PersonalDictionary])
@@ -375,21 +526,33 @@ def create_personal_dictionary(
     personal_dictionary: schemas.PersonalDictionaryCreate,
     db: Session = Depends(get_db),
 ):
-        
+    word_lemma = dictionary.get_pos_lemma(
+        word=personal_dictionary.vocabulary,
+        relevant_sentence=personal_dictionary.relevant_sentence
+    )
+    
     vocab = crud.get_vocabulary(
         db=db,
-        vocabulary=personal_dictionary.vocabulary
+        vocabulary=word_lemma['lemma'],
+        part_of_speech=word_lemma['pos']
     )
+
     if not vocab:
         meanings=dictionary.get_meaning(
-            word=personal_dictionary.vocabulary,
-            relevant_sentence=personal_dictionary.relevant_sentence
+            lemma=word_lemma['lemma'],
+            pos=word_lemma['pos']
         )
+        if isinstance(meanings, list):
+            meaning = '; '.join(meanings)
+        else:
+            meaning = meanings
+
         vocab = crud.create_vocabulary(
             db=db,
             vocabulary=schemas.VocabularyBase(
-                word=personal_dictionary.vocabulary,
-                meaning='; '.join(meanings)
+                word=word_lemma['lemma'],
+                pos=word_lemma['pos'],
+                meaning=meaning
             )
         )
 
@@ -400,4 +563,78 @@ def create_personal_dictionary(
                 round_id=personal_dictionary.save_at_round_id,
                 created_at=personal_dictionary.created_at,
     )
+
+@app.put("/personal_dictionary/{personal_dictionary_id}", tags=["Personal Dictionary"], response_model=schemas.PersonalDictionary)
+def update_personal_dictionary(
+    personal_dictionary: schemas.PersonalDictionaryUpdate,
+    personal_dictionary_id: int,
+    db: Session = Depends(get_db),
+):
+    return crud.update_personal_dictionary(
+        db=db,
+        dictionary=personal_dictionary,
+    )
+
+@app.delete("/personal_dictionary/{personal_dictionary_id}", tags=["Personal Dictionary"], response_model=schemas.PersonalDictionary)
+def delete_personal_dictionary(
+    personal_dictionary_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+):
+    return crud.delete_personal_dictionary(
+        db=db,
+        player_id=user_id,
+        vocabulary_id=personal_dictionary_id,
+    )
+
+@app.get("/chat/{chat_id}", tags=["Chat"], response_model=schemas.Chat)
+def read_chat(chat_id: int, db: Session = Depends(get_db)):
+    chat = crud.get_chat(db, chat_id=chat_id)
+    return chat
+
+@app.put("/round/{round_id}/chat", tags=["Chat"], response_model=schemas.Chat)
+def update_chat(
+    round_id: int,
+    message: schemas.MessageReceive,
+    db: Session = Depends(get_db),
+):
+    db_round = crud.get_round(db, round_id)
+    if db_round is None:
+        raise HTTPException(status_code=404, detail="Round not found")
+    
+    if db_round.is_completed:
+        raise HTTPException(status_code=400, detail="The round is already ended.")
+    
+    db_chat = crud.get_chat(db=db, chat_id=db_round.chat_history)
+    if db_chat is None:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    
+    db_new=crud.create_message(
+        db=db,
+        message=schemas.MessageBase(
+            content=message.content,
+            sender="user"
+        ),
+        chat_id=db_chat.id
+    )
+
+    # get hint from AI
+    cb = chatbot.Hint_Chatbot()
+
+    model_response = cb.nextResponse(
+        ask_for_hint=message.content,
+        chat_history=db_new['chat'].messages,
+        original_image=db_round.leaderboard.original_image.image_path,
+    )
+
+    result = crud.create_message(
+        db=db,
+        message=schemas.MessageBase(
+            content=model_response,
+            sender="model"
+        ),
+        chat_id=db_chat.id
+    )
+
+    return result
 

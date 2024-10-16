@@ -59,10 +59,21 @@ def create_leaderboard(
         leaderboard: schemas.LeaderboardCreate,
 ):
     db_leaderboard = models.Leaderboard(
-        **leaderboard.dict()
+        leaderboard.model_dump()
     )
 
     db.add(db_leaderboard)
+    db.commit()
+    db.refresh(db_leaderboard)
+    return db_leaderboard
+
+def update_leaderboard_difficulty(
+        db: Session,
+        leaderboard_id: int,
+        difficulty_level: int
+):
+    db_leaderboard = db.query(models.Leaderboard).filter(models.Leaderboard.id == leaderboard_id).first()
+    db_leaderboard.difficulty_level = difficulty_level
     db.commit()
     db.refresh(db_leaderboard)
     return db_leaderboard
@@ -71,7 +82,7 @@ def get_original_image(db: Session, image_id: int):
     return db.query(models.OriginalImage).filter(models.OriginalImage.id == image_id).first()
 
 def create_original_image(db: Session, image: schemas.ImageBase):
-    db_image = models.OriginalImage(**image.dict())
+    db_image = models.OriginalImage(image.model_dump())
     db.add(db_image)
     db.commit()
     db.refresh(db_image)
@@ -81,7 +92,7 @@ def get_interpreted_image(db: Session, image_id: int):
     return db.query(models.InterpretedImage).filter(models.InterpretedImage.id == image_id).first()
 
 def create_interpreted_image(db: Session, image: schemas.ImageBase):
-    db_image = models.InterpretedImage(**image.dict())
+    db_image = models.InterpretedImage(image.model_dump())
     db.add(db_image)
     db.commit()
     db.refresh(db_image)
@@ -95,7 +106,7 @@ def get_stories(db: Session, skip: int = 0, limit: int = 100):
 
 def create_story(db: Session, story: schemas.StoryCreate):
     db_story = models.Story(
-        **story.dict()
+        story.model_dump()
     )
     db.add(db_story)
     db.commit()
@@ -109,7 +120,7 @@ def get_scene(db: Session, scene_id: int):
     return db.query(models.Scene).filter(models.Scene.id == scene_id).first()
 
 def create_scene(db: Session, scene: schemas.SceneBase):
-    db_scene = models.Scene(**scene.dict())
+    db_scene = models.Scene(scene.model_dump())
     db.add(db_scene)
     db.commit()
     db.refresh(db_scene)
@@ -122,7 +133,7 @@ def get_description(db: Session, leaderboard_id: int, model_name: str=None):
         return db.query(models.Description).filter(models.Description.leaderboard_id == leaderboard_id).all()
 
 def create_description(db: Session, description: schemas.DescriptionBase):
-    db_description = models.Description(**description.dict())
+    db_description = models.Description(description.model_dump())
     db.add(db_description)
     db.commit()
     db.refresh(db_description)
@@ -195,9 +206,9 @@ def get_chat(db: Session, chat_id: int):
 
 def create_message(db: Session, message: schemas.MessageBase, chat_id: int):
     db_message = models.Message(
-        chat_id=chat_id,
-        **message.dict()
+        message.model_dump()
     )
+    db_message.chat_id = chat_id
     db.add(db_message)
     db.commit()
     db.refresh(db_message)
@@ -206,23 +217,23 @@ def create_message(db: Session, message: schemas.MessageBase, chat_id: int):
     db_chat.messages.append(db_message)
     db.commit()
     db.refresh(db_chat)
-    return db_message
+    return {"message": db_message, "chat": db_chat}
 
-def get_vocabulary(db: Session, vocabulary: str):
-    return db.query(models.Vocabulary).filter(models.Vocabulary.word == vocabulary).first()
+def get_vocabulary(db: Session, vocabulary: str, part_of_speech: str):
+    return db.query(models.Vocabulary).filter(models.Vocabulary.word == vocabulary).filter(models.Vocabulary.pos == part_of_speech).first()
 
 def create_vocabulary(db: Session, vocabulary: schemas.VocabularyBase):
-    db_vocabulary = models.Vocabulary(**vocabulary.dict())
+    db_vocabulary = models.Vocabulary(vocabulary.model_dump())
     db.add(db_vocabulary)
     db.commit()
     db.refresh(db_vocabulary)
     return db_vocabulary
 
-def get_personal_dictionary(db: Session, dictionary_id: int):
-    return db.query(models.PersonalDictionary).filter(models.PersonalDictionary.id == dictionary_id).first()
+def get_vocab_saved_time(db: Session, vocabulary_id: int):
+    return db.query(models.PersonalDictionary).filter(models.PersonalDictionary.vocabulary == vocabulary_id).count()
 
-def get_personal_dictionaries(db: Session, player_id: int):
-    return db.query(models.PersonalDictionary).filter(models.PersonalDictionary.player == player_id).all()
+def get_personal_dictionary(db: Session, player_id: int, vocabulary_id: int):
+    return db.query(models.PersonalDictionary).filter(models.PersonalDictionary.player == player_id).filter(models.PersonalDictionary.vocabulary == vocabulary_id).first()
 
 def create_personal_dictionary(
         db: Session, 
@@ -232,8 +243,8 @@ def create_personal_dictionary(
         created_at: datetime.datetime
 ):
     db_dictionary = models.PersonalDictionary(
-        player_id=user_id,
-        vocabulary_id=vocabulary_id,
+        player=user_id,
+        vocabulary=vocabulary_id,
         save_at_round_id=round_id,
         created_at=created_at
     )
@@ -241,6 +252,38 @@ def create_personal_dictionary(
     db.add(db_dictionary)
     db.commit()
     db.refresh(db_dictionary)
+    return db_dictionary
+
+def update_personal_dictionary(
+        db: Session,
+        dictionary: schemas.PersonalDictionaryUpdate
+):
+    
+    db_dictionary = db.query(models.PersonalDictionary).filter(models.PersonalDictionary.player == dictionary.player).filter(models.PersonalDictionary.vocabulary == dictionary.vocabulary).first()
+    db_dictionary.update(dictionary.model_dump())
+    db.commit()
+    db.refresh(db_dictionary)
+    return db_dictionary
+
+def update_personal_dictionary_used(
+        db: Session,
+        dictionary: schemas.PersonalDictionaryId
+):
+    db_dictionary = db.query(models.PersonalDictionary).filter(models.PersonalDictionary.player == dictionary.player).filter(models.PersonalDictionary.vocabulary == dictionary.vocabulary).first()
+    db_dictionary.used_times += 1
+    db.commit()
+    db.refresh(db_dictionary)
+    return db_dictionary
+
+def delete_personal_dictionary(
+        db: Session,
+        player_id: int,
+        vocabulary_id: int
+):
+    db_dictionary = db.query(models.PersonalDictionary).filter(models.PersonalDictionary.player == player_id).filter(models.PersonalDictionary.vocabulary == vocabulary_id).first()
+    if db_dictionary:
+        db.delete(db_dictionary)
+        db.commit()
     return db_dictionary
 
 def get_leaderboard_vocabulary(db: Session, leaderboard_vocabulary_id: int):

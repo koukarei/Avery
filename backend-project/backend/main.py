@@ -11,3 +11,9 @@ app.mount("/sqlapp", subapi)
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
+
+@app.get('/files/{filename}')
+async def get_files(filename: str):
+    return responses.FileResponse(filename)
+
+app.mount('/', staticfiles.StaticFiles(directory='/static/',html=True))

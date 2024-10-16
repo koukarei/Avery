@@ -42,7 +42,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./backend-project/backend:/backend
-      - ./backend-project/media:/media
+      - ./backend-project/media:/static
     command: fastapi dev --host 0.0.0.0 --port 8000 /backend/main.py
     ports:
       - "7871:8000"

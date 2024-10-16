@@ -1,4 +1,5 @@
 from openai import OpenAI
+from pydantic import BaseModel
 import base64
 import io
 
@@ -6,19 +7,18 @@ def encode_image(image_path):
   with open(image_path, "rb") as image_file:
     return base64.b64encode(image_file.read()).decode('utf-8')
 
-def generateSentence(image,story):
+class Description(BaseModel):
+   details: list[str]
+
+def generateSentence(image,story, model_name="gpt-4o-2024-08-06"):
   #base64_image = encode_image(image)
   client=OpenAI()
-  completion = client.chat.completions.create(
-    model="gpt-4o-mini",
+  completion = client.beta.chat.completions.parse(
+    model=model_name,
     messages=[
       {"role": "system", "content": """
-        You must descibe the scene of the image given by the user. 
-        Your output must be one sentence. 
-        Total length of the output must be less than 120 characters. 
+        Describe the image in details, line by line.
         You can make reference to the story given by the user.
-        You do not need to use characters' name in the story.
-        For example, A boy is playing with a cat in the dining room and the mother of the boy is serving the food.
        """},
       {"role": "user", "content": [
         {"type": "text", "text": story},
@@ -30,16 +30,20 @@ def generateSentence(image,story):
         },
       ]
       }
-    ]
+    ],
+    response_format=Description,
   )
-  return completion.choices[0].message
+
+  description = completion.choices[0].message.parsed
+  
+  return description.details
 
 def genSentences(image,story,amt=3):
-    gen_Sentences=[]
+    
     if "http" not in image:
        image="data:image/jpeg;base64,{}".format(encode_image(image))
     for i in range(amt):
-        gen_Sentences.append(generateSentence(image,story).content)
+        gen_Sentences=generateSentence(image,story)
     return gen_Sentences
 
 def checkSentence(sentence,temp=0.3):
@@ -52,7 +56,6 @@ def checkSentence(sentence,temp=0.3):
        You are going to correct the sentence given by the user. 
        Your input only needs to be the corrected sentence.
        If the sentence is not English, reply with "Please enter an English sentence."
-       If the sentence is not valid, reply with "Please enter a valid English sentence."
        If the sentence is offensive, reply with "Please avoid offensive language."
        If the sentence is correct, reply with the sentence itself.
 """},

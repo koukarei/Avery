@@ -2,7 +2,6 @@ from openai import OpenAI
 import urllib.request 
 from dependencies.round import Round
 import spacy
-import pytextrank
 import random
 
 def save_image(url, filename):

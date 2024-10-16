@@ -66,6 +66,7 @@ class Leaderboard(Base):
     scene_id=Column(Integer,ForeignKey("scenes.id"))
     story_id=Column(Integer,ForeignKey("stories.id"),nullable=True)
     story_extract=Column(String(255), index=True)
+    difficulty = Column(Integer, default=1)
 
     created_by_id = Column(Integer, ForeignKey("user_profiles.id"))
     created_by = relationship("UserProfile", back_populates="leaderboards")
@@ -140,6 +141,7 @@ class Vocabulary(Base):
 
     id = Column(Integer, primary_key=True)
     word = Column(String(255), index=True)
+    pos = Column(String(50), index=True) # Part of Speech
     meaning = Column(String(255), index=True)
 
     leaderboards = relationship("Leaderboard",secondary="leaderboard_vocabulary", back_populates="vocabularies")
@@ -162,6 +164,7 @@ class PersonalDictionary(Base):
 
     player = Column(Integer, ForeignKey("users.id"),primary_key=True)
     vocabulary = Column(Integer, ForeignKey("vocabularies.id"),primary_key=True)
+    save_at_round_id = Column(Integer, ForeignKey("rounds.id"))
 
     created_at = Column(DateTime, default=datetime.datetime.now())
     used_times = Column(Integer, default=0)

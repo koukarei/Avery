@@ -5,7 +5,6 @@ import PIL.Image
 import io
 import requests
 import Levenshtein
-from .sentence import genSentences
 from .cefr_few_shot import predict_cefr_en_level
 from .get_embedding import get_embedding,cosine_similarity
 
@@ -30,7 +29,7 @@ def cosine_similarity_to_ai(ai_play: List[str],corrected_sentence:str):
         avg_embedding([get_embedding(text=i) for i in ai_play])
     )
 
-    return result
+    return float(result[0]) if isinstance(result, np.ndarray) else float(result)
 
 def vocab_difficulty(corrected_sentence:str):
     few_shot=predict_cefr_en_level(corrected_sentence)

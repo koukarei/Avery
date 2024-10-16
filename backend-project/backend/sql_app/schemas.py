@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 import datetime
 from typing import Optional
@@ -18,8 +18,10 @@ class InterpretedImage(ImageBase):
     class Config:
         orm_mode = True
 
-class MessageBase(BaseModel):
+class MessageReceive(BaseModel):
     content: str
+
+class MessageBase(MessageReceive):
     sender: str
 
 class Message(MessageBase):
@@ -87,6 +89,7 @@ class LeaderboardCreate(LeaderboardBase):
 class VocabularyBase(BaseModel):
     word: str
     meaning: str
+    pos: str
     
 class Vocabulary(VocabularyBase):
     id: int
@@ -207,8 +210,11 @@ class StoryOut(BaseModel):
     class Config:
         orm_mode = True
 
+class PersonalDictionaryId(BaseModel):
+    player: int
+    vocabulary: int
+
 class PersonalDictionaryCreate(BaseModel):
-    id: int
     user_id: int
     vocabulary: str
     save_at_round_id: int
@@ -218,13 +224,10 @@ class PersonalDictionaryCreate(BaseModel):
     class Config:
         orm_mode = True
 
-class PersonalDictionaryBase(BaseModel):
-    user_id: int
-    vocabulary_id: int
+class PersonalDictionaryBase(PersonalDictionaryId):
     save_at_round_id: int
 
 class PersonalDictionary(PersonalDictionaryBase):
-    id: int
     created_at: datetime.datetime
     used_times: int
     position_top: int
@@ -236,6 +239,13 @@ class PersonalDictionary(PersonalDictionaryBase):
     class Config:
         orm_mode = True
         
+class PersonalDictionaryUpdate(PersonalDictionaryId):
+    position_top: Optional[int]
+    position_left: Optional[int]
+    size_width: Optional[int]
+    size_height: Optional[int]
+    note: Optional[str]
+
 class GoodImage(BaseModel):
     player_id: int
     image_id: int
