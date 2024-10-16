@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 
 import datetime
+from typing import Optional
 
 class ImageBase(BaseModel):
     image_path: str
@@ -13,7 +14,6 @@ class OriginalImage(ImageBase):
 
 class InterpretedImage(ImageBase):
     id: int
-    round_id: int
 
     class Config:
         orm_mode = True
@@ -76,10 +76,11 @@ class UserOut(BaseModel):
 class LeaderboardBase(BaseModel):
     title: str
     story_extract: str
+    is_public: bool
 
 class LeaderboardCreate(LeaderboardBase):
     scene_id: int
-    story_id: int
+    story_id: Optional[int]
     original_image_id: int
     created_by_id: int
 
@@ -96,15 +97,20 @@ class Vocabulary(VocabularyBase):
 class Leaderboard(LeaderboardCreate):
     id: int
     original_image_id: int
-    created_by: int
+    created_by_id: int
     vocabularies: list[Vocabulary]=[]
 
     class Config:
         orm_mode = True
 
+class RoundCreate(BaseModel):
+    leaderboard_id: int
+    model: str="gpt-4o-mini"
+    created_at: datetime.datetime
+
 class RoundBase(BaseModel):
     player_id: int
-    leaderboard: int
+    leaderboard: Leaderboard
     chat_history: int
 
 class Round(RoundBase):
@@ -114,22 +120,30 @@ class Round(RoundBase):
     class Config:
         orm_mode = True
 
-class RoundSentence(Round):
+class RoundSentence(BaseModel):
+    id: int
     sentence: str
 
     class Config:
         orm_mode = True
 
-class RoundCorrectSentence(RoundSentence):
+class RoundCorrectSentence(BaseModel):
+    id: int
     correct_sentence: str
 
     class Config:
         orm_mode = True
 
-class RoundInterpretation(RoundCorrectSentence):
+class RoundInterpretation(BaseModel):
+    id: int
     interpreted_image_id: int
 
-class RoundComplete(RoundInterpretation):
+class RoundCompleteCreate(BaseModel):
+    id: int
+    at: datetime.datetime
+
+class RoundComplete(BaseModel):
+    id: int
     grammar_score: int
     vocabulary_score: int
     effectiveness_score: int
@@ -141,7 +155,7 @@ class RoundComplete(RoundInterpretation):
 class RoundOut(BaseModel):
     id: int
     player: UserOut
-    interpreted_image: InterpretedImage
+    interpreted_image_id: int
     sentence: str
     correct_sentence: str
     total_score: int
@@ -150,6 +164,9 @@ class RoundOut(BaseModel):
 
     class Config:
         orm_mode = True
+
+class Round_id(BaseModel):
+    id: int
 
 class UserProfile(UserProfileBase):
     id: int
@@ -190,17 +207,21 @@ class StoryOut(BaseModel):
     class Config:
         orm_mode = True
 
+class PersonalDictionaryCreate(BaseModel):
+    id: int
+    user_id: int
+    vocabulary: str
+    save_at_round_id: int
+    created_at: datetime.datetime
+    relevant_sentence: str
+
+    class Config:
+        orm_mode = True
+
 class PersonalDictionaryBase(BaseModel):
     user_id: int
     vocabulary_id: int
     save_at_round_id: int
-
-class PersonalDictionaryCreate(PersonalDictionaryBase):
-    id: int
-    created_at: datetime.datetime
-
-    class Config:
-        orm_mode = True
 
 class PersonalDictionary(PersonalDictionaryBase):
     id: int
@@ -236,9 +257,20 @@ class LeaderboardOut(LeaderboardBase):
     id: int
     original_image: OriginalImage
     scene: Scene
-    story: Story
+    story: Optional[Story]
     created_by: UserOut
     vocabularies: list[Vocabulary]=[]
+
+    class Config:
+        orm_mode = True
+
+class DescriptionBase(BaseModel):
+    content: str
+    model: str
+    leaderboard_id: int
+
+class Description(DescriptionBase):
+    id: int
 
     class Config:
         orm_mode = True

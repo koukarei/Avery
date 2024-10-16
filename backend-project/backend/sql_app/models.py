@@ -61,9 +61,10 @@ class Leaderboard(Base):
 
     id = Column(Integer, primary_key=True)
     title = Column(String(255), index=True)
+    is_public = Column(Boolean, default=True)
     original_image_id=Column(Integer,ForeignKey("original_images.id"))
     scene_id=Column(Integer,ForeignKey("scenes.id"))
-    story_id=Column(Integer,ForeignKey("stories.id"))
+    story_id=Column(Integer,ForeignKey("stories.id"),nullable=True)
     story_extract=Column(String(255), index=True)
 
     created_by_id = Column(Integer, ForeignKey("user_profiles.id"))
@@ -74,13 +75,28 @@ class Leaderboard(Base):
     story = relationship("Story", back_populates="leaderboards",foreign_keys=[story_id])
     vocabularies = relationship("Vocabulary",secondary="leaderboard_vocabulary", back_populates="leaderboards")
 
+    rounds = relationship("Round", back_populates="leaderboard")
+    descriptions = relationship("Description", back_populates="leaderboard")
+
+class Description(Base):
+    __tablename__ = "descriptions"
+
+    id = Column(Integer, primary_key=True)
+    content = Column(String(255), index=True)
+    model = Column(String(100), index=True)
+
+    leaderboard_id=Column(Integer,ForeignKey("leaderboards.id"))
+    leaderboard = relationship("Leaderboard", back_populates="descriptions")
+
 class Round(Base): 
     __tablename__ = "rounds"
 
     id = Column(Integer, primary_key=True)
     chat_history=Column(Integer,ForeignKey("chats.id"))
-    leaderboard=Column(Integer,ForeignKey("leaderboards.id"))
+    leaderboard_id=Column(Integer,ForeignKey("leaderboards.id"))
     player_id = Column(Integer, ForeignKey("user_profiles.id"))
+
+    model=Column(String(100), index=True)
 
     sentence = Column(String(120), index=True,nullable=True)
     correct_sentence = Column(String(120), index=True,nullable=True)
@@ -101,6 +117,7 @@ class Round(Base):
     interpreted_image = relationship("InterpretedImage", back_populates="round",foreign_keys=[interpreted_image_id])
     player = relationship("UserProfile", back_populates="rounds",foreign_keys=[player_id])
     personal_dictionaries = relationship("PersonalDictionary", back_populates="save_at_round")
+    leaderboard = relationship("Leaderboard", back_populates="rounds", foreign_keys=[leaderboard_id])
 
 class Chat(Base):
     __tablename__ = "chats"

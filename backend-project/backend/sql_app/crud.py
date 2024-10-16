@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from . import models, schemas
 
 from typing import Union
+import datetime
 
 
 def get_user(db: Session, user_id: int):
@@ -114,16 +115,29 @@ def create_scene(db: Session, scene: schemas.SceneBase):
     db.refresh(db_scene)
     return db_scene
 
+def get_description(db: Session, leaderboard_id: int, model_name: str=None):
+    if model_name:
+        return db.query(models.Description).filter(models.Description.leaderboard_id == leaderboard_id).filter(models.Description.model == model_name).all()
+    else:
+        return db.query(models.Description).filter(models.Description.leaderboard_id == leaderboard_id).all()
+
+def create_description(db: Session, description: schemas.DescriptionBase):
+    db_description = models.Description(**description.dict())
+    db.add(db_description)
+    db.commit()
+    db.refresh(db_description)
+    return db_description
+
 def get_round(db: Session, round_id: int):
     return db.query(models.Round).filter(models.Round.id == round_id).first()
 
 def get_rounds(db: Session, skip: int = 0, limit: int = 100, is_completed: bool = True, leaderboard_id: int = None):
     if leaderboard_id:
-        return db.query(models.Round).filter(models.Round.is_completed == is_completed).filter(models.Round.leaderboard == leaderboard_id).offset(skip).limit(limit).all()
+        return db.query(models.Round).filter(models.Round.is_completed == is_completed).filter(models.Round.leaderboard_id == leaderboard_id).offset(skip).limit(limit).all()
     else:
         return db.query(models.Round).filter(models.Round.is_completed == is_completed).offset(skip).limit(limit).all()
 
-def create_round(db: Session, leaderboard_id:int, user_id: int):
+def create_round(db: Session, leaderboard_id:int, user_id: int, created_at: datetime.datetime, model_name: str="gpt-4o-mini"):
     db_chat=models.Chat()
     db.add(db_chat)
     db.commit()
@@ -132,7 +146,9 @@ def create_round(db: Session, leaderboard_id:int, user_id: int):
     db_round = models.Round(
         player_id=user_id,
         chat_history=db_chat.id,
-        leaderboards_id=leaderboard_id
+        leaderboard_id=leaderboard_id,
+        model=model_name,
+        created_at=created_at
     )
 
     db.add(db_round)
@@ -192,8 +208,8 @@ def create_message(db: Session, message: schemas.MessageBase, chat_id: int):
     db.refresh(db_chat)
     return db_message
 
-def get_vocabulary(db: Session, vocabulary_id: int):
-    return db.query(models.Vocabulary).filter(models.Vocabulary.id == vocabulary_id).first()
+def get_vocabulary(db: Session, vocabulary: str):
+    return db.query(models.Vocabulary).filter(models.Vocabulary.word == vocabulary).first()
 
 def create_vocabulary(db: Session, vocabulary: schemas.VocabularyBase):
     db_vocabulary = models.Vocabulary(**vocabulary.dict())
@@ -205,16 +221,21 @@ def create_vocabulary(db: Session, vocabulary: schemas.VocabularyBase):
 def get_personal_dictionary(db: Session, dictionary_id: int):
     return db.query(models.PersonalDictionary).filter(models.PersonalDictionary.id == dictionary_id).first()
 
+def get_personal_dictionaries(db: Session, player_id: int):
+    return db.query(models.PersonalDictionary).filter(models.PersonalDictionary.player == player_id).all()
+
 def create_personal_dictionary(
         db: Session, 
         user_id: int,
         vocabulary_id: int,
-        round_id: int
+        round_id: int,
+        created_at: datetime.datetime
 ):
     db_dictionary = models.PersonalDictionary(
         player_id=user_id,
         vocabulary_id=vocabulary_id,
-        save_at_round_id=round_id
+        save_at_round_id=round_id,
+        created_at=created_at
     )
 
     db.add(db_dictionary)
@@ -278,3 +299,4 @@ def create_goodround(db: Session, user_id: int, round_id: int):
     db.commit()
     db.refresh(db_goodround)
     return db_goodround
+

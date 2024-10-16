@@ -37,7 +37,6 @@ services:
     env_file:
       - backend-project/.env
     container_name: backend
-    restart: always
     build:
       context: backend-project
       dockerfile: Dockerfile
