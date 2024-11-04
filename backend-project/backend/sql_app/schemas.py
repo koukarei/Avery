@@ -18,6 +18,12 @@ class InterpretedImage(ImageBase):
     class Config:
         orm_mode = True
 
+class InterpretedImageOut(ImageBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
 class MessageReceive(BaseModel):
     content: str
 
@@ -123,29 +129,34 @@ class Round(RoundBase):
     class Config:
         orm_mode = True
 
-class RoundSentence(BaseModel):
+class GenerationCreate(BaseModel):
+    round_id: int
+    created_at: datetime.datetime
+    sentence: str
+
+class GenerationBase(BaseModel):
     id: int
     sentence: str
 
     class Config:
         orm_mode = True
 
-class RoundCorrectSentence(BaseModel):
+class GenerationCorrectSentence(BaseModel):
     id: int
     correct_sentence: str
 
     class Config:
         orm_mode = True
 
-class RoundInterpretation(BaseModel):
+class GenerationInterpretation(BaseModel):
     id: int
     interpreted_image_id: int
 
-class RoundCompleteCreate(BaseModel):
+class GenerationCompleteCreate(BaseModel):
     id: int
     at: datetime.datetime
 
-class RoundComplete(BaseModel):
+class GenerationComplete(BaseModel):
     id: int
     grammar_score: int
     vocabulary_score: int
@@ -155,15 +166,33 @@ class RoundComplete(BaseModel):
     duration: int
     is_completed: bool
 
+class GenerationOut(BaseModel):
+    id: int
+    sentence: str
+    correct_sentence: str
+    grammar_score: int
+    vocabulary_score: int
+    effectiveness_score: int
+    total_score: int
+    rank: str
+    duration: int
+    is_completed: bool
+    interpreted_image: InterpretedImage
+
+    class Config:
+        orm_mode = True
+
+class RoundComplete(BaseModel):
+    id: int
+    last_generation_id: int
+    duration: int
+    is_completed: bool
+
 class RoundOut(BaseModel):
     id: int
     player: UserOut
     interpreted_image_id: int
-    sentence: str
-    correct_sentence: str
-    total_score: int
-    rank: str
-    duration: int
+    generations: list[GenerationOut]=[]
 
     class Config:
         orm_mode = True

@@ -13,6 +13,6 @@ numpy
 Levenshtein==0.25.1
 openai==1.51.2
 spacy
-langdetect
-fasttext-langdetect
 google-generativeai==0.7.2
+pytest
+langchain

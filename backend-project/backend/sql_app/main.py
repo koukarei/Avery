@@ -1,4 +1,4 @@
-from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, BackgroundTasks
+from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, BackgroundTasks, responses
 from sqlalchemy.orm import Session
 import shutil, time, os, datetime, io, requests
 from pathlib import Path
@@ -17,7 +17,7 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
 # Define the directory where the images will be stored
-media_dir = Path(os.getenv("MEDIA_DIR", "/media"))
+media_dir = Path(os.getenv("MEDIA_DIR", "/static"))
 media_dir.mkdir(parents=True, exist_ok=True)
 
 # Dependency
@@ -638,3 +638,37 @@ def update_chat(
 
     return result
 
+@app.get("/original_image/{leaderboard_id}", tags=["Image"])
+async def get_original_image(leaderboard_id: int, db: Session = Depends(get_db)):
+    db_leaderboard = crud.get_leaderboard(
+        db=db,
+        leaderboard_id=leaderboard_id
+    )
+    image_name = db_leaderboard.original_image.image_path.split('/')[-1]
+    # Construct the image path
+    image_path = os.path.join('/static','original_images', image_name)
+    
+    # Check if the file exists
+    if os.path.isfile(image_path):
+        # Return the image as a file response
+        return responses.FileResponse(image_path, media_type="image/jpeg")
+    else:
+        raise HTTPException(status_code=404, detail="Image not found")
+    
+@app.get("/interpreted_image/{round_id}", tags=["Image"])
+async def get_interpreted_image(round_id: int, db: Session = Depends(get_db)):
+    db_round = crud.get_round(
+        db=db,
+        round_id=round_id
+    )
+    image_name = db_round.interpreted_image.image_path.split('/')[-1]
+    # Construct the image path
+    image_path = os.path.join('/static','interpreted_images', image_name)
+    
+    # Check if the file exists
+    if os.path.isfile(image_path):
+        # Return the image as a file response
+        return responses.FileResponse(image_path, media_type="image/jpeg")
+    else:
+        raise HTTPException(status_code=404, detail="Image not found")
+    

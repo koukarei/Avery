@@ -99,6 +99,22 @@ class Round(Base):
 
     model=Column(String(100), index=True)
 
+    created_at = Column(DateTime, default=datetime.datetime.now())
+    duration = Column(Integer, default=0,nullable=True)
+    last_generation_id = Column(Integer, ForeignKey("generations.id"),nullable=True)
+
+    is_completed = Column(Boolean, default=False)
+    
+    player = relationship("UserProfile", back_populates="rounds",foreign_keys=[player_id])
+    personal_dictionaries = relationship("PersonalDictionary", back_populates="save_at_round")
+    generations = relationship("Generation", back_populates="round")
+    leaderboard = relationship("Leaderboard", back_populates="rounds", foreign_keys=[leaderboard_id])
+
+class Generation(Base): 
+    __tablename__ = "generations"
+
+    id = Column(Integer, primary_key=True)
+
     sentence = Column(String(120), index=True,nullable=True)
     correct_sentence = Column(String(120), index=True,nullable=True)
 
@@ -107,6 +123,7 @@ class Round(Base):
     effectiveness_score = Column(Integer, default=0,nullable=True)
     total_score = Column(Integer, default=0,nullable=True)
     rank = Column(String(1), default='F',nullable=True)
+    generated_time = Column(Integer, default=1,nullable=True)
 
     created_at = Column(DateTime, default=datetime.datetime.now())
     duration = Column(Integer, default=0,nullable=True)
@@ -114,11 +131,10 @@ class Round(Base):
     is_completed = Column(Boolean, default=False)
     
     interpreted_image_id=Column(Integer,ForeignKey("interpreted_images.id"),nullable=True)
+    round_id=Column(Integer,ForeignKey("rounds.id"))
 
     interpreted_image = relationship("InterpretedImage", back_populates="round",foreign_keys=[interpreted_image_id])
-    player = relationship("UserProfile", back_populates="rounds",foreign_keys=[player_id])
-    personal_dictionaries = relationship("PersonalDictionary", back_populates="save_at_round")
-    leaderboard = relationship("Leaderboard", back_populates="rounds", foreign_keys=[leaderboard_id])
+    round = relationship("Round", back_populates="generations",foreign_keys=[round_id])
 
 class Chat(Base):
     __tablename__ = "chats"
@@ -191,7 +207,7 @@ class InterpretedImage(Base):
     id = Column(Integer, primary_key=True)
     image_path = Column(String(255), index=True)
 
-    round = relationship("Round", back_populates="interpreted_image")
+    generation = relationship("Generation", back_populates="interpreted_image")
 
 class GoodOriginal(Base):
     __tablename__ = "good_originals"
