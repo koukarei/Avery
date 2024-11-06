@@ -12,6 +12,19 @@ services:
     tty: true
     volumes:
       - ./gradio-project:/app/gradio
+
+  react_front:
+    container_name: react_front
+    build:
+      context: react-project
+      dockerfile: Dockerfile
+    volumes:
+      - ./react-project/app:/code
+      - node_modules:/app/node_modules
+    command: sh -c "npm start"
+    ports:
+      - "7873:3000"
+    tty: true
       
   db:
     build:
@@ -53,6 +66,7 @@ services:
 volumes:
   db-store:
   media:
+  node_modules:
 
 networks:
   backend-network:

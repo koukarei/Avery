@@ -118,9 +118,25 @@ class Generation(Base):
     sentence = Column(String(120), index=True,nullable=True)
     correct_sentence = Column(String(120), index=True,nullable=True)
 
-    grammar_score = Column(Integer, default=0,nullable=True)
-    vocabulary_score = Column(Integer, default=0,nullable=True)
-    effectiveness_score = Column(Integer, default=0,nullable=True)
+    n_words = Column(Integer, default=0,nullable=True)
+    n_conjunctions = Column(Integer, default=0,nullable=True)
+    n_adj= Column(Integer, default=0,nullable=True)
+    n_adv = Column(Integer, default=0,nullable=True)
+    n_pronouns = Column(Integer, default=0,nullable=True)
+    n_prepositions = Column(Integer, default=0,nullable=True)
+
+    n_grammar_errors = Column(Integer, default=0,nullable=True)
+    n_spelling_errors = Column(Integer, default=0,nullable=True)
+
+    perplexity = Column(Integer, default=0,nullable=True)
+
+    f_word = Column(Integer, default=0,nullable=True)
+    f_bigram = Column(Integer, default=0,nullable=True)
+
+    n_clauses = Column(Integer, default=0,nullable=True)
+
+    content_score = Column(Integer, default=0,nullable=True)
+
     total_score = Column(Integer, default=0,nullable=True)
     rank = Column(String(1), default='F',nullable=True)
     generated_time = Column(Integer, default=1,nullable=True)

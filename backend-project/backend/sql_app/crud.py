@@ -167,36 +167,49 @@ def create_round(db: Session, leaderboard_id:int, user_id: int, created_at: date
     db.refresh(db_round)
     return db_round
 
-def update_round1(db: Session, round_id: int, round: schemas.RoundSentence):
+def get_generation(db: Session, generation_id: int):
+    return db.query(models.Generation).filter(models.Generation.id == generation_id).first()
+
+def create_generation(db: Session, round_id: int, generation: schemas.GenerationCreate):
     db_round = db.query(models.Round).filter(models.Round.id == round_id).first()
-    db_round.sentence = round.sentence
+    
+    db_generation = models.Generation(
+        generation.model_dump()
+    )
+    db.add(db_generation)
+    db.commit()
+    db.refresh(db_generation)
+
+    db_round.last_generation_id = db_generation.id
+    
     db.commit()
     db.refresh(db_round)
-    return db_round
+    return db_generation
 
-def update_round2(db: Session, round_id: int, round: schemas.RoundCorrectSentence):
-    db_round = db.query(models.Round).filter(models.Round.id == round_id).first()
-    db_round.correct_sentence = round.correct_sentence
+def update_generation1(db: Session, generation: schemas.GenerationCorrectSentence):
+    db_generation = db.query(models.Generation).filter(models.Generation.id == generation.id).first()
+    db_generation.correct_sentence = generation.correct_sentence
     db.commit()
-    db.refresh(db_round)
-    return db_round
+    db.refresh(db_generation)
+    return db_generation
 
-def update_round3(db: Session, round_id: int, round: schemas.RoundInterpretation):
-    db_round = db.query(models.Round).filter(models.Round.id == round_id).first()
-    db_round.interpreted_image_id = round.interpreted_image_id
+def update_generation2(db: Session, generation: schemas.GenerationInterpretation):
+    db_generation = db.query(models.Generation).filter(models.Generation.id == generation.id).first()
+    db_generation.interpreted_image_id = generation.interpreted_image_id
     db.commit()
-    db.refresh(db_round)
-    return db_round
+    db.refresh(db_generation)
+    return db_generation
 
-def update_round4(db: Session, round_id: int, round: schemas.RoundComplete):
+def update_generation3(db: Session, generation: schemas.GenerationComplete):
+    db_generation = db.query(models.Generation).filter(models.Generation.id == generation.id).first()
+    db_generation.update(generation.model_dump())
+    db.commit()
+    db.refresh(db_generation)
+    return db_generation
+
+def complete_round(db: Session, round_id: int, round: schemas.RoundComplete):
     db_round = db.query(models.Round).filter(models.Round.id == round_id).first()
-    db_round.grammar_score = round.grammar_score
-    db_round.vocabulary_score = round.vocabulary_score
-    db_round.effectiveness_score = round.effectiveness_score
-    db_round.total_score = round.total_score
-    db_round.rank = round.rank
-    db_round.duration = round.duration
-    db_round.is_completed = round.is_completed
+    db_round.update(round.model_dump())
     db.commit()
     db.refresh(db_round)
     return db_round

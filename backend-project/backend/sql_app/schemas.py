@@ -132,6 +132,7 @@ class Round(RoundBase):
 class GenerationCreate(BaseModel):
     round_id: int
     created_at: datetime.datetime
+    generated_time: int
     sentence: str
 
 class GenerationBase(BaseModel):
@@ -158,25 +159,33 @@ class GenerationCompleteCreate(BaseModel):
 
 class GenerationComplete(BaseModel):
     id: int
-    grammar_score: int
-    vocabulary_score: int
-    effectiveness_score: int
+    n_words: int
+    n_conjunctions: int
+    n_adj: int
+    n_adv: int
+    n_pronouns: int
+    n_prepositions: int
+
+    n_grammar_errors: int
+    n_spelling_errors: int
+
+    perlexity: int
+
+    f_word: int
+    f_bigram: int
+
+    n_clauses: int
+
+    content_score: int
+
     total_score: int
     rank: str
     duration: int
     is_completed: bool
 
-class GenerationOut(BaseModel):
-    id: int
+class GenerationOut(GenerationComplete):
     sentence: str
     correct_sentence: str
-    grammar_score: int
-    vocabulary_score: int
-    effectiveness_score: int
-    total_score: int
-    rank: str
-    duration: int
-    is_completed: bool
     interpreted_image: InterpretedImage
 
     class Config:
@@ -191,7 +200,6 @@ class RoundComplete(BaseModel):
 class RoundOut(BaseModel):
     id: int
     player: UserOut
-    interpreted_image_id: int
     generations: list[GenerationOut]=[]
 
     class Config:

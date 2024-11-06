@@ -60,16 +60,16 @@ def generateDescription(db: Session, leaderboard_id: int, image: str, story: Opt
 
 def calculate_score(
     db: Session,
-    thisround: schemas.RoundCompleteCreate,
+    generation: schemas.GenerationCompleteCreate,
     is_completed: bool=False
 ):
 
-    db_round = crud.get_round(db, thisround.id)
-    if db_round is None:
+    db_generation = crud.get_generation(db, generation_id=generation.id)
+    if db_generation is None:
         raise HTTPException(status_code=404, detail="Round not found")
     
-    if db_round.duration==0 or db_round.total_score==0:
-
+    if db_generation.duration==0 or db_generation.total_score==0:
+        db_round = crud.get_round(db, round_id=db_generation.round_id)
         ai_play = crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
 
         if not ai_play:
@@ -83,6 +83,7 @@ def calculate_score(
                 story=story, 
                 model_name="gpt-4o-mini"
             )
+
 
 
         effective_score = score.cosine_similarity_to_ai(
@@ -102,18 +103,32 @@ def calculate_score(
         total_score = (effective_score+grammar_score+vocab_score)/3
 
         if is_completed:
-            thisround_aware = thisround.at.replace(tzinfo=timezone.utc)
-            db_round_aware = db_round.created_at.replace(tzinfo=timezone.utc)
-            duration = (thisround_aware - db_round_aware).seconds
+            generation_aware = generation.at.replace(tzinfo=timezone.utc)
+            db_generation_aware = db_generation.created_at.replace(tzinfo=timezone.utc)
+            duration = (generation_aware - db_generation_aware).seconds
         else: 
             duration = 0
 
-        round_com = schemas.RoundComplete(
+        round_com = schemas.GenerationComplete(
             id=db_round.id,
-            grammar_score=int(grammar_score*100),
-            vocabulary_score=int(vocab_score*100),
-            effectiveness_score=int(effective_score*100),
-            total_score=int(total_score*100),
+            n_words=
+            n_conjunctions: int
+            n_adj: int
+            n_adv: int
+            n_pronouns: int
+            n_prepositions: int
+
+            n_grammar_errors: int
+            n_spelling_errors: int
+
+            perlexity: int
+
+            f_word: int
+            f_bigram: int
+
+            n_clauses: int
+
+            content_score: int
             rank=score.rank(total_score),
             duration=duration,
             is_completed=is_completed
@@ -372,49 +387,50 @@ def create_round(
     return db_round
 
 
-@app.put("/round/{round_id}", tags=["Round"], response_model=schemas.RoundCorrectSentence)
+@app.put("/round/{round_id}", tags=["Round"], response_model=schemas.GenerationCorrectSentence)
 def get_user_answer(
     round_id: int,
-    thisround: schemas.RoundSentence,
+    generation: schemas.GenerationCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    db_round = crud.update_round1(
+    db_generation = crud.create_generation(
         db=db,
         round_id=round_id,
-        round=thisround,
+        generation=generation,
     )
 
     try:
-        correct_sentence=sentence.checkSentence(sentence=db_round.sentence)
+        correct_sentence=sentence.checkSentence(sentence=db_generation.sentence)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     
+    db_round = crud.get_round(db, round_id)
+
     background_tasks.add_task(
         update_vocab_used_time,
         db=db,
-        sentence=db_round.sentence,
+        sentence=db_generation.sentence,
         user_id=db_round.player_id
     )
 
-    return crud.update_round2(
+    return crud.update_generation1(
         db=db,
-        round_id=round_id,
-        round=schemas.RoundCorrectSentence(
-            id=db_round.id,
+        generation=schemas.GenerationCorrectSentence(
+            id=db_generation.id,
             correct_sentence=correct_sentence
-        ),
+        )
     )
 
-@app.put("/round/{round_id}/interpretation", tags=["Round"], response_model=schemas.RoundInterpretation)
+@app.put("/round/{round_id}/interpretation", tags=["Round"], response_model=schemas.GenerationInterpretation)
 def get_interpretation(
     round_id: int,
-    thisround: schemas.RoundCorrectSentence,
+    generation: schemas.GenerationCorrectSentence,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     interpreted_image_url = gen_image.generate_interpretion(
-        sentence=thisround.correct_sentence,
+        sentence=generation.correct_sentence
     )
     image_filename = f"i_{round_id}"
     interpreted_image_path = media_dir / "interpreted_images" / f"{image_filename}.jpg"
@@ -448,31 +464,32 @@ def get_interpretation(
         )
     )
 
-    db_round = crud.update_round3(
+    db_generation = crud.update_generation2(
         db=db,
-        round_id=round_id,
-        round=schemas.RoundInterpretation(
+        generation=schemas.GenerationInterpretation(
             id=round_id,
             interpreted_image_id=db_interpreted_image.id,
-        ),
+        )
     )
 
-    thisround_complete = schemas.RoundCompleteCreate(
+    generation_complete = schemas.GenerationCompleteCreate(
         id=round_id,
-        at=db_round.created_at
+        at=db_generation.created_at
     )
 
     background_tasks.add_task(
         calculate_score,
         db=db,
-        thisround=thisround_complete,
+        generation=generation_complete,
         is_completed=False
     )
+
+    db_round = crud.get_round(db, round_id)
 
     new_message="""
 We input the sentence into Skyler's system. 📝
 Sentence: {}
-""".format(thisround.correct_sentence)
+""".format(generation.correct_sentence)
 
     crud.create_message(
         db=db,
@@ -483,14 +500,15 @@ Sentence: {}
         chat_id=db_round.chat_history
     )
 
-    return db_round
+    return db_generation
 
-@app.put("/round/{round_id}/complete", tags=["Round"], response_model=schemas.RoundComplete)
-def complete_round(
-    thisround: schemas.RoundCompleteCreate,
+@app.put("/round/{round_id}/complete", tags=["Round"], response_model=schemas.GenerationComplete)
+def complete_generation(
+    generation: schemas.GenerationCompleteCreate,
     db: Session = Depends(get_db),
 ):
-    db_round = crud.get_round(db, thisround.id)
+    db_generation = crud.get_generation(db, generation_id=generation.id)
+    db_round = crud.get_round(db, db_generation.round_id)
     db_chat = crud.get_chat(db=db,chat_id=db_round.chat_history)
     cb=chatbot.Hint_Chatbot()
     evaluation = cb.get_result(
@@ -505,14 +523,14 @@ def complete_round(
         db=db,
         message=schemas.MessageBase(
             content=evaluation,
-            sender="model"
+            sender="model" 
         ),
         chat_id=db_round.chat_history
     )
 
     return calculate_score(
         db=db,
-        thisround=thisround,
+        generation=generation,
         is_completed=True
     )
 
