@@ -12,7 +12,7 @@ pillow
 numpy
 Levenshtein==0.25.1
 openai==1.51.2
-spacy
-google-generativeai==0.7.2
+stanza==1.9.2
 pytest
 langchain
+language-tool-python==2.8.1
