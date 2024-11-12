@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, TEXT
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, TEXT, Float
 from sqlalchemy.orm import relationship
 
 import datetime
@@ -15,6 +15,7 @@ class User(Base):
     hashed_password = Column(String(255))
     is_active = Column(Boolean, default=True)
     profile_id = Column(Integer, ForeignKey("user_profiles.id"))
+    user_type = Column(String(25))
 
     profiles = relationship("UserProfile", back_populates="user")
 
@@ -89,6 +90,15 @@ class Description(Base):
     leaderboard_id=Column(Integer,ForeignKey("leaderboards.id"))
     leaderboard = relationship("Leaderboard", back_populates="descriptions")
 
+class Program(Base):
+    __tablename__ = "programs"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), index=True)
+    description = Column(String(255), index=True)
+
+    rounds = relationship("Round", back_populates="program")
+
 class Round(Base): 
     __tablename__ = "rounds"
 
@@ -96,6 +106,7 @@ class Round(Base):
     chat_history=Column(Integer,ForeignKey("chats.id"))
     leaderboard_id=Column(Integer,ForeignKey("leaderboards.id"))
     player_id = Column(Integer, ForeignKey("user_profiles.id"))
+    program_id = Column(Integer, ForeignKey("programs.id"))
 
     model=Column(String(100), index=True)
 
@@ -128,10 +139,10 @@ class Generation(Base):
     n_grammar_errors = Column(Integer, default=0,nullable=True)
     n_spelling_errors = Column(Integer, default=0,nullable=True)
 
-    perplexity = Column(Integer, default=0,nullable=True)
+    perplexity = Column(Float(precision=10, scale=2), default=0,nullable=True)
 
-    f_word = Column(Integer, default=0,nullable=True)
-    f_bigram = Column(Integer, default=0,nullable=True)
+    f_word = Column(Float(precision=10, scale=2), default=0,nullable=True)
+    f_bigram = Column(Float(precision=10, scale=2), default=0,nullable=True)
 
     n_clauses = Column(Integer, default=0,nullable=True)
 

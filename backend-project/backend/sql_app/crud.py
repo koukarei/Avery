@@ -59,7 +59,7 @@ def create_leaderboard(
         leaderboard: schemas.LeaderboardCreate,
 ):
     db_leaderboard = models.Leaderboard(
-        leaderboard.model_dump()
+        **leaderboard.model_dump()
     )
 
     db.add(db_leaderboard)
@@ -82,7 +82,7 @@ def get_original_image(db: Session, image_id: int):
     return db.query(models.OriginalImage).filter(models.OriginalImage.id == image_id).first()
 
 def create_original_image(db: Session, image: schemas.ImageBase):
-    db_image = models.OriginalImage(image.model_dump())
+    db_image = models.OriginalImage(**image.model_dump())
     db.add(db_image)
     db.commit()
     db.refresh(db_image)
@@ -92,7 +92,7 @@ def get_interpreted_image(db: Session, image_id: int):
     return db.query(models.InterpretedImage).filter(models.InterpretedImage.id == image_id).first()
 
 def create_interpreted_image(db: Session, image: schemas.ImageBase):
-    db_image = models.InterpretedImage(image.model_dump())
+    db_image = models.InterpretedImage(**image.model_dump())
     db.add(db_image)
     db.commit()
     db.refresh(db_image)
@@ -106,7 +106,7 @@ def get_stories(db: Session, skip: int = 0, limit: int = 100):
 
 def create_story(db: Session, story: schemas.StoryCreate):
     db_story = models.Story(
-        story.model_dump()
+        **story.model_dump()
     )
     db.add(db_story)
     db.commit()
@@ -120,7 +120,7 @@ def get_scene(db: Session, scene_id: int):
     return db.query(models.Scene).filter(models.Scene.id == scene_id).first()
 
 def create_scene(db: Session, scene: schemas.SceneBase):
-    db_scene = models.Scene(scene.model_dump())
+    db_scene = models.Scene(**scene.model_dump())
     db.add(db_scene)
     db.commit()
     db.refresh(db_scene)
@@ -133,7 +133,7 @@ def get_description(db: Session, leaderboard_id: int, model_name: str=None):
         return db.query(models.Description).filter(models.Description.leaderboard_id == leaderboard_id).all()
 
 def create_description(db: Session, description: schemas.DescriptionBase):
-    db_description = models.Description(description.model_dump())
+    db_description = models.Description(**description.model_dump())
     db.add(db_description)
     db.commit()
     db.refresh(db_description)
@@ -161,7 +161,7 @@ def create_round(db: Session, leaderboard_id:int, user_id: int, created_at: date
         model=model_name,
         created_at=created_at
     )
-
+    
     db.add(db_round)
     db.commit()
     db.refresh(db_round)
@@ -174,7 +174,7 @@ def create_generation(db: Session, round_id: int, generation: schemas.Generation
     db_round = db.query(models.Round).filter(models.Round.id == round_id).first()
     
     db_generation = models.Generation(
-        generation.model_dump()
+        **generation.model_dump()
     )
     db.add(db_generation)
     db.commit()
@@ -202,14 +202,14 @@ def update_generation2(db: Session, generation: schemas.GenerationInterpretation
 
 def update_generation3(db: Session, generation: schemas.GenerationComplete):
     db_generation = db.query(models.Generation).filter(models.Generation.id == generation.id).first()
-    db_generation.update(generation.model_dump())
+    db_generation.update(**generation.model_dump())
     db.commit()
     db.refresh(db_generation)
     return db_generation
 
 def complete_round(db: Session, round_id: int, round: schemas.RoundComplete):
     db_round = db.query(models.Round).filter(models.Round.id == round_id).first()
-    db_round.update(round.model_dump())
+    db_round.update(**round.model_dump())
     db.commit()
     db.refresh(db_round)
     return db_round
@@ -219,7 +219,7 @@ def get_chat(db: Session, chat_id: int):
 
 def create_message(db: Session, message: schemas.MessageBase, chat_id: int):
     db_message = models.Message(
-        message.model_dump()
+        **message.model_dump()
     )
     db_message.chat_id = chat_id
     db.add(db_message)
@@ -236,7 +236,7 @@ def get_vocabulary(db: Session, vocabulary: str, part_of_speech: str):
     return db.query(models.Vocabulary).filter(models.Vocabulary.word == vocabulary).filter(models.Vocabulary.pos == part_of_speech).first()
 
 def create_vocabulary(db: Session, vocabulary: schemas.VocabularyBase):
-    db_vocabulary = models.Vocabulary(vocabulary.model_dump())
+    db_vocabulary = models.Vocabulary(**vocabulary.model_dump())
     db.add(db_vocabulary)
     db.commit()
     db.refresh(db_vocabulary)
@@ -273,7 +273,7 @@ def update_personal_dictionary(
 ):
     
     db_dictionary = db.query(models.PersonalDictionary).filter(models.PersonalDictionary.player == dictionary.player).filter(models.PersonalDictionary.vocabulary == dictionary.vocabulary).first()
-    db_dictionary.update(dictionary.model_dump())
+    db_dictionary.update(**dictionary.model_dump())
     db.commit()
     db.refresh(db_dictionary)
     return db_dictionary

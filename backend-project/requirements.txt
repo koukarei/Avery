@@ -16,3 +16,6 @@ stanza==1.9.2
 pytest
 langchain
 language-tool-python==2.8.1
+transformers==4.46.2
+torch==2.5.1
+salesforce-lavis==1.0.2

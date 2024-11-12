@@ -169,10 +169,10 @@ class GenerationComplete(BaseModel):
     n_grammar_errors: int
     n_spelling_errors: int
 
-    perlexity: int
+    perlexity: float
 
-    f_word: int
-    f_bigram: int
+    f_word: float
+    f_bigram: float
 
     n_clauses: int
 

@@ -29,6 +29,7 @@ def get_db():
         db.close()
 
 def generateDescription(db: Session, leaderboard_id: int, image: str, story: Optional[str], model_name: str="gpt-4o-mini"):
+    
     contents = sentence.genSentences(
         image=image,
         story=story
@@ -63,7 +64,7 @@ def calculate_score(
     generation: schemas.GenerationCompleteCreate,
     is_completed: bool=False
 ):
-
+    
     db_generation = crud.get_generation(db, generation_id=generation.id)
     if db_generation is None:
         raise HTTPException(status_code=404, detail="Round not found")
