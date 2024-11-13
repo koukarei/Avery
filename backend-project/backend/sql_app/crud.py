@@ -48,6 +48,17 @@ def create_user(db: Session, user: schemas.UserCreate):
 
     return db_user
 
+def delete_user(db: Session, user_id: int):
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    db_user_profile = db.query(models.UserProfile).filter(models.UserProfile.id == db_user.profile_id).first()
+    if db_user_profile:
+        db.delete(db_user_profile)
+        db.commit()
+    if db_user:
+        db.delete(db_user)
+        db.commit()
+    return db_user
+
 def get_leaderboards(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Leaderboard).offset(skip).limit(limit).all()
 
