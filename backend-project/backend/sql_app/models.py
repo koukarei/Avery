@@ -112,7 +112,7 @@ class Round(Base):
 
     created_at = Column(DateTime, default=datetime.datetime.now())
     duration = Column(Integer, default=0,nullable=True)
-    last_generation_id = Column(Integer, ForeignKey("generations.id"),nullable=True)
+    last_generation_id = Column(Integer, nullable=True)
 
     is_completed = Column(Boolean, default=False)
     
@@ -161,7 +161,7 @@ class Generation(Base):
     interpreted_image_id=Column(Integer,ForeignKey("interpreted_images.id"),nullable=True)
     round_id=Column(Integer,ForeignKey("rounds.id"))
 
-    interpreted_image = relationship("InterpretedImage", back_populates="round",foreign_keys=[interpreted_image_id])
+    interpreted_image = relationship("InterpretedImage", back_populates="generation",foreign_keys=[interpreted_image_id])
     round = relationship("Round", back_populates="generations",foreign_keys=[round_id])
 
 class Chat(Base):
