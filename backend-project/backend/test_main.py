@@ -5,6 +5,7 @@ sys.path.append(os.getcwd())
 from fastapi.testclient import TestClient
 
 from main import app 
+from fastapi import UploadFile
 
 client = TestClient(app)
 
@@ -62,12 +63,45 @@ def test_users():
 
 
 def test_read_scenes():
+    # Test read all scenes
     response = client.get("/sqlapp/scenes/")
     assert response.status_code == 200
 
+    # Test create a new scene
+    new_scene = {
+        "name": "Beatrix Potter",
+        "prompt": "in the style of Beatrix Potter"
+    }
+
+    response = client.post("/sqlapp/scene/", json=new_scene.copy(),headers={"Content-Type": "application/json"})
+    assert response.status_code == 200
+    scene_id = response.json()['id']
+    assert scene_id > 0
+
 def test_read_stories():
+    # Test read all stories
     response = client.get("/sqlapp/stories/")
     assert response.status_code == 200
+    num_stories = len(response.json())
+
+    # Test create a new story
+    test_file_path = "mice_story_for_test.txt"
+    with open(test_file_path, "rb") as f:
+        response = client.post(
+            "/sqlapp/story/",
+            files={"story_content_file": ("mice_story_for_test.txt", f, "text/plain")},
+            data={
+                "title": "The Tale of Two Bad Mice",
+                "scene_id": "1"  
+            },
+        )
+    print(f"story file uploaded: {response.json()}")
+    assert response.status_code == 200
+
+    # Test whether story is created
+    response = client.get("/sqlapp/stories/")
+    assert response.status_code == 200
+    assert len(response.json()) == num_stories + 1
 
 def test_read_leaderboards():
     response = client.get("/sqlapp/leaderboards/")
