@@ -116,6 +116,7 @@ class Round(Base):
 
     is_completed = Column(Boolean, default=False)
     
+    program = relationship("Program", back_populates="rounds")
     player = relationship("UserProfile", back_populates="rounds",foreign_keys=[player_id])
     personal_dictionaries = relationship("PersonalDictionary", back_populates="save_at_round")
     generations = relationship("Generation", back_populates="round")
@@ -139,10 +140,10 @@ class Generation(Base):
     n_grammar_errors = Column(Integer, default=0,nullable=True)
     n_spelling_errors = Column(Integer, default=0,nullable=True)
 
-    perplexity = Column(Float(precision=10, scale=2), default=0,nullable=True)
+    perplexity = Column(Float(precision=10), default=0,nullable=True)
 
-    f_word = Column(Float(precision=10, scale=2), default=0,nullable=True)
-    f_bigram = Column(Float(precision=10, scale=2), default=0,nullable=True)
+    f_word = Column(Float(precision=10), default=0,nullable=True)
+    f_bigram = Column(Float(precision=10), default=0,nullable=True)
 
     n_clauses = Column(Integer, default=0,nullable=True)
 

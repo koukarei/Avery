@@ -1,6 +1,10 @@
+import os
+import sys
+sys.path.append(os.getcwd())
+
 from fastapi.testclient import TestClient
 
-from .main import app 
+from main import app 
 
 client = TestClient(app)
 
@@ -8,6 +12,8 @@ client = TestClient(app)
 def test_read_users():
     response = client.get("/sqlapp/users/")
     assert response.status_code == 200
+    s=f"read_users: {response.json()}"
+    print(s)
 
 def test_read_scenes():
     response = client.get("/sqlapp/scenes/")

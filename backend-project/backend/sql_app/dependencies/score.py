@@ -11,9 +11,6 @@ import torch
 from lavis.models import load_model_and_preprocess
 from lavis.processors import load_processor
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model, vis_processors, text_processors = load_model_and_preprocess("blip2_image_text_matching", "pretrain", device=device, is_eval=True)
-
 import stanza
 import language_tool_python
 import time
@@ -39,16 +36,16 @@ def model_init(model_string, cuda):
     print("Model init")
     return model, tokenizer
 
-model, tokenizer = model_init('gpt2', False)
+perplexity_model, tokenizer = model_init('gpt2', False)
 
 def get_loss_pretrained(text, cuda=False):
-    assert model is not None
+    assert perplexity_model is not None
     assert tokenizer is not None
     input_ids = torch.tensor(tokenizer.encode(text)).unsqueeze(0)  # Batch size 1
     if cuda:
         input_ids = input_ids.to('cuda')
     with torch.no_grad():
-        outputs = model(input_ids, labels=input_ids)
+        outputs = perplexity_model(input_ids, labels=input_ids)
     loss, logits = outputs[:2]
     sentence_prob = loss.item()
     return sentence_prob
@@ -175,7 +172,12 @@ def calculate_content_score(image_path: str, sentence: str):
     img = vis_processors["eval"](raw_image).unsqueeze(0).to(device)
     txt = text_processors["eval"](sentence)
 
-    itm_output = model({"image": img, "text_input": txt}, match_head="itm")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    content_model, vis_processors, text_processors = load_model_and_preprocess(
+        "blip2_image_text_matching", "pretrain", device=device, is_eval=True
+    )
+
+    itm_output = content_model({"image": img, "text_input": txt}, match_head="itm")
     itm_scores = torch.nn.functional.softmax(itm_output, dim=1)
     content_score = itm_scores[:, 1].item()*100
     # print(f'The image and text are matched with a probability of {itm_scores[:, 1].item():.3%}')
@@ -196,14 +198,14 @@ def calculate_score(
       n_pronouns: int,
       n_prepositions: int,
       n_clauses: int,
-      perplexity: int,
-      f_word: int,
-      f_bigram: int,
+      perplexity: float,
+      f_word: float,
+      f_bigram: float,
       content_score: int
 ):
     output={
        'grammar_score':5-len(n_grammar_errors) if len(n_grammar_errors)<5 else 0,
-       'spelling_score':(n_words-len(n_spelling_errors))/n_words
+       'spelling_score':((n_words-len(n_spelling_errors))/n_words)*5
     }
 
     output['vividness_score']+= 1 if n_adj else 0
@@ -217,9 +219,12 @@ def calculate_score(
         output['vividness_score']+= 2
     else:
        output['vividness_score']+= descriptive_words*4
-    output['vividness_score'] = f_word
-    
+    output['vividness_score'] += f_word
+    output['vividness_score'] = output['vividness_score'] if output['vividness_score'] < 8 else 8
+    output['vividness_score'] = output['vividness_score'] / 8 * 5
+
     perplexity_score = perplexity*100
+    f_bigram = f_bigram if f_bigram < 5 else 5
     convention = f_bigram-perplexity_score
     output['convention']= convention
     
@@ -255,7 +260,7 @@ def calculate_score_init(image_path: str, sentence: str):
    
    output=calculate_score(**factors)
 
-   return output
+   return factors, output
 
 # def semantic_similarity(sentence:str,corrected_sentence:str):
 #     semantic_score=Levenshtein.ratio(sentence,corrected_sentence)
@@ -291,14 +296,16 @@ def calculate_score_init(image_path: str, sentence: str):
 #     return vocab_score
 
 def rank(total_score):
-    if total_score>0.8:
+    if total_score>2100:
         return "A"
-    elif total_score>0.6:
+    elif total_score>1800:
         return "B"
-    elif total_score>0.4:
+    elif total_score>1600:
         return "C"
-    elif total_score>0.2:
+    elif total_score>1000:
         return "D"
+    elif total_score>500:
+        return "E"
     else:
         return "F"
 

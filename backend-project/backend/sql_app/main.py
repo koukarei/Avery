@@ -7,7 +7,7 @@ from PIL import Image
 from . import crud, models, schemas
 from .database import SessionLocal, engine
 
-from .dependencies import sentence, gen_image, score, dictionary, chatbot
+from .dependencies import sentence, gen_image, score, dictionary, openai_chatbot
 
 from typing import Union, List, Annotated, Optional
 from datetime import timezone
@@ -67,7 +67,7 @@ def calculate_score(
     
     db_generation = crud.get_generation(db, generation_id=generation.id)
     if db_generation is None:
-        raise HTTPException(status_code=404, detail="Round not found")
+        raise HTTPException(status_code=404, detail="Generation not found")
     
     if db_generation.duration==0 or db_generation.total_score==0:
         db_round = crud.get_round(db, round_id=db_generation.round_id)
@@ -85,23 +85,10 @@ def calculate_score(
                 model_name="gpt-4o-mini"
             )
 
-
-
-        effective_score = score.cosine_similarity_to_ai(
-            ai_play=[ai.content for ai in ai_play],
-            corrected_sentence=db_round.correct_sentence,
+        factors, scores=score.calculate_score_init(
+            image_path=db_round.leaderboard.original_image.image_path,
+            sentence=db_generation.sentence,
         )
-
-        grammar_score = score.semantic_similarity(
-            sentence=db_round.sentence,
-            corrected_sentence=db_round.correct_sentence,
-        )
-
-        vocab_score = score.vocab_difficulty(
-            corrected_sentence=db_round.correct_sentence,
-        )
-
-        total_score = (effective_score+grammar_score+vocab_score)/3
 
         if is_completed:
             generation_aware = generation.at.replace(tzinfo=timezone.utc)
@@ -110,53 +97,90 @@ def calculate_score(
         else: 
             duration = 0
 
-        round_com = schemas.GenerationComplete(
+        generation_com = schemas.GenerationComplete(
             id=db_round.id,
-            n_words=
-            n_conjunctions: int
-            n_adj: int
-            n_adv: int
-            n_pronouns: int
-            n_prepositions: int
+            n_words=factors['n_words'],
+            n_conjunctions=factors['n_conjunctions'],
+            n_adj=factors['n_adj'],
+            n_adv=factors['n_adv'],
+            n_pronouns=factors['n_pronouns'],
+            n_prepositions=factors['n_prepositions'],
 
-            n_grammar_errors: int
-            n_spelling_errors: int
+            n_grammar_errors=factors['n_grammar_errors'],
+            n_spelling_errors=factors['n_spelling_errors'],
 
-            perlexity: int
+            perlexity=factors['perplexity'],
 
-            f_word: int
-            f_bigram: int
+            f_word=factors['f_word'],
+            f_bigram=factors['f_bigram'],
 
-            n_clauses: int
+            n_clauses=factors['n_clauses'],
 
-            content_score: int
-            rank=score.rank(total_score),
+            content_score=scores['content_score'],
+
+            total_score=scores['total_score'],
+            rank=score.rank(scores['total_score']),
             duration=duration,
             is_completed=is_completed
         )
+
     else:
 
-        thisround_aware = thisround.at.replace(tzinfo=timezone.utc)
-        db_round_aware = db_round.created_at.replace(tzinfo=timezone.utc)
-        duration = (thisround_aware - db_round_aware).seconds
+        generation_aware = generation.at.replace(tzinfo=timezone.utc)
+        db_generation_aware = db_generation.created_at.replace(tzinfo=timezone.utc)
+        duration = (generation_aware - db_generation_aware).seconds
 
-        round_com = schemas.RoundComplete(
-            id=db_round.id,
-            grammar_score=db_round.grammar_score,
-            vocabulary_score=db_round.vocabulary_score,
-            effectiveness_score=db_round.effectiveness_score,
-            total_score=db_round.total_score,
-            rank=db_round.rank,
+        generation_com = schemas.GenerationComplete(
+            id=db_generation.id,
+            
+            n_words=db_generation.n_words,
+            n_conjunctions=db_generation.n_conjunctions,
+            n_adj=db_generation.n_adj,
+            n_adv=db_generation.n_adv,
+            n_pronouns=db_generation.n_pronouns,
+            n_prepositions=db_generation.n_prepositions,
+
+            n_grammar_errors=db_generation.n_grammar_errors,
+            n_spelling_errors=db_generation.n_spelling_errors,
+
+            perlexity=db_generation.perlexity,
+
+            f_word=db_generation.f_word,
+            f_bigram=db_generation.f_bigram,
+
+            n_clauses=db_generation.n_clauses,
+
+            content_score=db_generation.content_score,
+
+            rank=db_generation.rank,
             duration=duration,
             is_completed=is_completed
         )
 
+        factors = {
+            'n_words': db_generation.n_words,
+            'n_conjunctions': db_generation.n_conjunctions,
+            'n_adj': db_generation.n_adj,
+            'n_adv': db_generation.n_adv,
+            'n_pronouns': db_generation.n_pronouns,
+            'n_prepositions': db_generation.n_prepositions,
+            'n_grammar_errors': db_generation.n_grammar_errors,
+            'n_spelling_errors': db_generation.n_spelling_errors,
+            'perplexity': db_generation.perlexity,
+            'f_word': db_generation.f_word,
+            'f_bigram': db_generation.f_bigram,
+            'n_clauses': db_generation.n_clauses,
+            'content_score': db_generation.content_score
+        }
 
-    return crud.update_round4(
+        scores = score.calculate_score(**factors)
+
+    crud.update_generation3(
         db=db,
-        round_id=thisround.id,
-        round=round_com,
+        generation=generation_com
     )
+
+    return factors, scores
 
 def update_vocab_used_time(
         db: Session,
@@ -177,6 +201,7 @@ def update_vocab_used_time(
                 player_id=user_id,
                 vocabulary_id=db_vocab.id
             )
+
             if db_personal_dictionary:
                 updated_vocab.append(
                     crud.update_personal_dictionary_used(
@@ -379,14 +404,13 @@ def create_round(
     crud.create_message(
         db=db,
         message=schemas.MessageBase(
-            content="The image is imported to my system. You can ask me for a hint.",
-            sender="model"
+            content="画像はシステムにインポートされました。ヒントを求めることができます。",
+            sender="assistant"
         ),
         chat_id=db_round.chat_history
     )
 
     return db_round
-
 
 @app.put("/round/{round_id}", tags=["Round"], response_model=schemas.GenerationCorrectSentence)
 def get_user_answer(
@@ -403,6 +427,7 @@ def get_user_answer(
 
     try:
         correct_sentence=sentence.checkSentence(sentence=db_generation.sentence)
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     
@@ -435,7 +460,6 @@ def get_interpretation(
     )
     image_filename = f"i_{round_id}"
     interpreted_image_path = media_dir / "interpreted_images" / f"{image_filename}.jpg"
-
 
     try:
         b_interpreted_image = io.BytesIO(requests.get(interpreted_image_url).content)
@@ -488,15 +512,15 @@ def get_interpretation(
     db_round = crud.get_round(db, round_id)
 
     new_message="""
-We input the sentence into Skyler's system. 📝
-Sentence: {}
+回答をシステム入力しました。📝
+回答: {}
 """.format(generation.correct_sentence)
 
     crud.create_message(
         db=db,
         message=schemas.MessageBase(
             content=new_message,
-            sender="model"
+            sender="assistant"
         ),
         chat_id=db_round.chat_history
     )
@@ -511,29 +535,104 @@ def complete_generation(
     db_generation = crud.get_generation(db, generation_id=generation.id)
     db_round = crud.get_round(db, db_generation.round_id)
     db_chat = crud.get_chat(db=db,chat_id=db_round.chat_history)
-    cb=chatbot.Hint_Chatbot()
-    evaluation = cb.get_result(
-        generated_image=db_round.interpreted_image.image_path,
-        sentence=db_round.correct_sentence,
-        scoring="Effectiveness Score: %d Vocabulary Score: %d".format(db_round.effectiveness_score,db_round.vocabulary_score),
-        original_image=db_round.leaderboard.original_image.image_path,
-        chat_history=db_chat.messages,
-    )
+    cb=openai_chatbot.Hint_Chatbot()
 
-    crud.create_message(
-        db=db,
-        message=schemas.MessageBase(
-            content=evaluation,
-            sender="model" 
-        ),
-        chat_id=db_round.chat_history
-    )
-
-    return calculate_score(
+    factors, scores_dict = calculate_score(
         db=db,
         generation=generation,
         is_completed=True
     )
+    if 'grammar_error' in factors:
+        grammar_errors=str(factors['grammar_error'])
+        spelling_errors=str(factors['spelling_error'])
+    elif factors['n_grammar_errors'] > 0:
+        errors = score.grammar_spelling_errors(db_generation.sentence)
+        grammar_errors=str(errors['grammar_error'])
+        spelling_errors=str(errors['spelling_error'])
+    else:
+        grammar_errors='None'
+        spelling_errors='None'
+
+    evaluation = cb.get_result(
+        sentence=db_generation.sentence,
+        scoring=scores_dict,
+        rank=db_generation.rank,
+        original_image=db_round.leaderboard.original_image.image_path,
+        chat_history=db_chat.messages,
+        grammar_errors=grammar_errors,
+        spelling_errors=spelling_errors
+    )
+
+    if evaluation:
+        evaluation_message = """あなたの回答：{user_sentence}
+        Grammar Score: {grammar_score} (out of 5)
+        Spelling Score: {spelling_score} (out of 5)
+        Vividness Score: {vividness_score} (out of 5)
+        Convention Score: {convention} (out of 5)
+        Structure Score: {structure_score} (out of 3)
+        Content Comprehensive Score: {content_score} (out of 100)
+        Total Score: {total_score} (out of 2300)
+        Rank: {rank}
+        
+        文法について
+        {grammar_feedback}
+        スペルについて
+        {spelling_feedback}
+        スタオルについて
+        {style_feedback}
+        内容について
+        {content_feedback}
+
+        整体的なコメント
+        {overall_feedback}
+        """.format(
+            user_sentence=db_round.correct_sentence,
+            grammar_score=scores_dict['grammar_score'],
+            spelling_score=scores_dict['spelling_score'],
+            vividness_score=scores_dict['vividness_score'],
+            convention=scores_dict['convention'],
+            structure_score=scores_dict['structure_score'],
+            content_score=scores_dict['content_score'],
+            total_score=scores_dict['total_score'],
+            rank=db_generation.rank,
+            grammar_feedback=evaluation.grammar_evaluation,
+            spelling_feedback=evaluation.spelling_evaluation,
+            style_feedback=evaluation.style_evaluation,
+            content_feedback=evaluation.content_evaluation,
+            overall_feedback=evaluation.overall_evaluation
+        )
+
+        crud.create_message(
+            db=db,
+            message=schemas.MessageBase(
+                content=evaluation_message,
+                sender="assistant" 
+            ),
+            chat_id=db_round.chat_history
+        )
+
+    return crud.get_generation(db, generation_id=generation.id)
+
+@app.post("/round/{round_id}/end",tags=["Round"], response_model=schemas.RoundOut)
+def end_round(
+    round_id: int,
+    db: Session = Depends(get_db),
+):
+    db_round = crud.get_round(db, round_id)
+
+    now_tim = datetime.datetime.now(tz=timezone.utc)
+    db_generation_aware = db_round.created_at.replace(tzinfo=timezone.utc)
+    duration = (now_tim - db_generation_aware).seconds
+
+
+    db_round = crud.complete_round(db, round_id, schemas.RoundComplete(
+        id=round_id,
+        last_generation_id=db_round.last_generation_id,
+        duration=duration,
+        is_completed=True
+    ))
+
+    return db_round
 
 @app.get("/personal_dictionaries/", tags=["Personal Dictionary"], response_model=list[schemas.PersonalDictionary])
 def read_personal_dictionaries(player_id: int, db: Session = Depends(get_db)):
@@ -638,24 +737,26 @@ def update_chat(
     )
 
     # get hint from AI
-    cb = chatbot.Hint_Chatbot()
+    cb = openai_chatbot.Hint_Chatbot()
 
     model_response = cb.nextResponse(
         ask_for_hint=message.content,
-        chat_history=db_new['chat'].messages,
+        chat_history=db_chat.messages,
         original_image=db_round.leaderboard.original_image.image_path,
     )
+    if model_response:
+        result = crud.create_message(
+            db=db,
+            message=schemas.MessageBase(
+                content=model_response.hints,
+                sender="assistant"
+            ),
+            chat_id=db_chat.id
+        )
 
-    result = crud.create_message(
-        db=db,
-        message=schemas.MessageBase(
-            content=model_response,
-            sender="model"
-        ),
-        chat_id=db_chat.id
-    )
-
-    return result
+        return result
+    else:
+        raise HTTPException(status_code=400, detail="Error in chatbot response")
 
 @app.get("/original_image/{leaderboard_id}", tags=["Image"])
 async def get_original_image(leaderboard_id: int, db: Session = Depends(get_db)):

@@ -1,17 +1,17 @@
 services:
-  gradio:
-    env_file:
-      - gradio-project/.env
-    container_name: frontend
-    build:
-      context: gradio-project
-      dockerfile: Dockerfile
-    command: python3 gradio_app.py
-    ports:
-      - "7870:7860"
-    tty: true
-    volumes:
-      - ./gradio-project:/app/gradio
+  # gradio:
+  #   env_file:
+  #     - gradio-project/.env
+  #   container_name: frontend
+  #   build:
+  #     context: gradio-project
+  #     dockerfile: Dockerfile
+  #   command: python3 gradio_app.py
+  #   ports:
+  #     - "7870:7860"
+  #   tty: true
+  #   volumes:
+  #     - ./gradio-project:/app/gradio
 
   react_front:
     container_name: react_front
