@@ -1,4 +1,3 @@
-import { red } from '@mui/material/colors';
 import { createTheme, responsiveFontSizes } from '@mui/material/styles';
 
 // Light theme

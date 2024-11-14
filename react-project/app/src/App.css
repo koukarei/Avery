@@ -3,13 +3,16 @@
 }
 
 .App-logo {
-  height: 40vmin;
-  pointer-events: none;
+  height: 30vmin;
+  pointer-events: auto;
+  position: relative;
+  bottom: 5%;
+  left: 5%;
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .App-logo {
-    animation: App-logo-spin infinite 20s linear;
+    animation: upDown infinite 20s linear;
   }
 }
 
@@ -35,4 +38,10 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+@keyframes upDown {
+  0% { top: 0; }
+  50% { top: 5vh; }
+  100% { top: 0; }
 }

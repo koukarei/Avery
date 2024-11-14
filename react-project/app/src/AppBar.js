@@ -48,7 +48,17 @@ const DrawerList = (
 
   return (
     <div>
-      <Button onClick={toggleDrawer(true)}>Open drawer</Button>
+      <Button onClick={toggleDrawer(true)}>
+        <IconButton
+            size="large"
+            edge="start"
+            color="inherit"
+            aria-label="menu"
+            sx={{ mr: 2 }}
+          >
+            <MenuIcon />
+        </IconButton>
+      </Button>
       <Drawer open={open} onClose={toggleDrawer(false)}>
         {DrawerList}
       </Drawer>
@@ -62,15 +72,7 @@ export default function ButtonAppBar({currentPage}) {
     <Box sx={{ flexGrow: 1 }}>
       <AppBar position="static">
         <Toolbar>
-          <IconButton
-            size="large"
-            edge="start"
-            color="inherit"
-            aria-label="menu"
-            sx={{ mr: 2 }}
-          >
-            <MenuIcon />
-          </IconButton>
+          <AveryDrawer />
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             {currentPage}
           </Typography>
