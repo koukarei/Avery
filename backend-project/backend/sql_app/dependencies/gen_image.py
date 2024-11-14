@@ -25,16 +25,13 @@ def gen_image(sentence,size="1024x1024",quality="standard",n=1):
     return response.data[0].url
 
 def generate_interpretion(sentence):
-    rules="""
-            Generate a image in the style of Beatrix Potter for the sentence above.
+    prompt="""
+            I NEED to test how the tool works with extremely simple prompts. DO NOT add any detail, just use it AS-IS:
+            Generate a image in the style of Beatrix Potter for the sentence.
             The image must not contain any text, wording or sentence.
-            The image must not be a collage. The image must be a single image.
-            """
+            Sentence: {}
+            """.format(sentence)
 
-    prompt = "{} \n {}".format(
-        sentence,
-        rules
-    )
     url = gen_image(prompt)
     return url
 
