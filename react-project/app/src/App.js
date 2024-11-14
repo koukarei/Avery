@@ -11,7 +11,7 @@ function App() {
       <div className="App">
         <ButtonAppBar currentPage={"Leaderboard"}/>
         <header className="App-header">
-          <img src={avery} className="App-logo" alt="logo" />
+          <img src={avery} className="Robot-Look" alt="logo" />
         </header>
       </div>
     </ThemeProvider>

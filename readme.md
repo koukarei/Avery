@@ -9,3 +9,6 @@
 
 # Rerun docker
 ```docker-compose down && docker-compose up -d```
+
+# Stop specific container
+```docker-compose rm -fsv react_front```
