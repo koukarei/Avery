@@ -103,10 +103,20 @@ def test_read_stories():
     assert response.status_code == 200
     assert len(response.json()) == num_stories + 1
 
-def test_read_leaderboards():
+def test_leaderboards():
     response = client.get("/sqlapp/leaderboards/")
     assert response.status_code == 200
 
+def test_round():
+    pass
 
+def test_vocabulary():
+    pass
+
+def test_chat():
+    pass
+
+def test_image():
+    pass
 
 
