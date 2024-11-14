@@ -35,7 +35,7 @@ const DrawerList = (
             <ListItemButton>
               <ListItemIcon>
                 <span class="material-symbols-outlined">
-                  drawer_items[text]
+                  {drawer_items[text]}
                 </span>
               </ListItemIcon>
               <ListItemText primary={text} />

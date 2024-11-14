@@ -2,17 +2,19 @@
   text-align: center;
 }
 
-.App-logo {
+.Robot-Look {
+  position: absolute;
   height: 30vmin;
   pointer-events: auto;
-  position: relative;
-  bottom: 5%;
-  left: 5%;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  margin: 10px;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: upDown infinite 20s linear;
+  .Robot-Look {
+    animation: upDown infinite 10s linear;
   }
 }
 
@@ -25,6 +27,7 @@
   justify-content: center;
   font-size: calc(10px + 2vmin);
   color: white;
+  position: relative;
 }
 
 .App-link {
@@ -41,7 +44,7 @@
 }
 
 @keyframes upDown {
-  0% { top: 0; }
-  50% { top: 5vh; }
-  100% { top: 0; }
+  0% { bottom: 10vmin; }
+  50% { bottom: 13vmin; }
+  100% { bottom: 10vmin; }
 }

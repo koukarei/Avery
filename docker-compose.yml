@@ -21,7 +21,7 @@ services:
     volumes:
       - ./react-project/app:/code
       - node_modules:/app/node_modules
-    command: sh -c "npm run build"
+    command: sh -c "npm start"
     ports:
       - "7873:3000"
     tty: true
