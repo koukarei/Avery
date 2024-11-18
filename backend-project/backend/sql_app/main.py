@@ -411,7 +411,8 @@ def create_round(
         db=db,
         message=schemas.MessageBase(
             content="画像はシステムにインポートされました。ヒントを求めることができます。",
-            sender="assistant"
+            sender="assistant",
+            created_at=datetime.datetime.now(tz=timezone.utc)
         ),
         chat_id=db_round.chat_history
     )
@@ -526,7 +527,8 @@ def get_interpretation(
         db=db,
         message=schemas.MessageBase(
             content=new_message,
-            sender="assistant"
+            sender="assistant",
+            created_at=datetime.datetime.now(tz=timezone.utc)
         ),
         chat_id=db_round.chat_history
     )
@@ -612,7 +614,8 @@ def complete_generation(
             db=db,
             message=schemas.MessageBase(
                 content=evaluation_message,
-                sender="assistant" 
+                sender="assistant",
+                created_at=datetime.datetime.now(tz=timezone.utc)
             ),
             chat_id=db_round.chat_history
         )
@@ -737,7 +740,8 @@ def update_chat(
         db=db,
         message=schemas.MessageBase(
             content=message.content,
-            sender="user"
+            sender="user",
+            created_at=datetime.datetime.now(tz=timezone.utc)
         ),
         chat_id=db_chat.id
     )
@@ -755,7 +759,8 @@ def update_chat(
             db=db,
             message=schemas.MessageBase(
                 content=model_response.hints,
-                sender="assistant"
+                sender="assistant",
+                created_at=datetime.datetime.now(tz=timezone.utc)
             ),
             chat_id=db_chat.id
         )

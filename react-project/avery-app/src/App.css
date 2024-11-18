@@ -1,0 +1,47 @@
+.App {
+  text-align: center;
+  background-color: #eae9b1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+  position: relative;
+}
+
+.Stepper{
+  top: 1vh;
+  left: 0;
+  height: 95vh;
+  position: absolute;
+  width: 100vw;
+}
+
+.Robot {
+  position: absolute;
+  height: 30vmin;
+  pointer-events: auto;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  margin: 10px;
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .Robot {
+    animation: Robot-updown infinite 5s linear;
+  }
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes Robot-updown {
+  0% { bottom: 0; }
+  50% { bottom: 2vh; }
+  100% { bottom: 0; }
+}

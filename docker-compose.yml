@@ -19,12 +19,14 @@ services:
       context: react-project
       dockerfile: Dockerfile
     volumes:
-      - ./react-project/app:/code
-      - node_modules:/app/node_modules
+      - ./react-project/avery-app:/code
+      - node_modules:/avery-app/node_modules
     command: sh -c "npm start"
     ports:
       - "7873:3000"
     tty: true
+    networks:
+      - avery-network
       
   db:
     build:
@@ -44,7 +46,7 @@ services:
         - ./db-project/init:/docker-entrypoint-initdb.d 
     tty: true
     networks:
-      - backend-network
+      - avery-network
       
   backend-project:
     env_file:
@@ -63,11 +65,21 @@ services:
     networks:
       - backend-network
 
+  stanza-project:
+    container_name: stanza
+    build:
+      context: stanza-project
+      dockerfile: Dockerfile
+    ports:
+      - "7874:5001"
+    networks:
+      - avery-network
+
 volumes:
   db-store:
   media:
   node_modules:
 
 networks:
-  backend-network:
+  avery-network:
     driver: bridge
