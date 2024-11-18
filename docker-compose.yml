@@ -13,20 +13,20 @@ services:
   #   volumes:
   #     - ./gradio-project:/app/gradio
 
-  react_front:
-    container_name: react_front
-    build:
-      context: react-project
-      dockerfile: Dockerfile
-    volumes:
-      - ./react-project/avery-app:/code
-      - node_modules:/avery-app/node_modules
-    command: sh -c "npm start"
-    ports:
-      - "7873:3000"
-    tty: true
-    networks:
-      - avery-network
+  # react_front:
+  #   container_name: react_front
+  #   build:
+  #     context: react-project
+  #     dockerfile: Dockerfile
+  #   volumes:
+  #     - ./react-project/avery-app:/code
+  #     - node_modules:/avery-app/node_modules
+  #   command: sh -c "npm start"
+  #   ports:
+  #     - "7873:3000"
+  #   tty: true
+  #   networks:
+  #     - avery-network
       
   db:
     build:
@@ -63,17 +63,17 @@ services:
       - "7871:8000"
     tty: true
     networks:
-      - backend-network
-
-  stanza-project:
-    container_name: stanza
-    build:
-      context: stanza-project
-      dockerfile: Dockerfile
-    ports:
-      - "7874:5001"
-    networks:
       - avery-network
+
+  # stanza-project:
+  #   container_name: stanza
+  #   build:
+  #     context: stanza-project
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "7874:5001"
+  #   networks:
+  #     - avery-network
 
 volumes:
   db-store:
