@@ -2,6 +2,9 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
+# Update pip
+RUN pip install --upgrade pip
+
 # Install dependencies
 RUN pip install flask stanza
 

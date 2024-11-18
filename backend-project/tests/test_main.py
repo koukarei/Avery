@@ -1,10 +1,12 @@
 import os
 import sys
+import datetime
+import time
 sys.path.append(os.getcwd())
 
 from fastapi.testclient import TestClient
 
-from main import app 
+from .main import app 
 from fastapi import UploadFile
 
 client = TestClient(app)
@@ -104,11 +106,142 @@ def test_read_stories():
     assert len(response.json()) == num_stories + 1
 
 def test_leaderboards():
+    # Test read all leaderboards
     response = client.get("/sqlapp/leaderboards/")
     assert response.status_code == 200
+    
+    num_leaderboards = len(response.json())
+
+    # Get user id
+    response = client.get("/sqlapp/users/")
+    user = response.json()[0]
+    user_id = user['id']
+
+    #Get scene id
+    response = client.get("/sqlapp/scenes/")
+    scene = response.json()[0]
+    scene_id = scene['id']
+
+    # Get story id
+    response = client.get("/sqlapp/stories/")
+    story = response.json()[0]
+    story_id = story['id']
+
+    test_image_path = "cut_ham_for_test.jpg"
+
+    # Test create a new leaderboard
+    data = {
+        "title":"Cut the Ham",
+        "story_extract": "The mouse set to work at once to carve the ham. It was a beautiful shiny yellow, streaked with red.",
+        "is_public": True,
+        "scene_id": scene_id,
+        "story_id": story_id,
+        "user_id": user_id,
+    }
+
+    with open(test_image_path, "rb") as f:
+        response = client.post(
+            "/sqlapp/leaderboards/",
+            files={"original_image": (test_image_path, f, "image/jpeg")},
+            data=data,
+        )
+    print(f"leaderboard created: {response.json()}")
+    assert response.status_code == 200
+
+    # Test read all leaderboards
+    response = client.get("/sqlapp/leaderboards/")
+    assert response.status_code == 200
+    assert len(response.json()) == num_leaderboards + 1
 
 def test_round():
-    pass
+    # Get leaderboard id
+    response = client.get("/sqlapp/leaderboards/")
+    leaderboard = response.json()[0]
+    leaderboard_id = leaderboard['id']
+
+    # Test read all rounds for a leaderboard
+    response = client.get(f"/sqlapp/leaderboards/{leaderboard_id}/rounds/")
+    assert response.status_code == 200
+    num_rounds = len(response.json())
+
+    # Get user id
+    response = client.get("/sqlapp/users/")
+    user = response.json()[0]
+    user_id = user['id']
+
+    # Test create a new round
+    new_round = {
+        "leaderboard_id": leaderboard_id,
+        "model": "gpt-4o-mini",
+        "created_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
+    }
+    data_json = {
+        "thisround":new_round.copy(),
+        "player_id":user_id
+    }
+    response = client.post("/sqlapp/users/", json=data_json,headers={"Content-Type": "application/json"})
+    print(f"round created: {response.json()}")
+    assert response.status_code == 200
+
+    # Test read all rounds for a leaderboard
+    response = client.get(f"/sqlapp/leaderboards/{leaderboard_id}/rounds/")
+    assert response.status_code == 200
+    assert len(response.json()) == num_rounds + 1
+
+    # Answer
+    round_id = response.json()[0]['id']
+
+    new_generation = {
+        "round_id": round_id,
+        "created_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
+        "generated_time": 1,
+        "sentence": "The mouse set to work at once to carve the ham."
+    }
+    response = client.put(
+        f"/sqlapp/round/{round_id}",
+        json=new_generation.copy(),
+        headers={"Content-Type": "application/json"},
+    )
+    print(f"generation created: {response.json()}")
+    assert response.status_code == 200
+    correct_sentence = response.json()['correct_sentence']
+    generation_id = response.json()['id']
+
+    # Test get interpretation
+    response = client.put(
+        f"/sqlapp/round/{round_id}/interpretation",
+        json={
+            "round_id": round_id,
+            "generation": {
+                "id": generation_id,
+                "correct_sentence": correct_sentence
+            }
+        },
+        headers={"Content-Type": "application/json"},
+    )
+    print(f"Get interpretation: {response.json()}")
+    assert response.status_code == 200
+    time.sleep(10)
+
+    #Test get scores
+    response = client.put(
+        f"/sqlapp/round/{round_id}/complete",
+        json={
+            "id":generation_id,
+            "at":datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
+        },
+        headers={"Content-Type": "application/json"},
+    )
+    print(f"Complete generation: {response.json()}")
+    assert response.status_code == 200
+
+    # Test complete round
+    response = client.post(
+        f"/round/{round_id}/end",
+        headers={"Content-Type": "application/json"},
+    )
+    print(f"Complete round: {response.json()}")
+    assert response.status_code == 200
 
 def test_vocabulary():
     pass
