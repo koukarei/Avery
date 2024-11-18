@@ -12,7 +12,7 @@ client = TestClient(app)
 
 def test_play():
     # Create leaderboards
-
+    response = client.post("/leaderboards/create")
 
     # Read csv file
     with open('static/entries/202408_Results.csv','r') as f:
