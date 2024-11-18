@@ -177,6 +177,7 @@ class Message(Base):
     chat_id = Column(Integer, ForeignKey("chats.id"))
     content = Column(String(255), index=True)
     sender = Column(String(50), index=True)
+    created_at = Column(DateTime, default=datetime.datetime.now())
 
     chat = relationship("Chat", back_populates="messages")
 

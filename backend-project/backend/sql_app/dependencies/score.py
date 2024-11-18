@@ -4,7 +4,6 @@ from enum import Enum
 import PIL.Image
 import io
 import requests
-import Levenshtein
 
 import torch
 
