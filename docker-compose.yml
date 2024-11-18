@@ -65,6 +65,16 @@ services:
     networks:
       - avery-network
 
+  stanza-project:
+    container_name: stanza
+    build:
+      context: stanza-project
+      dockerfile: Dockerfile
+    ports:
+      - "7874:5001"
+    networks:
+      - avery-network
+
 volumes:
   db-store:
   media:
