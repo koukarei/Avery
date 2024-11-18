@@ -26,6 +26,7 @@ class InterpretedImageOut(ImageBase):
 
 class MessageReceive(BaseModel):
     content: str
+    created_at: datetime.datetime
 
 class MessageBase(MessageReceive):
     sender: str
