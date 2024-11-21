@@ -12,6 +12,8 @@ from .dependencies import sentence, gen_image, score, dictionary, openai_chatbot
 from typing import Union, List, Annotated, Optional
 from datetime import timezone
 
+import torch
+
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
@@ -27,6 +29,46 @@ def get_db():
         yield db
     finally:
         db.close()
+
+def gpt2_model_load():
+    if "gpt2".startswith("gpt2"):
+        from transformers import GPT2Tokenizer, GPT2LMHeadModel
+        tokenizer = GPT2Tokenizer.from_pretrained(model_string)
+        model = GPT2LMHeadModel.from_pretrained(model_string)
+    else:
+        from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
+        tokenizer = OpenAIGPTTokenizer.from_pretrained(model_string)
+        model = OpenAIGPTLMHeadModel.from_pretrained(model_string)
+    model.eval()
+    if torch.cuda.is_available():
+        model.to('cuda')
+    print("Model init")
+
+    try:
+        yield model, tokenizer
+    finally:
+        del model, tokenizer
+
+def en_nlp_load():
+    import stanza
+    stanza.download('en')
+    en_nlp = stanza.Pipeline('en', processors='tokenize,pos,constituency', package='default_accurate')
+    try:
+        yield en_nlp
+    finally:
+        del en_nlp
+
+def blip2_model_load():
+    from lavis.models import load_model_and_preprocess
+    from lavis.processors import load_processor
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    blip2_model, vis_processors, text_processors = load_model_and_preprocess(
+        "blip2_image_text_matching", "pretrain", device=device, is_eval=True
+    )
+    try:
+        yield blip2_model, vis_processors, text_processors
+    finally:
+        del blip2_model, vis_processors, text_processors
 
 def generateDescription(db: Session, leaderboard_id: int, image: str, story: Optional[str], model_name: str="gpt-4o-mini"):
     
@@ -61,6 +103,12 @@ def generateDescription(db: Session, leaderboard_id: int, image: str, story: Opt
 
 def calculate_score(
     db: Session,
+    blip2_model,
+    vis_processors,
+    text_processors,
+    en_nlp,
+    perplexity_model,
+    tokenizer,
     generation: schemas.GenerationCompleteCreate,
     is_completed: bool=False
 ):
@@ -86,6 +134,12 @@ def calculate_score(
             )
 
         factors, scores=score.calculate_score_init(
+            blip2_model=blip2_model,
+            vis_processors=vis_processors,
+            text_processors=text_processors,
+            en_nlp=en_nlp,
+            perplexity_model=perplexity_model,
+            tokenizer=tokenizer,
             image_path=db_round.leaderboard.original_image.image_path,
             sentence=db_generation.sentence,
         )
@@ -302,61 +356,20 @@ def read_leaderboards(skip: int = 0, limit: int = 100, db: Session = Depends(get
     leaderboards = crud.get_leaderboards(db, skip=skip, limit=limit)
     return leaderboards
 
+
 @app.post("/leaderboards/", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
 def create_leaderboard(
-    original_image: Annotated[UploadFile, File()],
-    title: Annotated[str, Form()],
-    story_extract: Annotated[str, Form()],
-    is_public: Annotated[bool, Form()],
-    scene_id: Annotated[int, Form()],
-    story_id: Annotated[int, Form()],
-    user_id: Annotated[int, Form()],
+    leaderboard: schemas.LeaderboardCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    
-    timestamp = str(int(time.time()))
-    shortenfilename=".".join(original_image.filename.split(".")[:-1])[:20]
-    fileattr = original_image.filename.split(".")[-1:][0]
-    filename = f"o_{timestamp}_{shortenfilename}.{fileattr}"
-    image_path = media_dir / "original_images" / filename
-
-    try:
-        image_content = Image.open(original_image.file)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Please upload a valid image file")
-
-    try:
-        if not os.path.isfile(image_path):
-            image_content.save(image_path)
-    except Exception:
-        raise HTTPException(status_code=400, detail="There was an error uploading the file")
-    finally:
-        original_image.file.close()
-        
-    db_original_image = crud.create_original_image(
-        db=db,
-        image=schemas.ImageBase(
-            image_path=str(image_path),
-        )
-    )
-
+    story_id = leaderboard.story_id
     if story_id==0:
         story_id=None
-
-    db_leaderboard = schemas.LeaderboardCreate(
-        title=title,
-        story_extract=story_extract,
-        is_public=is_public,
-        scene_id=scene_id,
-        story_id=story_id,
-        original_image_id=db_original_image.id,
-        created_by_id=user_id
-    )
     
     result = crud.create_leaderboard(
         db=db, 
-        leaderboard=db_leaderboard,
+        leaderboard=leaderboard,
     )
 
     db_story=crud.get_story(db, story_id=story_id)
@@ -364,6 +377,9 @@ def create_leaderboard(
         story=None
     else:
         story=Path(db_story.textfile_path).read_text()
+
+    db_original_image = crud.get_original_image(db, image_id=leaderboard.original_image_id)
+    image_path = db_original_image.image_path
 
     background_tasks.add_task(
         generateDescription,
@@ -375,6 +391,48 @@ def create_leaderboard(
     )
 
     return result
+
+@app.post("/leaderboards/image", tags=["Leaderboard"], response_model=schemas.IdOnly)
+def create_leaderboard_image(
+    original_image: Annotated[UploadFile, File()],
+    db: Session = Depends(get_db),
+):
+    
+    timestamp = str(int(time.time()))
+    shortenfilename=".".join(original_image.filename.split(".")[:-1])[:20]
+    fileattr = original_image.filename.split(".")[-1:][0]
+    filename = f"o_{timestamp}_{shortenfilename}.{fileattr}"
+    image_path = media_dir / "original_images" / filename
+
+    os.makedirs(media_dir / "original_images", exist_ok=True)
+
+    try:
+        original_image.file.seek(0)
+        image_content = Image.open(original_image.file)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Please upload a valid image file")
+
+    counter = 0
+    while os.path.isfile(image_path):
+        counter += 1
+        image_path=media_dir / "original_images" / f"o_{timestamp}_{shortenfilename}_{counter}.{fileattr}"
+    
+    try:
+        image_content.save(image_path)
+    except Exception as e:
+        print(image_content)
+        raise HTTPException(status_code=400, detail=f"Error uploading file: {str(e)}")
+    finally:
+        original_image.file.close()
+        
+    db_original_image = crud.create_original_image(
+        db=db,
+        image=schemas.ImageBase(
+            image_path=str(image_path),
+        )
+    )
+
+    return db_original_image
 
 @app.get("/leaderboards/{leaderboard_id}", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
 def read_leaderboard(leaderboard_id: int, db: Session = Depends(get_db)):
@@ -461,7 +519,13 @@ def get_interpretation(
     generation: schemas.GenerationCorrectSentence,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    blip2_model_tuple=Depends(blip2_model_load),
+    en_nlp=Depends(en_nlp_load),
+    perplexity_model_turple=Depends(gpt2_model_load),
 ):
+    blip2_model,vis_processors,text_processors=blip2_model_tuple
+    perplexity_model,tokenizer=perplexity_model_turple
+
     interpreted_image_url = gen_image.generate_interpretion(
         sentence=generation.correct_sentence
     )
@@ -512,6 +576,12 @@ def get_interpretation(
     background_tasks.add_task(
         calculate_score,
         db=db,
+        blip2_model=blip2_model,
+        vis_processors=vis_processors,
+        text_processors=text_processors,
+        en_nlp=en_nlp,
+        perplexity_model=perplexity_model,
+        tokenizer=tokenizer,
         generation=generation_complete,
         is_completed=False
     )
@@ -539,7 +609,13 @@ def get_interpretation(
 def complete_generation(
     generation: schemas.GenerationCompleteCreate,
     db: Session = Depends(get_db),
+    blip2_model_tuple=Depends(blip2_model_load),
+    en_nlp=Depends(en_nlp_load),
+    perplexity_model_turple=Depends(gpt2_model_load),
 ):
+    blip2_model,vis_processors,text_processors=blip2_model_tuple
+    perplexity_model,tokenizer=perplexity_model_turple
+
     db_generation = crud.get_generation(db, generation_id=generation.id)
     db_round = crud.get_round(db, db_generation.round_id)
     db_chat = crud.get_chat(db=db,chat_id=db_round.chat_history)
@@ -547,6 +623,12 @@ def complete_generation(
 
     factors, scores_dict = calculate_score(
         db=db,
+        blip2_model=blip2_model,
+        vis_processors=vis_processors,
+        text_processors=text_processors,
+        en_nlp=en_nlp,
+        perplexity_model=perplexity_model,
+        tokenizer=tokenizer,
         generation=generation,
         is_completed=True
     )
