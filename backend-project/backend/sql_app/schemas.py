@@ -12,6 +12,9 @@ class OriginalImage(ImageBase):
     class Config:
         orm_mode = True
 
+class IdOnly(BaseModel):
+    id: int
+
 class InterpretedImage(ImageBase):
     id: int
 

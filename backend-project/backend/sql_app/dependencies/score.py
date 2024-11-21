@@ -16,30 +16,7 @@ import time
 
 import numpy as np
 
-stanza.download('en')
-en_nlp = stanza.Pipeline('en', processors='tokenize,pos,constituency', package='default_accurate')
-
-from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
-from transformers import GPT2Tokenizer, GPT2LMHeadModel
-
-def model_init(model_string, cuda):
-    if model_string.startswith("gpt2"):
-        tokenizer = GPT2Tokenizer.from_pretrained(model_string)
-        model = GPT2LMHeadModel.from_pretrained(model_string)
-    else:
-        tokenizer = OpenAIGPTTokenizer.from_pretrained(model_string)
-        model = OpenAIGPTLMHeadModel.from_pretrained(model_string)
-    model.eval()
-    if cuda:
-        model.to('cuda')
-    print("Model init")
-    return model, tokenizer
-
-perplexity_model, tokenizer = model_init('gpt2', False)
-
-def get_loss_pretrained(text, cuda=False):
-    assert perplexity_model is not None
-    assert tokenizer is not None
+def get_loss_pretrained(perplexity_model, tokenizer,text, cuda=False):
     input_ids = torch.tensor(tokenizer.encode(text)).unsqueeze(0)  # Batch size 1
     if cuda:
         input_ids = input_ids.to('cuda')
@@ -153,30 +130,32 @@ def frequency_score(words):
          "f_bigram":f_bigram
    }
 
-def perplexity(sentence, cut_points):
+def perplexity(perplexity_model, tokenizer,sentence, cut_points):
   log_probs=[]
   for i,p in enumerate(cut_points):
     if i+1 == len(cut_points):
       t=sentence
     else:
       t=sentence[:p]
-    log_probs.append(get_loss_pretrained(t))
+    log_probs.append(get_loss_pretrained(perplexity_model, tokenizer,t))
     perplexity_value = np.exp(-np.mean(log_probs))
   return {
      'perplexity':perplexity_value
   }
 
-def calculate_content_score(image_path: str, sentence: str):
+def calculate_content_score(
+      blip2_model, 
+      vis_processors, 
+      text_processors, 
+      image_path: str, 
+      sentence: str
+      ):
+    
     raw_image = PIL.Image.open(image_path).convert("RGB")
     img = vis_processors["eval"](raw_image).unsqueeze(0).to(device)
     txt = text_processors["eval"](sentence)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    content_model, vis_processors, text_processors = load_model_and_preprocess(
-        "blip2_image_text_matching", "pretrain", device=device, is_eval=True
-    )
-
-    itm_output = content_model({"image": img, "text_input": txt}, match_head="itm")
+    itm_output = blip2_model({"image": img, "text_input": txt}, match_head="itm")
     itm_scores = torch.nn.functional.softmax(itm_output, dim=1)
     content_score = itm_scores[:, 1].item()*100
     # print(f'The image and text are matched with a probability of {itm_scores[:, 1].item():.3%}')
@@ -237,7 +216,16 @@ def calculate_score(
 
     return output
 
-def calculate_score_init(image_path: str, sentence: str):
+def calculate_score_init(
+      blip2_model,
+      vis_processors,
+      text_processors,
+      en_nlp,
+      perplexity_model,
+      tokenizer,
+      image_path: str, 
+      sentence: str
+):
    doc = en_nlp(sentence)
    words=[w for s in doc.sentences for w in s.words]
    factors=n_wordsNclauses(
@@ -249,13 +237,21 @@ def calculate_score_init(image_path: str, sentence: str):
 
    cut_points=[w.end_char+1 for w in words if w.start_char != 0]
    factors.update(perplexity(
+        perplexity_model=perplexity_model,
+        tokenizer=tokenizer,
       sentence=sentence,
       cut_points=cut_points
    ))
 
    factors.update(frequency_score(words=words))
 
-   factors.update(calculate_content_score(image_path=image_path,sentence=sentence))
+   factors.update(calculate_content_score(
+      blip2_model=blip2_model,
+      vis_processors=vis_processors,
+      text_processors=text_processors,
+      image_path=image_path,
+      sentence=sentence
+   ))
    
    output=calculate_score(**factors)
 
