@@ -15,7 +15,7 @@ def test_play():
     response = client.post("/leaderboards/create")
 
     # Read csv file
-    with open('static/entries/202408_Results.csv','r') as f:
+    with open('initial/entries/202408_Results.csv','r') as f:
         reader = csv.DictReader(f)
-    for row in reader:
-        pass
+        for row in reader:
+            pass

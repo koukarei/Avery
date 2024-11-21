@@ -6,7 +6,7 @@ sys.path.append(os.getcwd())
 
 from fastapi.testclient import TestClient
 
-from .main import app 
+from main import app 
 from fastapi import UploadFile
 
 client = TestClient(app)
@@ -87,7 +87,7 @@ def test_read_stories():
     num_stories = len(response.json())
 
     # Test create a new story
-    test_file_path = "mice_story_for_test.txt"
+    test_file_path = "tests/mice_story_for_test.txt"
     with open(test_file_path, "rb") as f:
         response = client.post(
             "/sqlapp/story/",
@@ -127,24 +127,32 @@ def test_leaderboards():
     story = response.json()[0]
     story_id = story['id']
 
-    test_image_path = "cut_ham_for_test.jpg"
+    test_image_filename="cut_ham_for_test.jpg"
+    test_image_path = "tests/{}".format(test_image_filename)
+
+    # Test upload original image
+    with open(test_image_path, "rb") as f:
+        response = client.post(
+            "/sqlapp/leaderboards/image/",
+            files={"original_image": (test_image_filename, f, "image/jpeg")},
+        )
+
+    print(f"original image uploaded: {response.json()}")
+    assert response.status_code == 200
+    original_image_id = response.json()['id']
 
     # Test create a new leaderboard
-    data = {
+    new_leaderboard = {
         "title":"Cut the Ham",
         "story_extract": "The mouse set to work at once to carve the ham. It was a beautiful shiny yellow, streaked with red.",
         "is_public": True,
         "scene_id": scene_id,
         "story_id": story_id,
-        "user_id": user_id,
+        "original_image_id": original_image_id,
+        "created_by_id": user_id,
     }
 
-    with open(test_image_path, "rb") as f:
-        response = client.post(
-            "/sqlapp/leaderboards/",
-            files={"original_image": (test_image_path, f, "image/jpeg")},
-            data=data,
-        )
+    response = client.post("/sqlapp/leaderboards/", json=new_leaderboard.copy(),headers={"Content-Type": "application/json"})
     print(f"leaderboard created: {response.json()}")
     assert response.status_code == 200
 
@@ -156,6 +164,8 @@ def test_leaderboards():
 def test_round():
     # Get leaderboard id
     response = client.get("/sqlapp/leaderboards/")
+    if not response.json():
+        assert False
     leaderboard = response.json()[0]
     leaderboard_id = leaderboard['id']
 
@@ -242,6 +252,11 @@ def test_round():
     )
     print(f"Complete round: {response.json()}")
     assert response.status_code == 200
+
+    # Test read all rounds for a leaderboard
+    response = client.get(f"/sqlapp/leaderboards/{leaderboard_id}/rounds/")
+    assert response.status_code == 200
+    assert len(response.json()) == num_rounds + 1
 
 def test_vocabulary():
     pass
