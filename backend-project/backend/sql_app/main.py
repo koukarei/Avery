@@ -14,6 +14,8 @@ from datetime import timezone
 from .dependencies.models import *
 from .background_tasks import *
 
+import torch
+
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
