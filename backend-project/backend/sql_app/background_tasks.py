@@ -99,7 +99,7 @@ def calculate_score(
             n_grammar_errors=factors['n_grammar_errors'],
             n_spelling_errors=factors['n_spelling_errors'],
 
-            perlexity=factors['perplexity'],
+            perplexity=factors['perplexity'],
 
             f_word=factors['f_word'],
             f_bigram=factors['f_bigram'],
@@ -133,7 +133,7 @@ def calculate_score(
             n_grammar_errors=db_generation.n_grammar_errors,
             n_spelling_errors=db_generation.n_spelling_errors,
 
-            perlexity=db_generation.perlexity,
+            perplexity=db_generation.perplexity,
 
             f_word=db_generation.f_word,
             f_bigram=db_generation.f_bigram,
@@ -156,7 +156,7 @@ def calculate_score(
             'n_prepositions': db_generation.n_prepositions,
             'n_grammar_errors': db_generation.n_grammar_errors,
             'n_spelling_errors': db_generation.n_spelling_errors,
-            'perplexity': db_generation.perlexity,
+            'perplexity': db_generation.perplexity,
             'f_word': db_generation.f_word,
             'f_bigram': db_generation.f_bigram,
             'n_clauses': db_generation.n_clauses,
