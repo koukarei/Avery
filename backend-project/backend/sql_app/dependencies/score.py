@@ -151,6 +151,8 @@ def calculate_content_score(
       sentence: str
       ):
     
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     raw_image = PIL.Image.open(image_path).convert("RGB")
     img = vis_processors["eval"](raw_image).unsqueeze(0).to(device)
     txt = text_processors["eval"](sentence)
@@ -179,13 +181,15 @@ def calculate_score(
       perplexity: float,
       f_word: float,
       f_bigram: float,
-      content_score: int
+      content_score: int,
+      **kwargs
 ):
     output={
-       'grammar_score':5-len(n_grammar_errors) if len(n_grammar_errors)<5 else 0,
-       'spelling_score':((n_words-len(n_spelling_errors))/n_words)*5
+       'grammar_score':5-n_grammar_errors if n_grammar_errors<5 else 0,
+       'spelling_score':((n_words-n_spelling_errors)/n_words)*5
     }
 
+    output['vividness_score']=0
     output['vividness_score']+= 1 if n_adj else 0
     output['vividness_score']+= 1 if n_adv else 0
     output['vividness_score']+= 1 if n_pronouns else 0
