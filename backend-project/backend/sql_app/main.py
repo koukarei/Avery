@@ -90,6 +90,9 @@ def create_story(
     shortenfilename=".".join(story_content_file.filename.split(".")[:-1])[:20]
     fileattr = story_content_file.filename.split(".")[-1:][0]
     filename = f"s_{timestamp}_{shortenfilename}.{fileattr}"
+
+    os.mkdir(media_dir / "stories", exist_ok=True)
+
     textfile_path = media_dir / "stories" / filename
     
     try:
@@ -320,6 +323,9 @@ def get_interpretation(
         sentence=generation.correct_sentence
     )
     image_filename = f"i_{round_id}_{generation.id}"
+
+    os.mkdir(media_dir / "interpreted_images", exist_ok=True)
+
     interpreted_image_path = media_dir / "interpreted_images" / f"{image_filename}.jpg"
 
     try:
