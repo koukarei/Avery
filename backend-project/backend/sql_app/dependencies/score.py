@@ -165,7 +165,7 @@ def calculate_content_score(
     # itc_score = model({"image": img, "text_input": txt}, match_head='itc')
     # print('The image feature and text feature has a cosine similarity of %.4f'%itc_score)
     return {
-       'content_score':content_score
+       'content_score':int(round(content_score))
     }
 
 def calculate_score(
@@ -213,7 +213,7 @@ def calculate_score(
     output['structure_score']= n_clauses if n_clauses < 3 else 3
 
     lang_quality = sum(output.values())
-    output['total_score'] = lang_quality*content_score
+    output['total_score'] = int(round(lang_quality*content_score))
 
     output['lang_quality']=lang_quality
     output['content_score']=content_score
