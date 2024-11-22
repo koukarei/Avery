@@ -81,6 +81,7 @@ def create_story(
     scene_id: Annotated[int, Form()],
     db: Session = Depends(get_db),
 ):
+    os.mkdir(media_dir / "stories", exist_ok=True)
     if not os.path.exists(media_dir / "stories"):
         raise HTTPException(status_code=400, detail="The directory for stories does not exist")
     if not story_content_file.filename.endswith(".txt"):
@@ -90,8 +91,6 @@ def create_story(
     shortenfilename=".".join(story_content_file.filename.split(".")[:-1])[:20]
     fileattr = story_content_file.filename.split(".")[-1:][0]
     filename = f"s_{timestamp}_{shortenfilename}.{fileattr}"
-
-    os.mkdir(media_dir / "stories", exist_ok=True)
 
     textfile_path = media_dir / "stories" / filename
     
