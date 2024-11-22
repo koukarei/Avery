@@ -81,7 +81,7 @@ def create_story(
     scene_id: Annotated[int, Form()],
     db: Session = Depends(get_db),
 ):
-    os.mkdir(media_dir / "stories", exist_ok=True)
+    os.makedirs(media_dir / "stories", exist_ok=True)
     if not os.path.exists(media_dir / "stories"):
         raise HTTPException(status_code=400, detail="The directory for stories does not exist")
     if not story_content_file.filename.endswith(".txt"):
@@ -323,7 +323,7 @@ def get_interpretation(
     )
     image_filename = f"i_{round_id}_{generation.id}"
 
-    os.mkdir(media_dir / "interpreted_images", exist_ok=True)
+    os.makedirs(media_dir / "interpreted_images", exist_ok=True)
 
     interpreted_image_path = media_dir / "interpreted_images" / f"{image_filename}.jpg"
 
