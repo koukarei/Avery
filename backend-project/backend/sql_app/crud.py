@@ -215,17 +215,19 @@ def update_generation2(db: Session, generation: schemas.GenerationInterpretation
     return db_generation
 
 def update_generation3(db: Session, generation: schemas.GenerationComplete):
-    db_generation = db.query(models.Generation).filter(models.Generation.id == generation.id).update(
+    db.query(models.Generation).filter(models.Generation.id == generation.id).update(
         generation.model_dump()
-    ).first()
+    )
     db.commit()
+    db_generation = db.query(models.Generation).filter(models.Generation.id == generation.id).first()
     return db_generation
 
 def complete_round(db: Session, round_id: int, round: schemas.RoundComplete):
-    db_round = db.query(models.Round).filter(models.Round.id == round_id).update(
+    db.query(models.Round).filter(models.Round.id == round_id).update(
         round.model_dump()
-    ).first()
+    )
     db.commit()
+    db_round = db.query(models.Round).filter(models.Round.id == round_id).first()
     return db_round
 
 def get_chat(db: Session, chat_id: int):
@@ -286,10 +288,11 @@ def update_personal_dictionary(
         dictionary: schemas.PersonalDictionaryUpdate
 ):
     
-    db_dictionary = db.query(models.PersonalDictionary).filter(models.PersonalDictionary.player == dictionary.player).filter(models.PersonalDictionary.vocabulary == dictionary.vocabulary).update(
+    db.query(models.PersonalDictionary).filter(models.PersonalDictionary.player == dictionary.player).filter(models.PersonalDictionary.vocabulary == dictionary.vocabulary).update(
         dictionary.model_dump()
-    ).first()
+    )
     db.commit()
+    db_dictionary = db.query(models.PersonalDictionary).filter(models.PersonalDictionary.player == dictionary.player).filter(models.PersonalDictionary.vocabulary == dictionary.vocabulary).first()
     return db_dictionary
 
 def update_personal_dictionary_used(
