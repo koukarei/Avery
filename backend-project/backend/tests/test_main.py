@@ -54,7 +54,7 @@ def test_users():
     assert response.status_code == 200
     assert len(response.json()) == num_users - 1   
 
-    if 'admin' not in [i['username'] for i in response.json()]:
+    if not [i['username'] for i in response.json() if i['username'] == 'admin']:
         admin_user = {
             "username": "admin",
             "email": "admin@example.com",
@@ -62,7 +62,6 @@ def test_users():
             "display_name": "Admin"
         }
         response = client.post("/sqlapp/users/", json=admin_user.copy(),headers={"Content-Type": "application/json"})
-
 
 def test_read_scenes():
     # Test read all scenes
@@ -185,18 +184,21 @@ def test_round():
         "model": "gpt-4o-mini",
         "created_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
     }
-    data_json = {
-        "thisround":new_round.copy(),
-        "player_id":user_id
-    }
-    response = client.post("/sqlapp/users/", json=data_json,headers={"Content-Type": "application/json"})
+
+    response = client.post(
+        f"/sqlapp/round/?player_id={user_id}", 
+        json=new_round.copy(),
+        headers={
+            "Content-Type": "application/json",
+        }
+    )
     print(f"round created: {response.json()}")
     assert response.status_code == 200
 
-    # Test read all rounds for a leaderboard
-    response = client.get(f"/sqlapp/leaderboards/{leaderboard_id}/rounds/")
+    # Test read unfinish rounds for a leaderboard
+    response = client.get(f"/sqlapp/unfinished_rounds/?player_id={user_id}")
     assert response.status_code == 200
-    assert len(response.json()) == num_rounds + 1
+    assert len(response.json()) > 0
 
     # Answer
     round_id = response.json()[0]['id']
@@ -217,16 +219,15 @@ def test_round():
     correct_sentence = response.json()['correct_sentence']
     generation_id = response.json()['id']
 
+    interpretation_generation = {
+        "id": generation_id,
+        "correct_sentence": correct_sentence
+    }
+
     # Test get interpretation
     response = client.put(
         f"/sqlapp/round/{round_id}/interpretation",
-        json={
-            "round_id": round_id,
-            "generation": {
-                "id": generation_id,
-                "correct_sentence": correct_sentence
-            }
-        },
+        json=interpretation_generation.copy(),
         headers={"Content-Type": "application/json"},
     )
     print(f"Get interpretation: {response.json()}")
@@ -258,8 +259,6 @@ def test_round():
     assert response.status_code == 200
     assert len(response.json()) == num_rounds + 1
 
-def test_vocabulary():
-    pass
 
 def test_chat():
     pass
@@ -267,4 +266,5 @@ def test_chat():
 def test_image():
     pass
 
-
+def test_vocabulary():
+    pass

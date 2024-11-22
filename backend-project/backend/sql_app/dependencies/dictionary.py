@@ -28,4 +28,5 @@ def get_meaning(lemma: str, pos: str):
     
 def get_sentence_nlp(sentence: str):
     doc = en_nlp(sentence)
-    return doc
+    words = [word for sentence in doc.sentences for word in sentence.words if word.pos != 'PUNCT']
+    return words

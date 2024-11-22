@@ -2,6 +2,7 @@ from openai import OpenAI
 from pydantic import BaseModel
 import base64
 import io
+from typing import Optional
 
 def encode_image(image_path):
   with open(image_path, "rb") as image_file:
@@ -9,6 +10,11 @@ def encode_image(image_path):
 
 class Description(BaseModel):
    details: list[str]
+
+class Passage(BaseModel):
+   status: int
+   corrected_passage: Optional[str]
+
 
 def generateSentence(image,story, model_name="gpt-4o-2024-08-06"):
   #base64_image = encode_image(image)
@@ -48,23 +54,23 @@ def genSentences(image,story,amt=3):
 
 def checkSentence(sentence,temp=0.3):
   client=OpenAI()
-  completion = client.chat.completions.create(
+  completion = client.beta.chat.completions.parse(
     model="gpt-4o",
     messages=[
       {"role": "system", "content": """
-       You are English teacher.
-       You are going to correct the sentence given by the user. 
-       Your input only needs to be the corrected sentence.
-       If the sentence is not English, reply with "Please enter an English sentence."
-       If the sentence is offensive, reply with "Please avoid offensive language."
-       If the sentence is correct, reply with the sentence itself.
+       Transform the passage into a grammatically correct passage without any spelling mistake.
+       If the passage is not English, respond with status 1."
+       If the passage is offensive, respond with status 2."
+       Otherwise, respond with status 0 and the corrected passage."
 """},
       {"role": "user", "content": f"{sentence}"}
     ],
-    temperature=temp
+    temperature=temp,
+    response_format=Passage,
 
   )
-  if completion.choices[0].message:
-    return completion.choices[0].message.content
+  output = completion.choices[0].message.parsed
+  if output:
+    return output.status, output.corrected_passage
   else:
      raise Exception("Sentence correction failed.")
