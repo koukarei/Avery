@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
-from dependencies import sentence, score, dictionary
-import crud, schemas
+from .dependencies import sentence, score, dictionary
+from . import crud, schemas
 from pathlib import Path
 from typing import Union, List, Annotated, Optional
 from fastapi import HTTPException
@@ -182,8 +182,8 @@ def update_vocab_used_time(
     for token in doc:
         db_vocab = crud.get_vocabulary(
             db=db,
-            vocabulary=token.lemma_,
-            part_of_speech=token.pos_
+            vocabulary=token.lemma,
+            part_of_speech=token.pos
         )
         if db_vocab:
             db_personal_dictionary = crud.get_personal_dictionary(

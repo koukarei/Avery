@@ -204,7 +204,7 @@ class RoundComplete(BaseModel):
 class RoundOut(BaseModel):
     id: int
     player: UserOut
-    generations: list[GenerationOut]=[]
+    generations: list[IdOnly]=[]
 
     class Config:
         orm_mode = True

@@ -28,12 +28,12 @@ def blip2_model_load():
 def gpt2_model_load():
     if "gpt2".startswith("gpt2"):
         from transformers import GPT2Tokenizer, GPT2LMHeadModel
-        tokenizer = GPT2Tokenizer.from_pretrained(model_string)
-        model = GPT2LMHeadModel.from_pretrained(model_string)
+        tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        model = GPT2LMHeadModel.from_pretrained("gpt2")
     else:
         from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
-        tokenizer = OpenAIGPTTokenizer.from_pretrained(model_string)
-        model = OpenAIGPTLMHeadModel.from_pretrained(model_string)
+        tokenizer = OpenAIGPTTokenizer.from_pretrained("openai-gpt")
+        model = OpenAIGPTLMHeadModel.from_pretrained("openai-gpt")
     model.eval()
     if torch.cuda.is_available():
         model.to('cuda')

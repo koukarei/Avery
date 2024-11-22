@@ -12,7 +12,7 @@ from .dependencies import sentence, gen_image, score, dictionary, openai_chatbot
 from typing import Union, List, Annotated, Optional
 from datetime import timezone
 from .dependencies.models import *
-from .dependencies.background_tasks import *
+from .background_tasks import *
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -29,9 +29,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
-
-            
 
 @app.post("/users/", tags=["User"], response_model=schemas.User)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
@@ -215,6 +212,14 @@ def get_rounds_by_leaderboard(
         leaderboard_id=leaderboard_id,
     )
 
+@app.get("/unfinished_rounds/", tags=["Round"], response_model=list[schemas.RoundOut])
+def get_unfinished_rounds(player_id: int,db: Session = Depends(get_db)):
+    return crud.get_rounds(
+        db=db,
+        is_completed=False,
+        player_id=player_id
+    )
+
 @app.post("/round/", tags=["Round"], response_model=schemas.Round)
 def create_round(
     thisround: schemas.RoundCreate,
@@ -255,7 +260,7 @@ def get_user_answer(
     )
 
     try:
-        correct_sentence=sentence.checkSentence(sentence=db_generation.sentence)
+        status, correct_sentence=sentence.checkSentence(sentence=db_generation.sentence)
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -269,13 +274,34 @@ def get_user_answer(
         user_id=db_round.player_id
     )
 
-    return crud.update_generation1(
-        db=db,
-        generation=schemas.GenerationCorrectSentence(
-            id=db_generation.id,
-            correct_sentence=correct_sentence
+    if status == 0:
+        return crud.update_generation1(
+            db=db,
+            generation=schemas.GenerationCorrectSentence(
+                id=db_generation.id,
+                correct_sentence=correct_sentence
+            )
         )
-    )
+    elif status == 1:
+        crud.create_message(
+            db=db,
+            message=schemas.MessageBase(
+                content="ブー！英語で答えてください。",
+                sender="assistant",
+                created_at=datetime.datetime.now(tz=timezone.utc)
+            ),
+        )
+    elif status == 2:
+        crud.create_message(
+            db=db,
+            message=schemas.MessageBase(
+                content="ブー！不適切な言葉が含まれています。",
+                sender="assistant",
+                created_at=datetime.datetime.now(tz=timezone.utc)
+            ),
+            chat_id=db_round.chat_history
+        )
+    return None
 
 @app.put("/round/{round_id}/interpretation", tags=["Round"], response_model=schemas.GenerationInterpretation)
 def get_interpretation(
@@ -293,7 +319,7 @@ def get_interpretation(
     interpreted_image_url = gen_image.generate_interpretion(
         sentence=generation.correct_sentence
     )
-    image_filename = f"i_{round_id}"
+    image_filename = f"i_{round_id}_{generation.id}"
     interpreted_image_path = media_dir / "interpreted_images" / f"{image_filename}.jpg"
 
     try:
@@ -352,10 +378,8 @@ def get_interpretation(
 
     db_round = crud.get_round(db, round_id)
 
-    new_message="""
-回答をシステム入力しました。📝
-回答: {}
-""".format(generation.correct_sentence)
+    new_message="""回答をシステム入力しました。📝
+回答: {}""".format(generation.correct_sentence)
 
     crud.create_message(
         db=db,
