@@ -259,6 +259,21 @@ def test_round():
     assert response.status_code == 200
     assert len(response.json()) == num_rounds + 1
 
+def test_close_generation():
+    round_id = 1
+    generation_id=24
+    
+    #Test get scores
+    response = client.put(
+        f"/sqlapp/round/{round_id}/complete",
+        json={
+            "id":generation_id,
+            "at":datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
+        },
+        headers={"Content-Type": "application/json"},
+    )
+    print(f"Complete generation: {response.json()}")
+    assert response.status_code == 200
 
 def test_chat():
     pass
