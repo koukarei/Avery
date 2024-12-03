@@ -223,7 +223,10 @@ def update_generation3(db: Session, generation: schemas.GenerationComplete):
 def complete_round(db: Session, round_id: int, round: schemas.RoundComplete):
     db.bulk_update_mappings(models.Round, [round.model_dump()])
     db.commit()
-    db_round = db.query(models.Round).filter(models.Round.id == round_id).first()
+    db_round = get_round(
+        db=db,
+        round_id=round_id
+    )
     return db_round
 
 def get_chat(db: Session, chat_id: int):

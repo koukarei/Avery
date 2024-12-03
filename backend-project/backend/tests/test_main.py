@@ -194,14 +194,12 @@ def test_round():
     )
     print(f"round created: {response.json()}")
     assert response.status_code == 200
+    round_id = response.json()['id']
 
     # Test read unfinish rounds for a leaderboard
     response = client.get(f"/sqlapp/unfinished_rounds/?player_id={user_id}")
     assert response.status_code == 200
     assert len(response.json()) > 0
-
-    # Answer
-    round_id = response.json()[0]['id']
 
     new_generation = {
         "round_id": round_id,
@@ -261,7 +259,7 @@ def test_round():
 
 def test_close_generation():
     round_id = 1
-    generation_id=24
+    generation_id=29
     
     #Test get scores
     response = client.put(

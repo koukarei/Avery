@@ -1,5 +1,6 @@
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, TEXT, Float
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.mysql import MEDIUMTEXT
 
 import datetime
 
@@ -127,8 +128,8 @@ class Generation(Base):
 
     id = Column(Integer, primary_key=True)
 
-    sentence = Column(String(120), index=True,nullable=True)
-    correct_sentence = Column(String(120), index=True,nullable=True)
+    sentence = Column(String(200), index=True,nullable=True)
+    correct_sentence = Column(String(200), index=True,nullable=True)
 
     n_words = Column(Integer, default=0,nullable=True)
     n_conjunctions = Column(Integer, default=0,nullable=True)
@@ -175,7 +176,7 @@ class Message(Base):
 
     id = Column(Integer, primary_key=True)
     chat_id = Column(Integer, ForeignKey("chats.id"))
-    content = Column(String(255), index=True)
+    content = Column(MEDIUMTEXT, index=True)
     sender = Column(String(50), index=True)
     created_at = Column(DateTime, default=datetime.datetime.now())
 

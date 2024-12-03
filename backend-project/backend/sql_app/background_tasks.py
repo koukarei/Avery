@@ -39,9 +39,6 @@ def generateDescription(db: Session, leaderboard_id: int, image: str, story: Opt
 
 def calculate_score(
     db: Session,
-    blip2_model,
-    vis_processors,
-    text_processors,
     en_nlp,
     perplexity_model,
     tokenizer,
@@ -69,16 +66,6 @@ def calculate_score(
                 model_name="gpt-4o-mini"
             )
 
-        factors, scores=score.calculate_score_init(
-            blip2_model=blip2_model,
-            vis_processors=vis_processors,
-            text_processors=text_processors,
-            en_nlp=en_nlp,
-            perplexity_model=perplexity_model,
-            tokenizer=tokenizer,
-            image_path=db_round.leaderboard.original_image.image_path,
-            sentence=db_generation.sentence,
-        )
 
         if is_completed:
             generation_aware = generation.at.replace(tzinfo=timezone.utc)
@@ -86,6 +73,15 @@ def calculate_score(
             duration = (generation_aware - db_generation_aware).seconds
         else: 
             duration = 0
+
+        factors, scores=score.calculate_score_init(
+            en_nlp=en_nlp,
+            perplexity_model=perplexity_model,
+            tokenizer=tokenizer,
+            image_path=db_round.leaderboard.original_image.image_path,
+            sentence=db_generation.sentence,
+        )
+
 
         generation_com = schemas.GenerationComplete(
             id=db_round.id,
@@ -142,6 +138,7 @@ def calculate_score(
 
             content_score=db_generation.content_score,
 
+            total_score=db_generation.total_score,
             rank=db_generation.rank,
             duration=duration,
             is_completed=is_completed
@@ -162,7 +159,7 @@ def calculate_score(
             'n_clauses': db_generation.n_clauses,
             'content_score': db_generation.content_score
         }
-
+        
         scores = score.calculate_score(**factors)
 
     crud.update_generation3(

@@ -13,7 +13,7 @@ class Description(BaseModel):
 
 class Passage(BaseModel):
    status: int
-   corrected_passage: Optional[str]
+   corrected_passage: str
 
 
 def generateSentence(image,story, model_name="gpt-4o-2024-08-06"):
@@ -58,10 +58,40 @@ def checkSentence(sentence,temp=0.3):
     model="gpt-4o",
     messages=[
       {"role": "system", "content": """
-       Transform the passage into a grammatically correct passage without any spelling mistake.
-       If the passage is not English, respond with status 1."
-       If the passage is offensive, respond with status 2."
-       Otherwise, respond with status 0 and the corrected passage."
+# Role
+Language and content validator
+
+## Action
+Analyze a passage to determine:
+1. If it's non-English, return status 1.
+2. If it's offensive, return status 2.
+3. Otherwise, return status 0 and provide a grammatically correct, spell-checked version of the passage.
+
+## Skills
+- Language detection
+- Content moderation
+- Grammar correction
+- Spelling correction
+
+## Format
+- Output in the form: `{"status": X, "message": "Corrected passage or reason for status 1/2"}`
+- Ensure output follows a JSON-like structure for easy integration.
+
+## Constraints
+- Must detect non-English text accurately.
+- Must detect offensive or inappropriate content with high precision.
+- Correct spelling and grammar only for English text.
+- Message should not exceed 200 characters if providing reasons for statuses 1 or 2.
+
+## Example
+Input: "This is an exmple of bad grammar!"
+Output: `{"status": 0, "message": "This is an example of bad grammar!"}`
+
+Input: "Esto es un ejemplo."
+Output: `{"status": 1, "message": "ブー！英語で答えてください。"}`
+
+Input: "Fuck You!"
+Output: `{"status": 2, "message": "ブー！不適切な言葉が含まれています。"}`
 """},
       {"role": "user", "content": f"{sentence}"}
     ],

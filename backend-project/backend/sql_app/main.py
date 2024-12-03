@@ -14,8 +14,6 @@ from datetime import timezone
 from .dependencies.models import *
 from .background_tasks import *
 
-import torch
-
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
@@ -23,6 +21,8 @@ app = FastAPI()
 # Define the directory where the images will be stored
 media_dir = Path(os.getenv("MEDIA_DIR", "/static"))
 media_dir.mkdir(parents=True, exist_ok=True)
+
+perplexity_model,tokenizer, en_nlp = None, None, None
 
 # Dependency
 def get_db():
@@ -183,7 +183,6 @@ def create_leaderboard_image(
     try:
         image_content.save(image_path)
     except Exception as e:
-        print(image_content)
         raise HTTPException(status_code=400, detail=f"Error uploading file: {str(e)}")
     finally:
         original_image.file.close()
@@ -311,12 +310,13 @@ def get_interpretation(
     generation: schemas.GenerationCorrectSentence,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    blip2_model_tuple=Depends(blip2_model_load),
-    en_nlp=Depends(en_nlp_load),
-    perplexity_model_turple=Depends(gpt2_model_load),
 ):
-    blip2_model,vis_processors,text_processors=blip2_model_tuple
-    perplexity_model,tokenizer=perplexity_model_turple
+    global perplexity_model,tokenizer, en_nlp
+    if perplexity_model is None:
+        perplexity_model,tokenizer = gpt2_model_load()
+
+    if en_nlp is None:
+        en_nlp = en_nlp_load()
 
     interpreted_image_url = gen_image.generate_interpretion(
         sentence=generation.correct_sentence
@@ -368,9 +368,6 @@ def get_interpretation(
     background_tasks.add_task(
         calculate_score,
         db=db,
-        blip2_model=blip2_model,
-        vis_processors=vis_processors,
-        text_processors=text_processors,
         en_nlp=en_nlp,
         perplexity_model=perplexity_model,
         tokenizer=tokenizer,
@@ -399,12 +396,13 @@ def get_interpretation(
 def complete_generation(
     generation: schemas.GenerationCompleteCreate,
     db: Session = Depends(get_db),
-    blip2_model_tuple=Depends(blip2_model_load),
-    en_nlp=Depends(en_nlp_load),
-    perplexity_model_turple=Depends(gpt2_model_load),
 ):
-    blip2_model,vis_processors,text_processors=blip2_model_tuple
-    perplexity_model,tokenizer=perplexity_model_turple
+    global perplexity_model,tokenizer, en_nlp
+    if perplexity_model is None:
+        perplexity_model,tokenizer = gpt2_model_load()
+
+    if en_nlp is None:
+        en_nlp = en_nlp_load()
 
     db_generation = crud.get_generation(db, generation_id=generation.id)
     db_round = crud.get_round(db, db_generation.round_id)
@@ -413,9 +411,6 @@ def complete_generation(
 
     factors, scores_dict = calculate_score(
         db=db,
-        blip2_model=blip2_model,
-        vis_processors=vis_processors,
-        text_processors=text_processors,
         en_nlp=en_nlp,
         perplexity_model=perplexity_model,
         tokenizer=tokenizer,
@@ -444,7 +439,7 @@ def complete_generation(
     )
 
     if evaluation:
-        evaluation_message = """あなたの回答：{user_sentence}
+        score_message = """あなたの回答：{user_sentence}
         Grammar Score: {grammar_score} (out of 5)
         Spelling Score: {spelling_score} (out of 5)
         Vividness Score: {vividness_score} (out of 5)
@@ -453,20 +448,8 @@ def complete_generation(
         Content Comprehensive Score: {content_score} (out of 100)
         Total Score: {total_score} (out of 2300)
         Rank: {rank}
-        
-        文法について
-        {grammar_feedback}
-        スペルについて
-        {spelling_feedback}
-        スタオルについて
-        {style_feedback}
-        内容について
-        {content_feedback}
-
-        整体的なコメント
-        {overall_feedback}
         """.format(
-            user_sentence=db_round.correct_sentence,
+            user_sentence=db_generation.sentence,
             grammar_score=scores_dict['grammar_score'],
             spelling_score=scores_dict['spelling_score'],
             vividness_score=scores_dict['vividness_score'],
@@ -475,17 +458,53 @@ def complete_generation(
             content_score=scores_dict['content_score'],
             total_score=scores_dict['total_score'],
             rank=db_generation.rank,
+        )
+
+        evaluation_message = """文法について
+        {grammar_feedback}
+        スペルについて
+        {spelling_feedback}
+        スタオルについて
+        {style_feedback}
+        内容について
+        {content_feedback}
+        """.format(
             grammar_feedback=evaluation.grammar_evaluation,
             spelling_feedback=evaluation.spelling_evaluation,
             style_feedback=evaluation.style_evaluation,
-            content_feedback=evaluation.content_evaluation,
+            content_feedback=evaluation.content_evaluation
+        )
+
+        overall_evaluation_message = """整体的なコメント
+        {overall_feedback}
+        """.format(
             overall_feedback=evaluation.overall_evaluation
         )
 
         crud.create_message(
             db=db,
             message=schemas.MessageBase(
+                content=score_message,
+                sender="assistant",
+                created_at=datetime.datetime.now(tz=timezone.utc)
+            ),
+            chat_id=db_round.chat_history
+        )
+
+        crud.create_message(
+            db=db,
+            message=schemas.MessageBase(
                 content=evaluation_message,
+                sender="assistant",
+                created_at=datetime.datetime.now(tz=timezone.utc)
+            ),
+            chat_id=db_round.chat_history
+        )
+
+        crud.create_message(
+            db=db,
+            message=schemas.MessageBase(
+                content=overall_evaluation_message,
                 sender="assistant",
                 created_at=datetime.datetime.now(tz=timezone.utc)
             ),
@@ -505,14 +524,14 @@ def end_round(
     db_generation_aware = db_round.created_at.replace(tzinfo=timezone.utc)
     duration = (now_tim - db_generation_aware).seconds
 
-
     db_round = crud.complete_round(db, round_id, schemas.RoundComplete(
         id=round_id,
         last_generation_id=db_round.last_generation_id,
         duration=duration,
         is_completed=True
     ))
-
+    if db_round is None:
+        raise HTTPException(status_code=404, detail="Round not found")
     return db_round
 
 @app.get("/personal_dictionaries/", tags=["Personal Dictionary"], response_model=list[schemas.PersonalDictionary])
