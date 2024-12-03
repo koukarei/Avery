@@ -209,13 +209,15 @@ def update_generation1(db: Session, generation: schemas.GenerationCorrectSentenc
 
 def update_generation2(db: Session, generation: schemas.GenerationInterpretation):
     db_generation = db.query(models.Generation).filter(models.Generation.id == generation.id).first()
+    if not db_generation:
+        raise ValueError("Generation not found")
     db_generation.interpreted_image_id = generation.interpreted_image_id
     db.commit()
     db.refresh(db_generation)
     return db_generation
 
 def update_generation3(db: Session, generation: schemas.GenerationComplete):
-    db.bulk_update_mappings(models.Generation, [generation.model_dump()])
+    db.bulk_update_mappings(models.Generation, [generation.model_dump(exclude_none=True)])
     db.commit()
     db_generation = db.query(models.Generation).filter(models.Generation.id == generation.id).first()
     return db_generation

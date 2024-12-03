@@ -201,6 +201,21 @@ def test_round():
     assert response.status_code == 200
     assert len(response.json()) > 0
 
+    # Test ask hint to chatbot
+    new_message = {
+        "content": "What should I do?",
+        "created_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
+    }
+
+    response = client.put(
+        f"/sqlapp/round/{round_id}/chat",
+        json=new_message.copy(),
+        headers={"Content-Type": "application/json"},
+    )
+
+    print(f"ask hint: {response.json()}")
+    assert response.status_code == 200
+
     new_generation = {
         "round_id": round_id,
         "created_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
@@ -257,27 +272,53 @@ def test_round():
     assert response.status_code == 200
     assert len(response.json()) == num_rounds + 1
 
-def test_close_generation():
-    round_id = 1
-    generation_id=29
-    
-    #Test get scores
-    response = client.put(
-        f"/sqlapp/round/{round_id}/complete",
-        json={
-            "id":generation_id,
-            "at":datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
-        },
-        headers={"Content-Type": "application/json"},
-    )
-    print(f"Complete generation: {response.json()}")
-    assert response.status_code == 200
-
 def test_chat():
-    pass
+    # Get leaderboard id
+    response = client.get("/sqlapp/leaderboards/")
+    if not response.json():
+        return
+    leaderboard = response.json()[0]
+    leaderboard_id = leaderboard['id']
+
+    # Get user id
+    response = client.get("/sqlapp/users/")
+    user = response.json()[0]
+    user_id = user['id']
+
+    # Get round id
+    response = client.get(f"/sqlapp/leaderboards/{leaderboard_id}/rounds/")
+    if not response.json():
+        return
+    thisround = response.json()[0]
+    chat_id = thisround['chat_history']
+
+    # Get chat
+    response = client.get(f"/sqlapp/chat/{chat_id}")
+    assert response.status_code == 200
+    print(f"chat: {response.json()}")
 
 def test_image():
-    pass
+    # Get leaderboard id
+    response = client.get("/sqlapp/leaderboards/")
+    if not response.json():
+        assert False
+    leaderboard = response.json()[0]
+    leaderboard_id = leaderboard['id']
+
+    # Get original image
+    response = client.get(f"/sqlapp/original_image/{leaderboard_id}")
+    assert response.status_code == 200
+
+    # Get round id
+    response = client.get(f"/sqlapp/leaderboards/{leaderboard_id}/rounds/")
+    assert response.status_code == 200
+    print(f"rounds: {response.json()}")
+    
+    generation_id = response.json()[0]['last_generation_id']
+
+    # Get generated image
+    response = client.get(f"/sqlapp/interpreted_image/{generation_id}")
+    assert response.status_code == 200
 
 def test_vocabulary():
     pass

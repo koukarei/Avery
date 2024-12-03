@@ -259,7 +259,7 @@ def get_user_answer(
         round_id=round_id,
         generation=generation,
     )
-
+ 
     try:
         status, correct_sentence=sentence.checkSentence(sentence=db_generation.sentence)
 
@@ -355,24 +355,44 @@ def get_interpretation(
     db_generation = crud.update_generation2(
         db=db,
         generation=schemas.GenerationInterpretation(
-            id=round_id,
+            id=generation.id,
             interpreted_image_id=db_interpreted_image.id,
         )
     )
 
     generation_complete = schemas.GenerationCompleteCreate(
-        id=round_id,
+        id=generation.id,
         at=db_generation.created_at
     )
 
+    # update scores in background
     background_tasks.add_task(
-        calculate_score,
+        update_perplexity,
         db=db,
         en_nlp=en_nlp,
         perplexity_model=perplexity_model,
         tokenizer=tokenizer,
-        generation=generation_complete,
-        is_completed=False
+        generation=generation_complete
+    )
+    
+    background_tasks.add_task(
+        update_content_score,
+        db=db,
+        generation=generation_complete
+    )
+
+    background_tasks.add_task(
+        update_frequency_word,
+        db=db,
+        en_nlp=en_nlp,
+        generation=generation_complete
+    )
+
+    background_tasks.add_task(
+        update_n_words,
+        db=db,
+        en_nlp=en_nlp,
+        generation=generation_complete
     )
 
     db_round = crud.get_round(db, round_id)
@@ -535,7 +555,7 @@ def end_round(
         duration=duration,
         is_completed=True
     ))
-    
+
     if db_round is None:
         raise HTTPException(status_code=404, detail="Round not found")
     return db_round
@@ -655,14 +675,14 @@ def update_chat(
         result = crud.create_message(
             db=db,
             message=schemas.MessageBase(
-                content=model_response.hints,
+                content=model_response,
                 sender="assistant",
                 created_at=datetime.datetime.now(tz=timezone.utc)
             ),
             chat_id=db_chat.id
         )
 
-        return result
+        return result['chat']
     else:
         raise HTTPException(status_code=400, detail="Error in chatbot response")
 
@@ -683,13 +703,13 @@ async def get_original_image(leaderboard_id: int, db: Session = Depends(get_db))
     else:
         raise HTTPException(status_code=404, detail="Image not found")
     
-@app.get("/interpreted_image/{round_id}", tags=["Image"])
-async def get_interpreted_image(round_id: int, db: Session = Depends(get_db)):
-    db_round = crud.get_round(
+@app.get("/interpreted_image/{generation_id}", tags=["Image"])
+async def get_interpreted_image(generation_id: int, db: Session = Depends(get_db)):
+    db_generation = crud.get_generation(
         db=db,
-        round_id=round_id
+        generation_id=generation_id
     )
-    image_name = db_round.interpreted_image.image_path.split('/')[-1]
+    image_name = db_generation.interpreted_image.image_path.split('/')[-1]
     # Construct the image path
     image_path = os.path.join('/static','interpreted_images', image_name)
     
