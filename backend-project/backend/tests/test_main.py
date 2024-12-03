@@ -246,7 +246,7 @@ def test_round():
 
     # Test complete round
     response = client.post(
-        f"/round/{round_id}/end",
+        f"/sqlapp/round/{round_id}/end",
         headers={"Content-Type": "application/json"},
     )
     print(f"Complete round: {response.json()}")

@@ -405,7 +405,12 @@ def complete_generation(
         en_nlp = en_nlp_load()
 
     db_generation = crud.get_generation(db, generation_id=generation.id)
+    if db_generation is None:
+        raise HTTPException(status_code=404, detail="Generation not found")
     db_round = crud.get_round(db, db_generation.round_id)
+    if db_round is None:
+        raise HTTPException(status_code=404, detail="Round not found")
+    
     db_chat = crud.get_chat(db=db,chat_id=db_round.chat_history)
     cb=openai_chatbot.Hint_Chatbot()
 
@@ -530,6 +535,7 @@ def end_round(
         duration=duration,
         is_completed=True
     ))
+    
     if db_round is None:
         raise HTTPException(status_code=404, detail="Round not found")
     return db_round
