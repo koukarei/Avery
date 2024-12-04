@@ -11,18 +11,59 @@ from .dependencies import sentence, gen_image, score, dictionary, openai_chatbot
 
 from typing import Union, List, Annotated, Optional
 from datetime import timezone
-from .dependencies.models import *
+import torch, stanza
+from contextlib import asynccontextmanager
+from logging import getLogger
+
+logger = getLogger(__name__)
+
 from .background_tasks import *
 
 models.Base.metadata.create_all(bind=engine)
+nlp_models = {}
 
-app = FastAPI()
+def model_load():
+    logger.info("Loading models: stanza, GPT-2")
+    en_nlp = stanza.Pipeline('en', processors='tokenize,pos,constituency', package='default_accurate')
+    if "gpt2".startswith("gpt2"):
+        from transformers import GPT2Tokenizer, GPT2LMHeadModel
+        tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        perplexity_model = GPT2LMHeadModel.from_pretrained("gpt2")
+    else:
+        from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
+        tokenizer = OpenAIGPTTokenizer.from_pretrained("openai-gpt")
+        perplexity_model = OpenAIGPTLMHeadModel.from_pretrained("openai-gpt")
+    perplexity_model.eval()
+    if torch.cuda.is_available():
+        perplexity_model.to('cuda')
+    return en_nlp, tokenizer, perplexity_model
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await logger.info("Starting up")
+    try:
+        # Download the English model for stanza
+        stanza.download('en')
+        nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = await model_load()
+        logger.info("Models loaded successfully")
+        yield
+    except Exception as e:
+        print(f"Error in lifespan startup: {e}")
+        raise
+    finally:
+        await logger.info("Shutting down")
+        await nlp_models.clear()
+
+app = FastAPI(
+    debug=True,
+    title="AVERY",
+    lifespan=lifespan,
+)
 
 # Define the directory where the images will be stored
 media_dir = Path(os.getenv("MEDIA_DIR", "/static"))
 media_dir.mkdir(parents=True, exist_ok=True)
 
-perplexity_model,tokenizer, en_nlp = None, None, None
 
 # Dependency
 def get_db():
@@ -31,6 +72,32 @@ def get_db():
         yield db
     finally:
         db.close()
+
+@app.post("/content_score/")
+def content_score_test_endpoint(
+    image: Annotated[UploadFile, File()],
+    sentence: Annotated[str, Form()],
+):
+    temp_image_path = media_dir / "temp.jpg"
+    try:
+        image.file.seek(0)
+        image_content = Image.open(image.file)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Please upload a valid image file")
+    
+    try:
+        image_content.save(temp_image_path)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error uploading file: {str(e)}")
+    finally:
+        image.file.close()
+    output = score.calculate_content_score(
+        image_path=temp_image_path,
+        sentence=sentence
+    )
+    if os.path.isfile(temp_image_path):
+        os.remove(temp_image_path)
+    return output
 
 @app.post("/users/", tags=["User"], response_model=schemas.User)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
@@ -311,118 +378,127 @@ def get_interpretation(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    global perplexity_model,tokenizer, en_nlp
-    if perplexity_model is None:
-        perplexity_model,tokenizer = gpt2_model_load()
-
-    if en_nlp is None:
-        en_nlp = en_nlp_load()
-
-    interpreted_image_url = gen_image.generate_interpretion(
-        sentence=generation.correct_sentence
-    )
-    image_filename = f"i_{round_id}_{generation.id}"
-    interpreted_image_path = media_dir / "interpreted_images" / f"{image_filename}.jpg"
-
     try:
-        b_interpreted_image = io.BytesIO(requests.get(interpreted_image_url).content)
-        interpreted_image = Image.open(b_interpreted_image)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Please upload a valid image file")
-    
-    try:
-        counter = 0
-        while True:
-            if not os.path.isfile(interpreted_image_path):
-                with open(interpreted_image_path, "wb") as buffer:
-                    interpreted_image.save(buffer)
-                break
-            counter += 1
-            interpreted_image_path=media_dir / "interpreted_images" / f"{image_filename}_{counter}.jpg"
 
-    except Exception:
-        raise HTTPException(status_code=400, detail="There was an error uploading the file")
-    finally:
-        interpreted_image.close()
-    
-    db_interpreted_image = crud.create_interpreted_image(
-        db=db,
-        image=schemas.ImageBase(
-            image_path=str(interpreted_image_path),
+        # Image generation
+        interpreted_image_url = gen_image.generate_interpretion(
+            sentence=generation.correct_sentence
         )
-    )
+        image_filename = f"i_{round_id}_{generation.id}"
+        interpreted_image_path = media_dir / "interpreted_images" / f"{image_filename}.jpg"
 
-    db_generation = crud.update_generation2(
-        db=db,
-        generation=schemas.GenerationInterpretation(
+        # Download and save image
+        try:
+            b_interpreted_image = io.BytesIO(requests.get(interpreted_image_url).content)
+            interpreted_image = Image.open(b_interpreted_image)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid image file: {str(e)}")
+        
+        try:
+            counter = 0
+            while True:
+                if not os.path.isfile(interpreted_image_path):
+                    with open(interpreted_image_path, "wb") as buffer:
+                        interpreted_image.save(buffer)
+                    break
+                counter += 1
+                interpreted_image_path = media_dir / "interpreted_images" / f"{image_filename}_{counter}.jpg"
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error uploading file: {str(e)}")
+        finally:
+            interpreted_image.close()
+        
+        # Database operations
+        db_interpreted_image = crud.create_interpreted_image(
+            db=db,
+            image=schemas.ImageBase(
+                image_path=str(interpreted_image_path),
+            )
+        )
+
+        db_generation = crud.update_generation2(
+            db=db,
+            generation=schemas.GenerationInterpretation(
+                id=generation.id,
+                interpreted_image_id=db_interpreted_image.id,
+            )
+        )
+
+        generation_complete = schemas.GenerationCompleteCreate(
             id=generation.id,
-            interpreted_image_id=db_interpreted_image.id,
+            at=db_generation.created_at
         )
-    )
 
-    generation_complete = schemas.GenerationCompleteCreate(
-        id=generation.id,
-        at=db_generation.created_at
-    )
+        # Safe background task addition with error handling
+        try:
 
-    # update scores in background
-    background_tasks.add_task(
-        update_perplexity,
-        db=db,
-        en_nlp=en_nlp,
-        perplexity_model=perplexity_model,
-        tokenizer=tokenizer,
-        generation=generation_complete
-    )
-    
-    background_tasks.add_task(
-        update_content_score,
-        db=db,
-        generation=generation_complete
-    )
+            if 'en_nlp' not in nlp_models or 'perplexity_model' not in nlp_models or 'tokenizer' not in nlp_models:
+                nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = model_load()
 
-    background_tasks.add_task(
-        update_frequency_word,
-        db=db,
-        en_nlp=en_nlp,
-        generation=generation_complete
-    )
+            # Update scores in background
+            background_tasks.add_task(
+                update_perplexity,
+                db=db,
+                en_nlp=nlp_models['en_nlp'],
+                perplexity_model=nlp_models['perplexity_model'],
+                tokenizer=nlp_models['tokenizer'],
+                generation=generation_complete
+            )
+            
+            background_tasks.add_task(
+                update_content_score,
+                db=db,
+                generation=generation_complete
+            )
 
-    background_tasks.add_task(
-        update_n_words,
-        db=db,
-        en_nlp=en_nlp,
-        generation=generation_complete
-    )
+            background_tasks.add_task(
+                update_frequency_word,
+                db=db,
+                en_nlp=nlp_models['en_nlp'],
+                generation=generation_complete
+            )
 
-    db_round = crud.get_round(db, round_id)
+            background_tasks.add_task(
+                update_n_words,
+                db=db,
+                en_nlp=nlp_models['en_nlp'],
+                generation=generation_complete
+            )
+        except Exception as e:
+            # Log the background task error without raising
+            print(f"Background task error: {str(e)}")
 
-    new_message="""回答をシステム入力しました。📝
+        # Get round and create message
+        db_round = crud.get_round(db, round_id)
+
+        new_message = """回答をシステム入力しました。📝
 回答: {}""".format(generation.correct_sentence)
 
-    crud.create_message(
-        db=db,
-        message=schemas.MessageBase(
-            content=new_message,
-            sender="assistant",
-            created_at=datetime.datetime.now(tz=timezone.utc)
-        ),
-        chat_id=db_round.chat_history
-    )
+        crud.create_message(
+            db=db,
+            message=schemas.MessageBase(
+                content=new_message,
+                sender="assistant",
+                created_at=datetime.datetime.now(tz=timezone.utc)
+            ),
+            chat_id=db_round.chat_history
+        )
 
-    return db_generation
+        return db_generation
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Catch and log any unexpected errors
+        print(f"Unexpected error in get_interpretation: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.put("/round/{round_id}/complete", tags=["Round"], response_model=schemas.GenerationComplete)
 def complete_generation(
     generation: schemas.GenerationCompleteCreate,
     db: Session = Depends(get_db),
 ):
-    global perplexity_model,tokenizer, en_nlp
-    if perplexity_model is None:
-        perplexity_model,tokenizer = gpt2_model_load()
-
-    if en_nlp is None:
-        en_nlp = en_nlp_load()
 
     db_generation = crud.get_generation(db, generation_id=generation.id)
     if db_generation is None:
@@ -434,11 +510,14 @@ def complete_generation(
     db_chat = crud.get_chat(db=db,chat_id=db_round.chat_history)
     cb=openai_chatbot.Hint_Chatbot()
 
+    if 'en_nlp' not in nlp_models or 'perplexity_model' not in nlp_models or 'tokenizer' not in nlp_models:
+        nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = model_load()
+
     factors, scores_dict = calculate_score(
         db=db,
-        en_nlp=en_nlp,
-        perplexity_model=perplexity_model,
-        tokenizer=tokenizer,
+        en_nlp=nlp_models['en_nlp'],
+        perplexity_model=nlp_models['perplexity_model'],
+        tokenizer=nlp_models['tokenizer'],
         generation=generation,
         is_completed=True
     )

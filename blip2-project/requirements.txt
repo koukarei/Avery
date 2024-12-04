@@ -1,4 +1,5 @@
-Flask
+fastapi[standard]
+uvicorn[standard]
 salesforce-lavis
 torch
 numpy

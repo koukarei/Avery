@@ -72,12 +72,11 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./blip2-project:/blip2
-    command: flask --app /blip2/app/main.py run --host 0.0.0.0 --port 7874 --reload --debug
+    command: uvicorn blip2.app.main:app --host 0.0.0.0 --port 7874
     ports: 
       - "7874:7874"
     tty: true
     stdin_open: true
-    restart: always
     networks:
       - avery-network
 

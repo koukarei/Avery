@@ -16,7 +16,6 @@ def test_play():
     # Create leaderboards
     response = client.post("/leaderboards/create")
 
-    interpreted_dir = 'initial/interpreted/'
     picture_dir = 'initial/pic/'
 
     # Get user id
@@ -49,9 +48,10 @@ def test_play():
         assert response.status_code == 200
         original_image_id = response.json()['id']
 
+        title = filename.split('.')[0]
         # Test create a new leaderboard
         new_leaderboard = {
-            "title": filename.split('.')[0],
+            "title": title,
             "story_extract": "",
             "is_public": True,
             "scene_id": scene_id,
@@ -64,7 +64,7 @@ def test_play():
         print(f"leaderboard created: {response.json()}")
         assert response.status_code == 200
 
-        leaderboard_dict[filename] = response.json()['id']
+        leaderboard_dict[title] = response.json()['id']
     
     # Test read all leaderboards
     response = client.get("/sqlapp/leaderboards/")

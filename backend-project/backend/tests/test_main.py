@@ -11,7 +11,6 @@ from fastapi import UploadFile
 
 client = TestClient(app)
 
-
 def test_users():
     # Test read all users
     response = client.get("/sqlapp/users/")
@@ -318,6 +317,18 @@ def test_image():
 
     # Get generated image
     response = client.get(f"/sqlapp/interpreted_image/{generation_id}")
+    assert response.status_code == 200
+
+def test_content_score():
+    test_image_filename="cut_ham_for_test.jpg"
+
+    with open(f"tests/{test_image_filename}", "rb") as f:
+        response = client.post(
+            "/sqlapp/content_score/",
+            files={"image": (test_image_filename, f, "image/jpeg")},
+            data={"sentence":"The mouse set to work at once to carve the ham."}
+        )
+    print(f"content score: {response.json()}")
     assert response.status_code == 200
 
 def test_vocabulary():
