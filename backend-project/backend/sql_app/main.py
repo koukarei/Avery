@@ -76,13 +76,6 @@ def model_load():
     if torch.cuda.is_available():
         perplexity_model.to('cuda')
     return en_nlp, tokenizer, perplexity_model
-
-app = FastAPI(
-    debug=True,
-    title="AVERY",
-    lifespan=lifespan,
-)
-
 # Define the directory where the images will be stored
 media_dir = Path(os.getenv("MEDIA_DIR", "/static"))
 media_dir.mkdir(parents=True, exist_ok=True)
@@ -130,6 +123,13 @@ async def lifespan(app: FastAPI):
     finally:
         await logger1.info("Shutting down")
         await nlp_models.clear()
+
+app = FastAPI(
+    debug=True,
+    title="AVERY",
+    lifespan=lifespan,
+)
+
 
 @app.get("/")
 def hello_world():
