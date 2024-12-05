@@ -148,16 +148,31 @@ def calculate_content_score(
       sentence: str
       ):
     
-    BLIP2_URL = os.getenv("BLIP2_URL")
+    #BLIP2_URL = os.getenv("BLIP2_URL")
+    BLIP2_URL = "http://blip2:7874/fake_content_score"
+    if isinstance(image_path, str):
+      image_filename = image_path.split("/")[-1]
+    elif isinstance(image_path, os.PathLike):
+      image_filename = image_path.name
+    else:
+       raise ValueError("image_path must be a string or a PathLike object")
 
     try:
-       response = requests.post(
-          url=BLIP2_URL, data={"sentence":sentence}, files={"image":open(image_path,'rb')}
-       )
-       response.raise_for_status()
-       return response.json()
+      with open(image_path, "rb") as f:
+        status_code = 503
+        counter = 0
+        while status_code == 503:
+          if counter >0:
+            time.sleep(2)
+          response = requests.post(
+              url=BLIP2_URL, data={"sentence":sentence}, files={"image": (image_filename, f, "image/jpeg")}, timeout=30
+          )
+          status_code = response.status_code
+          counter += 1
+      response.raise_for_status()
+      return response.json()
     except requests.exceptions.RequestException as e:
-       raise HTTPException(status_code=500, detail="BLIP2 server error")
+      raise HTTPException(status_code=500, detail="BLIP2 server error")
 
 def calculate_score(
       n_grammar_errors: int,

@@ -76,7 +76,6 @@ services:
     ports: 
       - "7874:7874"
     tty: true
-    stdin_open: true
     networks:
       - avery-network
 
