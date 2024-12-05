@@ -1,3 +1,4 @@
+import logging.config
 from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, BackgroundTasks, responses
 from sqlalchemy.orm import Session
 import time, os, datetime, io, requests
@@ -8,14 +9,55 @@ from . import crud, models, schemas
 from .database import SessionLocal, engine
 
 from .dependencies import sentence, gen_image, score, dictionary, openai_chatbot
+import tracemalloc
+tracemalloc.start()
 
 from typing import Union, List, Annotated, Optional
 from datetime import timezone
 import torch, stanza
 from contextlib import asynccontextmanager
-from logging import getLogger
+import logging
 
-logger = getLogger(__name__)
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
+logger = logging.getLogger(__name__)
+
+class memory_tracker:
+    def __init__(self, message=None):
+        self.filehandler = logging.FileHandler("logs/memory_tracker.log", mode="a", encoding=None, delay=False)
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.setLevel(logging.WARNING)
+        self.logger.addHandler(self.filehandler)
+        self.filehandler.setFormatter(formatter)
+        self.logger.warning(f"{message} - Memory tracker started")
+        self.snapshot1 = tracemalloc.take_snapshot()
+
+    def get_top_stats(self, message=None):
+        snapshot2 = tracemalloc.take_snapshot()
+        top_stats = snapshot2.compare_to(self.snapshot1, 'lineno')
+        if message:
+            self.logger.warning(message)
+        self.logger.warning("[ Top 10 ]")
+        for stat in top_stats[:10]:
+            self.logger.warning(stat)
+        return top_stats
+
+log_filename = "logs/backend.log"
+
+os.makedirs(os.path.dirname(log_filename), exist_ok=True)
+file_handler = logging.FileHandler(log_filename, mode="a", encoding=None, delay=False)
+file_handler.setFormatter(formatter)
+
+logger1 = logging.getLogger(
+    "info_logger"
+)
+logger1.setLevel(logging.INFO)
+logger1.addHandler(file_handler)
 
 from .background_tasks import *
 
@@ -23,16 +65,11 @@ models.Base.metadata.create_all(bind=engine)
 nlp_models = {}
 
 def model_load():
-    logger.info("Loading models: stanza, GPT-2")
+    logger1.info("Loading models: stanza, GPT-2")
     en_nlp = stanza.Pipeline('en', processors='tokenize,pos,constituency', package='default_accurate')
-    if "gpt2".startswith("gpt2"):
-        from transformers import GPT2Tokenizer, GPT2LMHeadModel
-        tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-        perplexity_model = GPT2LMHeadModel.from_pretrained("gpt2")
-    else:
-        from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
-        tokenizer = OpenAIGPTTokenizer.from_pretrained("openai-gpt")
-        perplexity_model = OpenAIGPTLMHeadModel.from_pretrained("openai-gpt")
+    from transformers import GPT2Tokenizer, GPT2LMHeadModel
+    tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+    perplexity_model = GPT2LMHeadModel.from_pretrained("gpt2")
     perplexity_model.eval()
     if torch.cuda.is_available():
         perplexity_model.to('cuda')
@@ -40,18 +77,18 @@ def model_load():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await logger.info("Starting up")
+    await logger1.info("Starting up")
     try:
         # Download the English model for stanza
         stanza.download('en')
         nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = await model_load()
-        logger.info("Models loaded successfully")
+        logger1.info("Models loaded successfully")
         yield
     except Exception as e:
         print(f"Error in lifespan startup: {e}")
         raise
     finally:
-        await logger.info("Shutting down")
+        await logger1.info("Shutting down")
         await nlp_models.clear()
 
 app = FastAPI(
@@ -72,6 +109,11 @@ def get_db():
         yield db
     finally:
         db.close()
+
+@app.get("/")
+def hello_world():
+    logger1.info("Hello World")
+    return {"message": "Hello World"}
 
 @app.post("/content_score/")
 def content_score_test_endpoint(
@@ -170,7 +212,8 @@ def create_story(
                 f.write(story_content)
                 
     except Exception:
-        return {"message": f"There was an error uploading the file\n{Exception}"}
+        logger1.error(f"Error uploading file: {Exception}")
+        raise HTTPException(status_code=400, detail="Error uploading file")
     finally:
         story_content_file.file.close()
 
@@ -252,6 +295,7 @@ def create_leaderboard_image(
     try:
         image_content.save(image_path)
     except Exception as e:
+        logger1.error(f"Error uploading file: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Error uploading file: {str(e)}")
     finally:
         original_image.file.close()
@@ -269,6 +313,7 @@ def create_leaderboard_image(
 def read_leaderboard(leaderboard_id: int, db: Session = Depends(get_db)):
     db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
     if db_leaderboard is None:
+        logger1.error(f"Leaderboard not found: {leaderboard_id}")
         raise HTTPException(status_code=404, detail="Leaderboard not found")
     return db_leaderboard
 
@@ -333,6 +378,7 @@ def get_user_answer(
         status, correct_sentence=sentence.checkSentence(sentence=db_generation.sentence)
 
     except Exception as e:
+        logger1.error(f"Error in get_user_answer: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     
     db_round = crud.get_round(db, round_id)
@@ -379,10 +425,8 @@ def get_interpretation(
     generation: schemas.GenerationCorrectSentence,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    blip2_model_tuple=Depends(blip2_model_load),
-    en_nlp=Depends(en_nlp_load),
-    perplexity_model_turple=Depends(gpt2_model_load),
 ):
+    tracker_interpretation = memory_tracker(message=f"Round id: {round_id}, Generation id: {generation.id} - Get interpretation")
     try:
 
         # Image generation
@@ -471,7 +515,7 @@ def get_interpretation(
             )
         except Exception as e:
             # Log the background task error without raising
-            print(f"Background task error: {str(e)}")
+            logger1.error(f"Error in background task addition: {str(e)}")
 
         # Get round and create message
         db_round = crud.get_round(db, round_id)
@@ -489,6 +533,8 @@ def get_interpretation(
             chat_id=db_round.chat_history
         )
 
+        tracker_interpretation.get_top_stats(message=f"Round id: {round_id}, Generation id: {generation.id}")
+        del tracker_interpretation
         return db_generation
 
     except HTTPException:
@@ -496,17 +542,15 @@ def get_interpretation(
         raise
     except Exception as e:
         # Catch and log any unexpected errors
-        print(f"Unexpected error in get_interpretation: {str(e)}")
+        logger1.error(f"Unexpected error in get_interpretation: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.put("/round/{round_id}/complete", tags=["Round"], response_model=schemas.GenerationComplete)
 def complete_generation(
     generation: schemas.GenerationCompleteCreate,
     db: Session = Depends(get_db),
-    blip2_model_tuple=Depends(blip2_model_load),
-    en_nlp=Depends(en_nlp_load),
-    perplexity_model_turple=Depends(gpt2_model_load),
 ):
+    tracker_complete_generation = memory_tracker(message=f"Generation id: {generation.id} - Complete a generation")
 
     db_generation = crud.get_generation(db, generation_id=generation.id)
     if db_generation is None:
@@ -623,6 +667,10 @@ def complete_generation(
             chat_id=db_round.chat_history
         )
 
+    tracker_complete_generation.get_top_stats(
+        message=f"Generation id: {generation.id} - Complete a generation"
+    )
+    del tracker_complete_generation
     return crud.get_generation(db, generation_id=generation.id)
 
 @app.post("/round/{round_id}/end",tags=["Round"], response_model=schemas.RoundOut)

@@ -148,22 +148,10 @@ def test_play_2():
     leaderboard = response.json()[0]
     leaderboard_id = leaderboard['id']
 
-    picture_dir = 'initial/pic/'
-
     # Get user id
     response = client.get("/sqlapp/users/")
     user = response.json()[0]
     user_id = user['id']
-
-    #Get scene id
-    response = client.get("/sqlapp/scenes/")
-    scene = response.json()[0]
-    scene_id = scene['id']
-
-    # Get story id
-    response = client.get("/sqlapp/stories/")
-    story = response.json()[0]
-    story_id = story['id']
 
     # Read csv file
     with open('initial/entries/202408_Results.csv','r') as f:

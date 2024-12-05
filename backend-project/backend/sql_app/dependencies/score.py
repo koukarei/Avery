@@ -148,8 +148,8 @@ def calculate_content_score(
       sentence: str
       ):
     
-    #BLIP2_URL = os.getenv("BLIP2_URL")
-    BLIP2_URL = "http://blip2:7874/fake_content_score"
+    BLIP2_URL = os.getenv("BLIP2_URL")
+    # BLIP2_URL = "http://blip2:7874/fake_content_score"
     if isinstance(image_path, str):
       image_filename = image_path.split("/")[-1]
     elif isinstance(image_path, os.PathLike):

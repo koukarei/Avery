@@ -10,18 +10,18 @@ from lavis.models import load_model_and_preprocess
 
 def load_blip2_model():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    blip2_model, vis_processors, text_processors = load_model_and_preprocess(
-        "blip_image_text_matching", "large", device=device, is_eval=True
-    )
     # blip2_model, vis_processors, text_processors = load_model_and_preprocess(
-    #     "blip2_image_text_matching", "pretrain", device=device, is_eval=True
+    #     "blip_image_text_matching", "large", device=device, is_eval=True
     # )
+    blip2_model, vis_processors, text_processors = load_model_and_preprocess(
+        "blip2_image_text_matching", "pretrain", device=device, is_eval=True
+    )
     return blip2_model, vis_processors, text_processors, device
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        # models['blip2_model'], models['vis_processors'], models['text_processors'], models['device'] = load_blip2_model()
+        models['blip2_model'], models['vis_processors'], models['text_processors'], models['device'] = load_blip2_model()
         yield
     except Exception as e:
         raise ValueError(f"Error loading BLIP2 model: {e}")
