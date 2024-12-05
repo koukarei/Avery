@@ -65,6 +65,20 @@ services:
     networks:
       - avery-network
 
+  blip2-project:
+    container_name: blip2
+    build:
+      context: blip2-project
+      dockerfile: Dockerfile
+    volumes:
+      - ./blip2-project:/blip2
+    command: uvicorn blip2.app.main:app --host 0.0.0.0 --port 7874
+    ports: 
+      - "7874:7874"
+    tty: true
+    networks:
+      - avery-network
+
 volumes:
   db-store:
   media:

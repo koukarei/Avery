@@ -1,4 +1,5 @@
 from typing import List,Literal,Union
+from fastapi import HTTPException
 from enum import Enum
 
 import PIL.Image
@@ -7,8 +8,7 @@ import requests
 
 import torch
 
-from lavis.models import load_model_and_preprocess
-from lavis.processors import load_processor
+import os
 
 import stanza
 import language_tool_python
@@ -114,7 +114,7 @@ def frequency_word_ngram(words,n_gram=2):
                          'type':'ngram' if '%20' in ngram else 'word',
                          'freq':freq})
           if i != len(ngrams)-1:
-            time.sleep(1)
+            time.sleep(1.5)
       else:
         print(f"Error: {response.status_code}")
   if not output:
@@ -144,29 +144,35 @@ def perplexity(perplexity_model, tokenizer,sentence, cut_points):
   }
 
 def calculate_content_score(
-      blip2_model, 
-      vis_processors, 
-      text_processors, 
       image_path: str, 
       sentence: str
       ):
     
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #BLIP2_URL = os.getenv("BLIP2_URL")
+    BLIP2_URL = "http://blip2:7874/fake_content_score"
+    if isinstance(image_path, str):
+      image_filename = image_path.split("/")[-1]
+    elif isinstance(image_path, os.PathLike):
+      image_filename = image_path.name
+    else:
+       raise ValueError("image_path must be a string or a PathLike object")
 
-    raw_image = PIL.Image.open(image_path).convert("RGB")
-    img = vis_processors["eval"](raw_image).unsqueeze(0).to(device)
-    txt = text_processors["eval"](sentence)
-
-    itm_output = blip2_model({"image": img, "text_input": txt}, match_head="itm")
-    itm_scores = torch.nn.functional.softmax(itm_output, dim=1)
-    content_score = itm_scores[:, 1].item()*100
-    # print(f'The image and text are matched with a probability of {itm_scores[:, 1].item():.3%}')
-
-    # itc_score = model({"image": img, "text_input": txt}, match_head='itc')
-    # print('The image feature and text feature has a cosine similarity of %.4f'%itc_score)
-    return {
-       'content_score':int(round(content_score))
-    }
+    try:
+      with open(image_path, "rb") as f:
+        status_code = 503
+        counter = 0
+        while status_code == 503:
+          if counter >0:
+            time.sleep(2)
+          response = requests.post(
+              url=BLIP2_URL, data={"sentence":sentence}, files={"image": (image_filename, f, "image/jpeg")}, timeout=30
+          )
+          status_code = response.status_code
+          counter += 1
+      response.raise_for_status()
+      return response.json()
+    except requests.exceptions.RequestException as e:
+      raise HTTPException(status_code=500, detail="BLIP2 server error")
 
 def calculate_score(
       n_grammar_errors: int,
@@ -221,9 +227,6 @@ def calculate_score(
     return output
 
 def calculate_score_init(
-      blip2_model,
-      vis_processors,
-      text_processors,
       en_nlp,
       perplexity_model,
       tokenizer,
@@ -250,9 +253,6 @@ def calculate_score_init(
    factors.update(frequency_score(words=words))
 
    factors.update(calculate_content_score(
-      blip2_model=blip2_model,
-      vis_processors=vis_processors,
-      text_processors=text_processors,
       image_path=image_path,
       sentence=sentence
    ))

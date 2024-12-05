@@ -163,28 +163,28 @@ class GenerationCompleteCreate(BaseModel):
 
 class GenerationComplete(BaseModel):
     id: int
-    n_words: int
-    n_conjunctions: int
-    n_adj: int
-    n_adv: int
-    n_pronouns: int
-    n_prepositions: int
+    n_words: Optional[int] = None
+    n_conjunctions: Optional[int] = None
+    n_adj: Optional[int] = None
+    n_adv: Optional[int] = None
+    n_pronouns: Optional[int] = None
+    n_prepositions: Optional[int] = None
 
-    n_grammar_errors: int
-    n_spelling_errors: int
+    n_grammar_errors: Optional[int] = None
+    n_spelling_errors: Optional[int] = None
 
-    perlexity: float
+    perplexity: Optional[float] = None
 
-    f_word: float
-    f_bigram: float
+    f_word: Optional[float] = None
+    f_bigram: Optional[float] = None
 
-    n_clauses: int
+    n_clauses: Optional[int] = None
 
-    content_score: int
+    content_score: Optional[int] = None
 
-    total_score: int
-    rank: str
-    duration: int
+    total_score: Optional[int] = None
+    rank: Optional[str] = None
+    duration: Optional[int] = None
     is_completed: bool
 
 class GenerationOut(GenerationComplete):
@@ -204,6 +204,8 @@ class RoundComplete(BaseModel):
 class RoundOut(BaseModel):
     id: int
     player: UserOut
+    last_generation_id: Optional[int]=None
+    chat_history: int
     generations: list[IdOnly]=[]
 
     class Config:

@@ -11,16 +11,59 @@ from .dependencies import sentence, gen_image, score, dictionary, openai_chatbot
 
 from typing import Union, List, Annotated, Optional
 from datetime import timezone
-from .dependencies.models import *
+import torch, stanza
+from contextlib import asynccontextmanager
+from logging import getLogger
+
+logger = getLogger(__name__)
+
 from .background_tasks import *
 
 models.Base.metadata.create_all(bind=engine)
+nlp_models = {}
 
-app = FastAPI()
+def model_load():
+    logger.info("Loading models: stanza, GPT-2")
+    en_nlp = stanza.Pipeline('en', processors='tokenize,pos,constituency', package='default_accurate')
+    if "gpt2".startswith("gpt2"):
+        from transformers import GPT2Tokenizer, GPT2LMHeadModel
+        tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        perplexity_model = GPT2LMHeadModel.from_pretrained("gpt2")
+    else:
+        from transformers import OpenAIGPTTokenizer, OpenAIGPTLMHeadModel
+        tokenizer = OpenAIGPTTokenizer.from_pretrained("openai-gpt")
+        perplexity_model = OpenAIGPTLMHeadModel.from_pretrained("openai-gpt")
+    perplexity_model.eval()
+    if torch.cuda.is_available():
+        perplexity_model.to('cuda')
+    return en_nlp, tokenizer, perplexity_model
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await logger.info("Starting up")
+    try:
+        # Download the English model for stanza
+        stanza.download('en')
+        nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = await model_load()
+        logger.info("Models loaded successfully")
+        yield
+    except Exception as e:
+        print(f"Error in lifespan startup: {e}")
+        raise
+    finally:
+        await logger.info("Shutting down")
+        await nlp_models.clear()
+
+app = FastAPI(
+    debug=True,
+    title="AVERY",
+    lifespan=lifespan,
+)
 
 # Define the directory where the images will be stored
 media_dir = Path(os.getenv("MEDIA_DIR", "/static"))
 media_dir.mkdir(parents=True, exist_ok=True)
+
 
 # Dependency
 def get_db():
@@ -29,6 +72,32 @@ def get_db():
         yield db
     finally:
         db.close()
+
+@app.post("/content_score/")
+def content_score_test_endpoint(
+    image: Annotated[UploadFile, File()],
+    sentence: Annotated[str, Form()],
+):
+    temp_image_path = media_dir / "temp.jpg"
+    try:
+        image.file.seek(0)
+        image_content = Image.open(image.file)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Please upload a valid image file")
+    
+    try:
+        image_content.save(temp_image_path)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error uploading file: {str(e)}")
+    finally:
+        image.file.close()
+    output = score.calculate_content_score(
+        image_path=temp_image_path,
+        sentence=sentence
+    )
+    if os.path.isfile(temp_image_path):
+        os.remove(temp_image_path)
+    return output
 
 @app.post("/users/", tags=["User"], response_model=schemas.User)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
@@ -183,7 +252,6 @@ def create_leaderboard_image(
     try:
         image_content.save(image_path)
     except Exception as e:
-        print(image_content)
         raise HTTPException(status_code=400, detail=f"Error uploading file: {str(e)}")
     finally:
         original_image.file.close()
@@ -260,7 +328,7 @@ def get_user_answer(
         round_id=round_id,
         generation=generation,
     )
-
+ 
     try:
         status, correct_sentence=sentence.checkSentence(sentence=db_generation.sentence)
 
@@ -315,88 +383,121 @@ def get_interpretation(
     en_nlp=Depends(en_nlp_load),
     perplexity_model_turple=Depends(gpt2_model_load),
 ):
-    blip2_model,vis_processors,text_processors=blip2_model_tuple
-    perplexity_model,tokenizer=perplexity_model_turple
-
-    interpreted_image_url = gen_image.generate_interpretion(
-        sentence=generation.correct_sentence
-    )
-    image_filename = f"i_{round_id}_{generation.id}"
-
-    os.makedirs(media_dir / "interpreted_images", exist_ok=True)
-
-    interpreted_image_path = media_dir / "interpreted_images" / f"{image_filename}.jpg"
-
     try:
-        b_interpreted_image = io.BytesIO(requests.get(interpreted_image_url).content)
-        interpreted_image = Image.open(b_interpreted_image)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Please upload a valid image file")
-    
-    try:
-        counter = 0
-        while True:
-            if not os.path.isfile(interpreted_image_path):
-                with open(interpreted_image_path, "wb") as buffer:
-                    interpreted_image.save(buffer)
-                break
-            counter += 1
-            interpreted_image_path=media_dir / "interpreted_images" / f"{image_filename}_{counter}.jpg"
 
-    except Exception:
-        raise HTTPException(status_code=400, detail="There was an error uploading the file")
-    finally:
-        interpreted_image.close()
-    
-    db_interpreted_image = crud.create_interpreted_image(
-        db=db,
-        image=schemas.ImageBase(
-            image_path=str(interpreted_image_path),
+        # Image generation
+        interpreted_image_url = gen_image.generate_interpretion(
+            sentence=generation.correct_sentence
         )
-    )
+        image_filename = f"i_{round_id}_{generation.id}"
+        interpreted_image_path = media_dir / "interpreted_images" / f"{image_filename}.jpg"
 
-    db_generation = crud.update_generation2(
-        db=db,
-        generation=schemas.GenerationInterpretation(
-            id=round_id,
-            interpreted_image_id=db_interpreted_image.id,
+        # Download and save image
+        try:
+            b_interpreted_image = io.BytesIO(requests.get(interpreted_image_url).content)
+            interpreted_image = Image.open(b_interpreted_image)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid image file: {str(e)}")
+        
+        try:
+            counter = 0
+            while True:
+                if not os.path.isfile(interpreted_image_path):
+                    with open(interpreted_image_path, "wb") as buffer:
+                        interpreted_image.save(buffer)
+                    break
+                counter += 1
+                interpreted_image_path = media_dir / "interpreted_images" / f"{image_filename}_{counter}.jpg"
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error uploading file: {str(e)}")
+        finally:
+            interpreted_image.close()
+        
+        # Database operations
+        db_interpreted_image = crud.create_interpreted_image(
+            db=db,
+            image=schemas.ImageBase(
+                image_path=str(interpreted_image_path),
+            )
         )
-    )
 
-    generation_complete = schemas.GenerationCompleteCreate(
-        id=round_id,
-        at=db_generation.created_at
-    )
+        db_generation = crud.update_generation2(
+            db=db,
+            generation=schemas.GenerationInterpretation(
+                id=generation.id,
+                interpreted_image_id=db_interpreted_image.id,
+            )
+        )
 
-    background_tasks.add_task(
-        calculate_score,
-        db=db,
-        blip2_model=blip2_model,
-        vis_processors=vis_processors,
-        text_processors=text_processors,
-        en_nlp=en_nlp,
-        perplexity_model=perplexity_model,
-        tokenizer=tokenizer,
-        generation=generation_complete,
-        is_completed=False
-    )
+        generation_complete = schemas.GenerationCompleteCreate(
+            id=generation.id,
+            at=db_generation.created_at
+        )
 
-    db_round = crud.get_round(db, round_id)
+        # Safe background task addition with error handling
+        try:
 
-    new_message="""回答をシステム入力しました。📝
+            if 'en_nlp' not in nlp_models or 'perplexity_model' not in nlp_models or 'tokenizer' not in nlp_models:
+                nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = model_load()
+
+            # Update scores in background
+            background_tasks.add_task(
+                update_perplexity,
+                db=db,
+                en_nlp=nlp_models['en_nlp'],
+                perplexity_model=nlp_models['perplexity_model'],
+                tokenizer=nlp_models['tokenizer'],
+                generation=generation_complete
+            )
+            
+            background_tasks.add_task(
+                update_content_score,
+                db=db,
+                generation=generation_complete
+            )
+
+            background_tasks.add_task(
+                update_frequency_word,
+                db=db,
+                en_nlp=nlp_models['en_nlp'],
+                generation=generation_complete
+            )
+
+            background_tasks.add_task(
+                update_n_words,
+                db=db,
+                en_nlp=nlp_models['en_nlp'],
+                generation=generation_complete
+            )
+        except Exception as e:
+            # Log the background task error without raising
+            print(f"Background task error: {str(e)}")
+
+        # Get round and create message
+        db_round = crud.get_round(db, round_id)
+
+        new_message = """回答をシステム入力しました。📝
 回答: {}""".format(generation.correct_sentence)
 
-    crud.create_message(
-        db=db,
-        message=schemas.MessageBase(
-            content=new_message,
-            sender="assistant",
-            created_at=datetime.datetime.now(tz=timezone.utc)
-        ),
-        chat_id=db_round.chat_history
-    )
+        crud.create_message(
+            db=db,
+            message=schemas.MessageBase(
+                content=new_message,
+                sender="assistant",
+                created_at=datetime.datetime.now(tz=timezone.utc)
+            ),
+            chat_id=db_round.chat_history
+        )
 
-    return db_generation
+        return db_generation
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Catch and log any unexpected errors
+        print(f"Unexpected error in get_interpretation: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.put("/round/{round_id}/complete", tags=["Round"], response_model=schemas.GenerationComplete)
 def complete_generation(
@@ -406,22 +507,25 @@ def complete_generation(
     en_nlp=Depends(en_nlp_load),
     perplexity_model_turple=Depends(gpt2_model_load),
 ):
-    blip2_model,vis_processors,text_processors=blip2_model_tuple
-    perplexity_model,tokenizer=perplexity_model_turple
 
     db_generation = crud.get_generation(db, generation_id=generation.id)
+    if db_generation is None:
+        raise HTTPException(status_code=404, detail="Generation not found")
     db_round = crud.get_round(db, db_generation.round_id)
+    if db_round is None:
+        raise HTTPException(status_code=404, detail="Round not found")
+    
     db_chat = crud.get_chat(db=db,chat_id=db_round.chat_history)
     cb=openai_chatbot.Hint_Chatbot()
 
+    if 'en_nlp' not in nlp_models or 'perplexity_model' not in nlp_models or 'tokenizer' not in nlp_models:
+        nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = model_load()
+
     factors, scores_dict = calculate_score(
         db=db,
-        blip2_model=blip2_model,
-        vis_processors=vis_processors,
-        text_processors=text_processors,
-        en_nlp=en_nlp,
-        perplexity_model=perplexity_model,
-        tokenizer=tokenizer,
+        en_nlp=nlp_models['en_nlp'],
+        perplexity_model=nlp_models['perplexity_model'],
+        tokenizer=nlp_models['tokenizer'],
         generation=generation,
         is_completed=True
     )
@@ -447,7 +551,7 @@ def complete_generation(
     )
 
     if evaluation:
-        evaluation_message = """あなたの回答：{user_sentence}
+        score_message = """あなたの回答：{user_sentence}
         Grammar Score: {grammar_score} (out of 5)
         Spelling Score: {spelling_score} (out of 5)
         Vividness Score: {vividness_score} (out of 5)
@@ -456,20 +560,8 @@ def complete_generation(
         Content Comprehensive Score: {content_score} (out of 100)
         Total Score: {total_score} (out of 2300)
         Rank: {rank}
-        
-        文法について
-        {grammar_feedback}
-        スペルについて
-        {spelling_feedback}
-        スタオルについて
-        {style_feedback}
-        内容について
-        {content_feedback}
-
-        整体的なコメント
-        {overall_feedback}
         """.format(
-            user_sentence=db_round.correct_sentence,
+            user_sentence=db_generation.sentence,
             grammar_score=scores_dict['grammar_score'],
             spelling_score=scores_dict['spelling_score'],
             vividness_score=scores_dict['vividness_score'],
@@ -478,17 +570,53 @@ def complete_generation(
             content_score=scores_dict['content_score'],
             total_score=scores_dict['total_score'],
             rank=db_generation.rank,
+        )
+
+        evaluation_message = """文法について
+        {grammar_feedback}
+        スペルについて
+        {spelling_feedback}
+        スタオルについて
+        {style_feedback}
+        内容について
+        {content_feedback}
+        """.format(
             grammar_feedback=evaluation.grammar_evaluation,
             spelling_feedback=evaluation.spelling_evaluation,
             style_feedback=evaluation.style_evaluation,
-            content_feedback=evaluation.content_evaluation,
+            content_feedback=evaluation.content_evaluation
+        )
+
+        overall_evaluation_message = """整体的なコメント
+        {overall_feedback}
+        """.format(
             overall_feedback=evaluation.overall_evaluation
         )
 
         crud.create_message(
             db=db,
             message=schemas.MessageBase(
+                content=score_message,
+                sender="assistant",
+                created_at=datetime.datetime.now(tz=timezone.utc)
+            ),
+            chat_id=db_round.chat_history
+        )
+
+        crud.create_message(
+            db=db,
+            message=schemas.MessageBase(
                 content=evaluation_message,
+                sender="assistant",
+                created_at=datetime.datetime.now(tz=timezone.utc)
+            ),
+            chat_id=db_round.chat_history
+        )
+
+        crud.create_message(
+            db=db,
+            message=schemas.MessageBase(
+                content=overall_evaluation_message,
                 sender="assistant",
                 created_at=datetime.datetime.now(tz=timezone.utc)
             ),
@@ -508,7 +636,6 @@ def end_round(
     db_generation_aware = db_round.created_at.replace(tzinfo=timezone.utc)
     duration = (now_tim - db_generation_aware).seconds
 
-
     db_round = crud.complete_round(db, round_id, schemas.RoundComplete(
         id=round_id,
         last_generation_id=db_round.last_generation_id,
@@ -516,6 +643,8 @@ def end_round(
         is_completed=True
     ))
 
+    if db_round is None:
+        raise HTTPException(status_code=404, detail="Round not found")
     return db_round
 
 @app.get("/personal_dictionaries/", tags=["Personal Dictionary"], response_model=list[schemas.PersonalDictionary])
@@ -633,14 +762,14 @@ def update_chat(
         result = crud.create_message(
             db=db,
             message=schemas.MessageBase(
-                content=model_response.hints,
+                content=model_response,
                 sender="assistant",
                 created_at=datetime.datetime.now(tz=timezone.utc)
             ),
             chat_id=db_chat.id
         )
 
-        return result
+        return result['chat']
     else:
         raise HTTPException(status_code=400, detail="Error in chatbot response")
 
@@ -661,13 +790,13 @@ async def get_original_image(leaderboard_id: int, db: Session = Depends(get_db))
     else:
         raise HTTPException(status_code=404, detail="Image not found")
     
-@app.get("/interpreted_image/{round_id}", tags=["Image"])
-async def get_interpreted_image(round_id: int, db: Session = Depends(get_db)):
-    db_round = crud.get_round(
+@app.get("/interpreted_image/{generation_id}", tags=["Image"])
+async def get_interpreted_image(generation_id: int, db: Session = Depends(get_db)):
+    db_generation = crud.get_generation(
         db=db,
-        round_id=round_id
+        generation_id=generation_id
     )
-    image_name = db_round.interpreted_image.image_path.split('/')[-1]
+    image_name = db_generation.interpreted_image.image_path.split('/')[-1]
     # Construct the image path
     image_path = os.path.join('/static','interpreted_images', image_name)
     

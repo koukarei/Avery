@@ -5,7 +5,6 @@ from . import models, schemas
 from typing import Union
 import datetime
 
-
 def get_user(db: Session, user_id: int):
     return db.query(models.User).filter(models.User.id == user_id).first()
 
@@ -210,23 +209,23 @@ def update_generation1(db: Session, generation: schemas.GenerationCorrectSentenc
 
 def update_generation2(db: Session, generation: schemas.GenerationInterpretation):
     db_generation = db.query(models.Generation).filter(models.Generation.id == generation.id).first()
+    if not db_generation:
+        raise ValueError("Generation not found")
     db_generation.interpreted_image_id = generation.interpreted_image_id
     db.commit()
     db.refresh(db_generation)
     return db_generation
 
 def update_generation3(db: Session, generation: schemas.GenerationComplete):
-    db_generation = db.query(models.Generation).filter(models.Generation.id == generation.id).first()
-    db_generation.update(**generation.model_dump())
+    db.bulk_update_mappings(models.Generation, [generation.model_dump(exclude_none=True)])
     db.commit()
-    db.refresh(db_generation)
+    db_generation = db.query(models.Generation).filter(models.Generation.id == generation.id).first()
     return db_generation
 
 def complete_round(db: Session, round_id: int, round: schemas.RoundComplete):
-    db_round = db.query(models.Round).filter(models.Round.id == round_id).first()
-    db_round.update(**round.model_dump())
+    db.bulk_update_mappings(models.Round, [round.model_dump()])
     db.commit()
-    db.refresh(db_round)
+    db_round = db.query(models.Round).filter(models.Round.id == round_id).first()
     return db_round
 
 def get_chat(db: Session, chat_id: int):
@@ -286,11 +285,12 @@ def update_personal_dictionary(
         db: Session,
         dictionary: schemas.PersonalDictionaryUpdate
 ):
-    
-    db_dictionary = db.query(models.PersonalDictionary).filter(models.PersonalDictionary.player == dictionary.player).filter(models.PersonalDictionary.vocabulary == dictionary.vocabulary).first()
-    db_dictionary.update(**dictionary.model_dump())
+    db.bulk_update_mappings(models.PersonalDictionary, [dictionary.model_dump()])
     db.commit()
-    db.refresh(db_dictionary)
+    db_dictionary = db.query(models.PersonalDictionary).\
+        filter(models.PersonalDictionary.player == dictionary.player).\
+            filter(models.PersonalDictionary.vocabulary == dictionary.vocabulary).\
+                first()
     return db_dictionary
 
 def update_personal_dictionary_used(

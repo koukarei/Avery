@@ -19,12 +19,12 @@ class Final_Evaluation(BaseModel):
 class Hint(BaseModel):
     hints: str
 
+def encode_image(image_path):
+  with open(image_path, "rb") as image_file:
+    return base64.b64encode(image_file.read()).decode('utf-8')
+
 def convert_image(img):
     if img:
-        if isinstance(img, PngImageFile):
-            return img
-        elif isinstance(img, JpegImageFile):
-            return img
         try:
             pilImage = PIL.Image.open(io.BytesIO(requests.get(img).content))
         except:
@@ -93,16 +93,18 @@ Skylerはあなたたちの文章から画像を生成します。
                 ]}
             )
         
+        base64_image = encode_image(original_image)
+
         self.messages.append(
             {"role": "user", "content": [
                 {
-                "type": "image_url",
-                "image_url": {
-                    "url": convert_image(original_image),
-                },
+                "type": "text", "text": ask_for_hint
                 },
                 {
-                "type": "text", "text": ask_for_hint
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{base64_image}"
+                },
                 }
             ]
             }
@@ -129,14 +131,19 @@ Skylerはあなたたちの文章から画像を生成します。
             return {}
         
     def get_result(self, sentence,scoring,rank,original_image,chat_history,grammar_errors,spelling_errors):
-        system_prompt = """
+        prompt = """
+# 役割
 あなたの名前は Avery、ロボットです。
+
+## 行動
 あなたはロボットのように話す必要があります。例えば、ディズニーのベイマックスのように話します。
 あなたは人間と協力して画像を英語で説明します。
 スコアが高いほど、画像の説明が良いことを意味します。
 あなたの目標は、人間と最高のスコアを目指すことです。
 ユーザーと日本語と簡単な英語でコミュニケーションしてください。
 
+## 情報
+### 記述語
 あなたは以下の英作文とスコアを使って、ユーザーにフィードバックを提供する必要があります。
 Grammar Score: 文の文法の正確さに基づいています。満点は5点です。
 Spelling Score: スペルミスを基づいています。満点は5点です。
@@ -145,6 +152,7 @@ Convention Score: 文の自然さと通用性に基づいています。満点�
 Structure Score: 文の複雑さに基づいています。満点は3点です。
 Content Comprehensive Score: 画像に合っているかどうかに基づいています。満点は100点です。
 
+### 現状
 1. ユーザー：{user_sentence}
 2. Grammar Score: {grammar_score}
 検出された文法の誤り: {grammar_errors}
@@ -157,6 +165,7 @@ Content Comprehensive Score: 画像に合っているかどうかに基づいて
 8. Total score: {total_score}
 9. Rank: {rank}
 
+## 評価の例文
 あなたのミッションは、ユーザーにフィードバックを提供して、ユーザーの英作文が元の画像に合うようにすることです。
 
 以下は評価の例です。
@@ -217,9 +226,7 @@ overall_evaluation:
         )
 
 
-        self.messages=[
-            {"role": "system", "content": system_prompt},
-        ]
+        self.messages=[]
         for entry in chat_history:
             self.messages.append(
                 {"role": entry.sender, "content": [
@@ -227,16 +234,18 @@ overall_evaluation:
                 ]}
             )
         
+        base64_image = encode_image(original_image)
+
         self.messages.append(
             {"role": "user", "content": [
                 {
                 "type": "image_url",
                 "image_url": {
-                    "url": convert_image(original_image),
+                    "url": f"data:image/jpeg;base64,{base64_image}"
                 },
                 },
                 {
-                "type": "text", "text": sentence
+                "type": "text", "text": prompt
                 }
             ]
             }

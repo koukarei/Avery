@@ -1,0 +1,8 @@
+fastapi[standard]
+uvicorn[standard]
+salesforce-lavis
+torch
+numpy
+opencv-python
+pillow
+python-dotenv

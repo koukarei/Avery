@@ -37,11 +37,30 @@ def generateDescription(db: Session, leaderboard_id: int, image: str, story: Opt
 
     return db_descriptions
 
+def check_factors_done(
+    db: Session,
+    en_nlp,
+    perplexity_model,
+    tokenizer,
+    generation: schemas.GenerationCompleteCreate
+):
+    db_generation = crud.get_generation(db, generation_id=generation.id)
+
+    if db_generation.total_score==0:
+        if (not db_generation.n_words) or (not db_generation.n_clauses):
+            update_n_words(db=db, en_nlp=en_nlp, generation=generation)
+        if (not db_generation.f_word) or (not db_generation.f_bigram):
+            update_frequency_word(db=db, en_nlp=en_nlp, generation=generation)
+        if not db_generation.perplexity:
+            update_perplexity(db=db, en_nlp=en_nlp, perplexity_model=perplexity_model, tokenizer=tokenizer, generation=generation)
+        if not db_generation.content_score:
+            update_content_score(db=db, generation=generation)
+        
+    return
+
+
 def calculate_score(
     db: Session,
-    blip2_model,
-    vis_processors,
-    text_processors,
     en_nlp,
     perplexity_model,
     tokenizer,
@@ -53,118 +72,75 @@ def calculate_score(
     if db_generation is None:
         raise HTTPException(status_code=404, detail="Generation not found")
     
-    if db_generation.duration==0 or db_generation.total_score==0:
-        db_round = crud.get_round(db, round_id=db_generation.round_id)
-        ai_play = crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
+    check_factors_done(
+        db=db,
+        en_nlp=en_nlp,
+        perplexity_model=perplexity_model,
+        tokenizer=tokenizer,
+        generation=generation
+    )
 
-        if not ai_play:
-            story_path=db_round.leaderboard.story.textfile_path
-            story=Path(story_path).read_text()
-            
-            ai_play = generateDescription(
-                db=db,
-                leaderboard_id=db_round.leaderboard_id, 
-                image=str(db_round.leaderboard.original_image.image_path), 
-                story=story, 
-                model_name="gpt-4o-mini"
-            )
+    db_generation = crud.get_generation(db, generation_id=generation.id)
+    db_round = crud.get_round(db, round_id=db_generation.round_id)
+    ai_play = crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
 
-        factors, scores=score.calculate_score_init(
-            blip2_model=blip2_model,
-            vis_processors=vis_processors,
-            text_processors=text_processors,
-            en_nlp=en_nlp,
-            perplexity_model=perplexity_model,
-            tokenizer=tokenizer,
-            image_path=db_round.leaderboard.original_image.image_path,
-            sentence=db_generation.sentence,
+    if not ai_play:
+        story_path=db_round.leaderboard.story.textfile_path
+        story=Path(story_path).read_text()
+        
+        ai_play = generateDescription(
+            db=db,
+            leaderboard_id=db_round.leaderboard_id, 
+            image=str(db_round.leaderboard.original_image.image_path), 
+            story=story, 
+            model_name="gpt-4o-mini"
         )
 
-        if is_completed:
-            generation_aware = generation.at.replace(tzinfo=timezone.utc)
-            db_generation_aware = db_generation.created_at.replace(tzinfo=timezone.utc)
-            duration = (generation_aware - db_generation_aware).seconds
-        else: 
-            duration = 0
 
-        generation_com = schemas.GenerationComplete(
-            id=db_round.id,
-            n_words=factors['n_words'],
-            n_conjunctions=factors['n_conjunctions'],
-            n_adj=factors['n_adj'],
-            n_adv=factors['n_adv'],
-            n_pronouns=factors['n_pronouns'],
-            n_prepositions=factors['n_prepositions'],
-
-            n_grammar_errors=factors['n_grammar_errors'],
-            n_spelling_errors=factors['n_spelling_errors'],
-
-            perlexity=factors['perplexity'],
-
-            f_word=factors['f_word'],
-            f_bigram=factors['f_bigram'],
-
-            n_clauses=factors['n_clauses'],
-
-            content_score=scores['content_score'],
-
-            total_score=scores['total_score'],
-            rank=score.rank(scores['total_score']),
-            duration=duration,
-            is_completed=is_completed
-        )
-
-    else:
-
+    if is_completed:
         generation_aware = generation.at.replace(tzinfo=timezone.utc)
         db_generation_aware = db_generation.created_at.replace(tzinfo=timezone.utc)
         duration = (generation_aware - db_generation_aware).seconds
+    else: 
+        duration = 0
 
-        generation_com = schemas.GenerationComplete(
-            id=db_generation.id,
-            
-            n_words=db_generation.n_words,
-            n_conjunctions=db_generation.n_conjunctions,
-            n_adj=db_generation.n_adj,
-            n_adv=db_generation.n_adv,
-            n_pronouns=db_generation.n_pronouns,
-            n_prepositions=db_generation.n_prepositions,
+    grammar_spelling = score.grammar_spelling_errors(db_generation.sentence)
 
-            n_grammar_errors=db_generation.n_grammar_errors,
-            n_spelling_errors=db_generation.n_spelling_errors,
+    factors = {
+        'n_words': db_generation.n_words,
+        'n_conjunctions': db_generation.n_conjunctions,
+        'n_adj': db_generation.n_adj,
+        'n_adv': db_generation.n_adv,
+        'n_pronouns': db_generation.n_pronouns,
+        'n_prepositions': db_generation.n_prepositions,
+        'n_grammar_errors': grammar_spelling['n_grammar_errors'],
+        'grammar_errors': grammar_spelling['grammar_error'],
+        'n_spelling_errors': grammar_spelling['n_spelling_errors'],
+        'spelling_errors': grammar_spelling['spelling_error'],
+        'perplexity': db_generation.perplexity,
+        'f_word': db_generation.f_word,
+        'f_bigram': db_generation.f_bigram,
+        'n_clauses': db_generation.n_clauses,
+        'content_score': db_generation.content_score
+    }
 
-            perlexity=db_generation.perlexity,
-
-            f_word=db_generation.f_word,
-            f_bigram=db_generation.f_bigram,
-
-            n_clauses=db_generation.n_clauses,
-
-            content_score=db_generation.content_score,
-
-            rank=db_generation.rank,
-            duration=duration,
-            is_completed=is_completed
-        )
-
-        factors = {
-            'n_words': db_generation.n_words,
-            'n_conjunctions': db_generation.n_conjunctions,
-            'n_adj': db_generation.n_adj,
-            'n_adv': db_generation.n_adv,
-            'n_pronouns': db_generation.n_pronouns,
-            'n_prepositions': db_generation.n_prepositions,
-            'n_grammar_errors': db_generation.n_grammar_errors,
-            'n_spelling_errors': db_generation.n_spelling_errors,
-            'perplexity': db_generation.perlexity,
-            'f_word': db_generation.f_word,
-            'f_bigram': db_generation.f_bigram,
-            'n_clauses': db_generation.n_clauses,
-            'content_score': db_generation.content_score
-        }
-
+    try:
         scores = score.calculate_score(**factors)
+    except Exception as e:
+        print(f"Calculate score error: {e}")
+        print(f"Factors: {factors}")
+        raise HTTPException(status_code=500, detail="Error calculating score")
 
+    generation_com = schemas.GenerationComplete(
+        id=db_generation.id,
+        n_grammar_errors=grammar_spelling['n_grammar_errors'],
+        n_spelling_errors=grammar_spelling['n_spelling_errors'],
+        total_score=scores['total_score'],
+        rank=score.rank(scores['total_score']),
+        duration=duration,
+        is_completed=is_completed
+    )
+    
     crud.update_generation3(
         db=db,
         generation=generation_com
@@ -203,3 +179,134 @@ def update_vocab_used_time(
                     )
                 )
     return updated_vocab
+
+def update_n_words(
+    db: Session,
+    en_nlp,
+    generation: schemas.GenerationCompleteCreate,
+):
+   db_generation = crud.get_generation(db, generation_id=generation.id)
+
+   doc = en_nlp(db_generation.sentence)
+   words=[w for s in doc.sentences for w in s.words]
+   factors=score.n_wordsNclauses(
+      doc=doc,
+      words=words
+   )
+   
+   db_generation = crud.update_generation3(
+       db=db,
+       generation=schemas.GenerationComplete(
+        id=db_generation.id,
+        n_words=factors['n_words'],
+        n_conjunctions=factors['n_conjunctions'],
+        n_adj=factors['n_adj'],
+        n_adv=factors['n_adv'],
+        n_pronouns=factors['n_pronouns'],
+        n_prepositions=factors['n_prepositions'],
+        n_clauses=factors['n_clauses'],
+        is_completed=False
+       )
+   )
+
+   return
+
+def update_grammar_spelling(
+        db: Session,
+        generation: schemas.GenerationCompleteCreate,
+):
+    db_generation = crud.get_generation(db, generation_id=generation.id)
+
+    factors = score.grammar_spelling_errors(db_generation.sentence)
+
+    db_generation = crud.update_generation3(
+        db=db,
+        generation=schemas.GenerationComplete(
+            id=db_generation.id,
+            n_grammar_errors=factors['n_grammar_errors'],
+            n_spelling_errors=factors['n_spelling_errors'],
+            is_completed=False
+        )
+    )
+
+    return
+
+def update_frequency_word(
+        db: Session,
+        en_nlp,
+        generation: schemas.GenerationCompleteCreate,
+):
+    db_generation = crud.get_generation(db, generation_id=generation.id)
+
+    doc = en_nlp(db_generation.sentence)
+    words=[w for s in doc.sentences for w in s.words]
+    factors = score.frequency_score(words=words)
+
+    db_generation = crud.update_generation3(
+        db=db,
+        generation=schemas.GenerationComplete(
+            id=db_generation.id,
+            f_word=factors['f_word'],
+            f_bigram=factors['f_bigram'],
+            is_completed=False
+        )
+    )
+
+    return
+
+def update_perplexity(
+        db: Session,
+        en_nlp,
+        perplexity_model,
+        tokenizer,
+        generation: schemas.GenerationCompleteCreate,
+):
+    db_generation = crud.get_generation(db, generation_id=generation.id)
+    doc = en_nlp(db_generation.sentence)
+    words=[w for s in doc.sentences for w in s.words]
+    
+    cut_points=[w.end_char+1 for w in words if w.start_char != 0]
+    
+    factors = score.perplexity(
+        perplexity_model=perplexity_model,
+        tokenizer=tokenizer,
+        sentence=db_generation.sentence,
+        cut_points=cut_points
+    )
+
+    db_generation = crud.update_generation3(
+        db=db,
+        generation=schemas.GenerationComplete(
+            id=db_generation.id,
+            perplexity=factors['perplexity'],
+            is_completed=False
+        )
+    )
+
+    return
+
+def update_content_score(
+    db: Session,
+    generation: schemas.GenerationCompleteCreate,
+):
+    db_generation = crud.get_generation(db, generation_id=generation.id)
+
+    db_round = crud.get_round(db, round_id=db_generation.round_id)
+
+    image_path = db_round.leaderboard.original_image.image_path
+
+    factors = score.calculate_content_score(
+        image_path=image_path,
+        sentence=db_generation.sentence
+    )
+
+    db_generation = crud.update_generation3(
+        db=db,
+        generation=schemas.GenerationComplete(
+            id=db_generation.id,
+            content_score=factors['content_score'],
+            is_completed=False
+        )
+    )
+
+    return

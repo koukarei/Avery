@@ -22,4 +22,3 @@ pandas
 scipy
 matplotlib
 webdataset
-salesforce-lavis
