@@ -15,6 +15,7 @@ class User(Base):
     username = Column(String(100), unique=True, index=True)
     hashed_password = Column(String(255))
     is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False)
     profile_id = Column(Integer, ForeignKey("user_profiles.id"))
     user_type = Column(String(25))
 

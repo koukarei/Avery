@@ -1,5 +1,6 @@
 import logging.config
-from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, BackgroundTasks, responses
+from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, BackgroundTasks, responses, Security, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 import time, os, datetime, io, requests
 from pathlib import Path
@@ -9,11 +10,12 @@ from . import crud, models, schemas
 from .database import SessionLocal, engine
 
 from .dependencies import sentence, gen_image, score, dictionary, openai_chatbot
+from authentication import *
 import tracemalloc
 tracemalloc.start()
 
 from typing import Union, List, Annotated, Optional
-from datetime import timezone
+from datetime import timezone, timedelta
 import torch, stanza
 from contextlib import asynccontextmanager
 import logging
@@ -75,22 +77,6 @@ def model_load():
         perplexity_model.to('cuda')
     return en_nlp, tokenizer, perplexity_model
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await logger1.info("Starting up")
-    try:
-        # Download the English model for stanza
-        stanza.download('en')
-        nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = await model_load()
-        logger1.info("Models loaded successfully")
-        yield
-    except Exception as e:
-        print(f"Error in lifespan startup: {e}")
-        raise
-    finally:
-        await logger1.info("Shutting down")
-        await nlp_models.clear()
-
 app = FastAPI(
     debug=True,
     title="AVERY",
@@ -110,10 +96,127 @@ def get_db():
     finally:
         db.close()
 
+def create_admin_acc(db: Session):
+    username = os.getenv("ADMIN_USERNAME")
+    user=crud.get_user_by_username(db, username=username)
+    if user is None:
+        admin = schemas.UserCreate(
+            username=os.getenv("ADMIN_USERNAME"),
+            email=os.getenv("ADMIN_EMAIL"),
+            password=os.getenv("ADMIN_PASSWORD"),
+            display_name="Admin",
+            is_admin=True
+        )
+        crud.create_user(
+            db=db,
+            user=admin
+        )
+    return
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await logger1.info("Starting up")
+    try:
+        # Download the English model for stanza
+        stanza.download('en')
+        nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = await model_load()
+        logger1.info("Models loaded successfully")
+        create_admin_acc(SessionLocal())
+        yield
+    except Exception as e:
+        print(f"Error in lifespan startup: {e}")
+        raise
+    finally:
+        await logger1.info("Shutting down")
+        await nlp_models.clear()
+
 @app.get("/")
 def hello_world():
     logger1.info("Hello World")
     return {"message": "Hello World"}
+
+async def get_current_user(db: Annotated[Session, Depends(get_db)],token: Annotated[schemas.TokenData, Depends(oauth2_scheme)]):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    if token:
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            username: str = payload.get("sub")
+            if username is None:
+                raise credentials_exception
+            token_data = schemas.TokenData(username=username)
+        except JWTError:
+            raise credentials_exception
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+        user = crud.get_user_by_username(db, username=token_data.username)
+        if user is None:
+            raise credentials_exception
+        return user
+    else:
+        raise credentials_exception
+
+async def get_admin(
+        db: Annotated[Session, Depends(get_db)],
+        token: Annotated[schemas.TokenData, Depends(oauth2_scheme)]
+):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="You are not an admin",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    if token:
+        user = get_current_user(db, token)
+        if user.is_admin:
+            return user
+        else:
+            raise credentials_exception
+    else:
+        raise credentials_exception
+
+@app.post("/token",response_model=schemas.Token)
+async def login_for_access_token(
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    db: Session = Depends(get_db),
+):
+    user = authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    
+    refresh_token = create_refresh_token(user.username)
+    
+    return schemas.Token(access_token=access_token,refresh_token=refresh_token, token_type="bearer")
+
+@app.post("/refresh_token")
+async def refresh_token(current_user: schemas.User = Security(get_current_user, scopes=["refresh_token"])):
+    if current_user:
+            access_token = create_access_token(
+                data={"sub": current_user.username}
+            )
+            return {"access_token": access_token}
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer",
+                    "Current User":current_user.username},
+        )
 
 @app.post("/content_score/")
 def content_score_test_endpoint(
@@ -149,49 +252,65 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = crud.get_user_by_username(db, username=user.username)
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
+    user.is_admin=False
     return crud.create_user(db=db, user=user)
 
 @app.delete("/users/{user_id}", tags=["User"], response_model=schemas.UserBase)
-def delete_user(user_id: int, db: Session = Depends(get_db)):
+def delete_user(admin: Annotated[schemas.User, Depends(get_admin)], user_id: int, db: Session = Depends(get_db), ):
+    if not admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
     db_user = crud.get_user(db, user_id=user_id)
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return crud.delete_user(db=db, user_id=user_id)
 
 @app.get("/users/", tags=["User"], response_model=list[schemas.User])
-def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def read_users(admin: Annotated[schemas.User, Depends(get_admin)],skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    if not admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
     users = crud.get_users(db, skip=skip, limit=limit)
     return users
 
-
 @app.get("/users/{user_id}", tags=["User"], response_model=schemas.User)
-def read_user(user_id: int, db: Session = Depends(get_db)):
+def read_user(admin: Annotated[schemas.User, Depends(get_admin)],user_id: int, db: Session = Depends(get_db)):
+    if not admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
     db_user = crud.get_user(db, user_id=user_id)
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return db_user
 
 @app.get("/scenes/", tags=["Scene"], response_model=list[schemas.Scene])
-def read_scenes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def read_scenes(admin: Annotated[schemas.User, Depends(get_admin)],skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    if not admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
     scenes = crud.get_scenes(db, skip=skip, limit=limit)
     return scenes
 
 @app.post("/scene/", tags=["Scene"], response_model=schemas.Scene)
-def create_scene(scene: schemas.SceneBase, db: Session = Depends(get_db)):
+def create_scene(admin: Annotated[schemas.User, Depends(get_admin)],scene: schemas.SceneBase, db: Session = Depends(get_db)):
+    if not admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
     return crud.create_scene(db=db, scene=scene)
-
+    
 @app.get("/stories/", tags=["Story"], response_model=list[schemas.StoryOut])
-def read_stories(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def read_stories(admin: Annotated[schemas.User, Depends(get_admin)],skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    if not admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
     stories = crud.get_stories(db, skip=skip, limit=limit)
     return stories
+        
 
 @app.post("/story/", tags=["Story"], response_model=schemas.StoryOut)
 def create_story(
+    admin: Annotated[schemas.User, Depends(get_admin)],
     story_content_file: Annotated[UploadFile, File()],
     title: Annotated[str, Form()],
     scene_id: Annotated[int, Form()],
     db: Session = Depends(get_db),
 ):
+    if not admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
     os.makedirs(media_dir / "stories", exist_ok=True)
     if not os.path.exists(media_dir / "stories"):
         raise HTTPException(status_code=400, detail="The directory for stories does not exist")
@@ -227,17 +346,21 @@ def create_story(
 
 
 @app.get("/leaderboards/", tags=["Leaderboard"], response_model=list[schemas.LeaderboardOut])
-def read_leaderboards(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_current_user)],skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    if current_user:
+        raise HTTPException(status_code=401, detail="Login to view leaderboards")
     leaderboards = crud.get_leaderboards(db, skip=skip, limit=limit)
     return leaderboards
 
-
 @app.post("/leaderboards/", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
 def create_leaderboard(
+    admin: Annotated[schemas.User, Depends(get_admin)],
     leaderboard: schemas.LeaderboardCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
+    if not admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
     story_id = leaderboard.story_id
     if story_id==0:
         story_id=None
@@ -269,9 +392,12 @@ def create_leaderboard(
 
 @app.post("/leaderboards/image", tags=["Leaderboard"], response_model=schemas.IdOnly)
 def create_leaderboard_image(
+    admin: Annotated[schemas.User, Depends(get_admin)],
     original_image: Annotated[UploadFile, File()],
     db: Session = Depends(get_db),
 ):
+    if not admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
     
     timestamp = str(int(time.time()))
     shortenfilename=".".join(original_image.filename.split(".")[:-1])[:20]
@@ -310,7 +436,9 @@ def create_leaderboard_image(
     return db_original_image
 
 @app.get("/leaderboards/{leaderboard_id}", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
-def read_leaderboard(leaderboard_id: int, db: Session = Depends(get_db)):
+def read_leaderboard(current_user: Annotated[schemas.User, Depends(get_current_user)],leaderboard_id: int, db: Session = Depends(get_db)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view leaderboards")
     db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
     if db_leaderboard is None:
         logger1.error(f"Leaderboard not found: {leaderboard_id}")
@@ -319,16 +447,25 @@ def read_leaderboard(leaderboard_id: int, db: Session = Depends(get_db)):
 
 @app.get("/leaderboards/{leaderboard_id}/rounds/", tags=["Leaderboard", "Round"], response_model=list[schemas.RoundOut])
 def get_rounds_by_leaderboard(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: int,
     db: Session = Depends(get_db),
 ):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view")
     return crud.get_rounds(
         db=db,
         leaderboard_id=leaderboard_id,
     )
 
 @app.get("/unfinished_rounds/", tags=["Round"], response_model=list[schemas.RoundOut])
-def get_unfinished_rounds(player_id: int,db: Session = Depends(get_db)):
+def get_unfinished_rounds(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        return []
+    player_id = current_user.id
     return crud.get_rounds(
         db=db,
         is_completed=False,
@@ -337,10 +474,13 @@ def get_unfinished_rounds(player_id: int,db: Session = Depends(get_db)):
 
 @app.post("/round/", tags=["Round"], response_model=schemas.Round)
 def create_round(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
     thisround: schemas.RoundCreate,
-    player_id: int,
     db: Session = Depends(get_db),
 ):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to create a round")
+    player_id = current_user.id
     db_round = crud.create_round(
         db=db,
         leaderboard_id=thisround.leaderboard_id,
@@ -363,11 +503,17 @@ def create_round(
 
 @app.put("/round/{round_id}", tags=["Round"], response_model=schemas.GenerationCorrectSentence)
 def get_user_answer(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
     round_id: int,
     generation: schemas.GenerationCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to answer")
+    db_round = crud.get_round(db, round_id)
+    if current_user.id != db_round.player_id:
+        raise HTTPException(status_code=401, detail="You are not authorized to answer")
     db_generation = crud.create_generation(
         db=db,
         round_id=round_id,
@@ -421,11 +567,18 @@ def get_user_answer(
 
 @app.put("/round/{round_id}/interpretation", tags=["Round"], response_model=schemas.GenerationInterpretation)
 def get_interpretation(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
     round_id: int,
     generation: schemas.GenerationCorrectSentence,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to get interpretation")
+    db_round = crud.get_round(db, round_id)
+    if current_user.id != db_round.player_id:
+        raise HTTPException(status_code=401, detail="You are not authorized to get interpretation")
+    
     tracker_interpretation = memory_tracker(message=f"Round id: {round_id}, Generation id: {generation.id} - Get interpretation")
     try:
 
@@ -547,11 +700,13 @@ def get_interpretation(
 
 @app.put("/round/{round_id}/complete", tags=["Round"], response_model=schemas.GenerationComplete)
 def complete_generation(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
     generation: schemas.GenerationCompleteCreate,
     db: Session = Depends(get_db),
 ):
-    tracker_complete_generation = memory_tracker(message=f"Generation id: {generation.id} - Complete a generation")
-
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to complete generation")
+    
     db_generation = crud.get_generation(db, generation_id=generation.id)
     if db_generation is None:
         raise HTTPException(status_code=404, detail="Generation not found")
@@ -559,6 +714,11 @@ def complete_generation(
     if db_round is None:
         raise HTTPException(status_code=404, detail="Round not found")
     
+    if current_user.id != db_round.player_id:
+        raise HTTPException(status_code=401, detail="You are not authorized to complete generation")
+    
+    tracker_complete_generation = memory_tracker(message=f"Generation id: {generation.id} - Complete a generation")
+
     db_chat = crud.get_chat(db=db,chat_id=db_round.chat_history)
     cb=openai_chatbot.Hint_Chatbot()
 
@@ -675,10 +835,19 @@ def complete_generation(
 
 @app.post("/round/{round_id}/end",tags=["Round"], response_model=schemas.RoundOut)
 def end_round(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
     round_id: int,
     db: Session = Depends(get_db),
 ):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to end round")
+    
     db_round = crud.get_round(db, round_id)
+    if db_round is None:
+        raise HTTPException(status_code=404, detail="Round not found")
+    
+    if current_user.id != db_round.player_id:
+        raise HTTPException(status_code=401, detail="You are not authorized to end round")
 
     now_tim = datetime.datetime.now(tz=timezone.utc)
     db_generation_aware = db_round.created_at.replace(tzinfo=timezone.utc)
@@ -696,15 +865,24 @@ def end_round(
     return db_round
 
 @app.get("/personal_dictionaries/", tags=["Personal Dictionary"], response_model=list[schemas.PersonalDictionary])
-def read_personal_dictionaries(player_id: int, db: Session = Depends(get_db)):
+def read_personal_dictionaries(current_user: Annotated[schemas.User, Depends(get_current_user)], db: Session = Depends(get_db)):
+    if not current_user:
+        return []
+    player_id = current_user.id
     personal_dictionaries = crud.get_personal_dictionaries(db, player_id=player_id)
     return personal_dictionaries
 
 @app.post("/personal_dictionary/", tags=["Personal Dictionary"], response_model=schemas.PersonalDictionary)
 def create_personal_dictionary(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
     personal_dictionary: schemas.PersonalDictionaryCreate,
     db: Session = Depends(get_db),
 ):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to create personal dictionary")
+
+    personal_dictionary.user_id = current_user.id
+
     word_lemma = dictionary.get_pos_lemma(
         word=personal_dictionary.vocabulary,
         relevant_sentence=personal_dictionary.relevant_sentence
@@ -745,10 +923,14 @@ def create_personal_dictionary(
 
 @app.put("/personal_dictionary/{personal_dictionary_id}", tags=["Personal Dictionary"], response_model=schemas.PersonalDictionary)
 def update_personal_dictionary(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
     personal_dictionary: schemas.PersonalDictionaryUpdate,
     personal_dictionary_id: int,
     db: Session = Depends(get_db),
 ):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to update personal dictionary")
+    personal_dictionary.user_id = current_user.id
     return crud.update_personal_dictionary(
         db=db,
         dictionary=personal_dictionary,
@@ -756,30 +938,51 @@ def update_personal_dictionary(
 
 @app.delete("/personal_dictionary/{personal_dictionary_id}", tags=["Personal Dictionary"], response_model=schemas.PersonalDictionary)
 def delete_personal_dictionary(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
     personal_dictionary_id: int,
-    user_id: int,
     db: Session = Depends(get_db),
 ):
     return crud.delete_personal_dictionary(
         db=db,
-        player_id=user_id,
+        player_id=current_user.id,
         vocabulary_id=personal_dictionary_id,
     )
 
-@app.get("/chat/{chat_id}", tags=["Chat"], response_model=schemas.Chat)
-def read_chat(chat_id: int, db: Session = Depends(get_db)):
+@app.get("/chat/{round_id}", tags=["Chat"], response_model=schemas.Chat)
+def read_chat(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    round_id: int, db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view chat")
+    db_round = crud.get_round(db, round_id)
+    if db_round is None:
+        raise HTTPException(status_code=404, detail="Round not found")
+    if current_user.id != db_round.player_id and not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not authorized to view chat")
+    chat_id = db_round.chat_history
     chat = crud.get_chat(db, chat_id=chat_id)
+    if chat is None:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    
     return chat
 
 @app.put("/round/{round_id}/chat", tags=["Chat"], response_model=schemas.Chat)
 def update_chat(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
     round_id: int,
     message: schemas.MessageReceive,
     db: Session = Depends(get_db),
 ):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to send message")
+    
     db_round = crud.get_round(db, round_id)
     if db_round is None:
         raise HTTPException(status_code=404, detail="Round not found")
+    
+    if current_user.id != db_round.player_id:
+        raise HTTPException(status_code=401, detail="You are not authorized to send message")
     
     if db_round.is_completed:
         raise HTTPException(status_code=400, detail="The round is already ended.")
@@ -822,7 +1025,13 @@ def update_chat(
         raise HTTPException(status_code=400, detail="Error in chatbot response")
 
 @app.get("/original_image/{leaderboard_id}", tags=["Image"])
-async def get_original_image(leaderboard_id: int, db: Session = Depends(get_db)):
+async def get_original_image(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    leaderboard_id: int, 
+    db: Session = Depends(get_db)
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view images")
     db_leaderboard = crud.get_leaderboard(
         db=db,
         leaderboard_id=leaderboard_id
@@ -839,11 +1048,27 @@ async def get_original_image(leaderboard_id: int, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="Image not found")
     
 @app.get("/interpreted_image/{generation_id}", tags=["Image"])
-async def get_interpreted_image(generation_id: int, db: Session = Depends(get_db)):
+async def get_interpreted_image(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    generation_id: int, 
+    db: Session = Depends(get_db)
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view images")
+    
     db_generation = crud.get_generation(
         db=db,
         generation_id=generation_id
     )
+
+    db_round = crud.get_round(
+        db=db,
+        round_id=db_generation.round_id
+    )
+
+    if current_user.id != db_round.player_id and not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not authorized to view images")
+
     image_name = db_generation.interpreted_image.image_path.split('/')[-1]
     # Construct the image path
     image_path = os.path.join('/static','interpreted_images', image_name)

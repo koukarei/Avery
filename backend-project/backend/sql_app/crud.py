@@ -5,6 +5,8 @@ from . import models, schemas
 from typing import Union
 import datetime
 
+from authentication import get_password_hash
+
 def get_user(db: Session, user_id: int):
     return db.query(models.User).filter(models.User.id == user_id).first()
 
@@ -19,7 +21,7 @@ def get_users(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.User).offset(skip).limit(limit).all()
 
 def create_user(db: Session, user: schemas.UserCreate):
-    fake_hashed_password = user.password + "notreallyhashed"
+    hashed_password = get_password_hash(user.password)
 
     db_userprofile = models.UserProfile(
         display_name=user.display_name,
@@ -36,9 +38,10 @@ def create_user(db: Session, user: schemas.UserCreate):
     db_user = models.User(
         email=user.email,
         username=user.username, 
-        hashed_password=fake_hashed_password,
+        hashed_password=hashed_password,
         is_active=True,
-        profile_id=db_userprofile.id
+        profile_id=db_userprofile.id,
+        is_admin=user.is_admin
     )
 
     db.add(db_user)

@@ -59,6 +59,7 @@ class Scene(SceneBase):
 class UserBase(BaseModel):
     username: str
     email: str
+    is_admin: Optional[bool] = False
 
 class UserCreate(UserBase):
     password: str
@@ -327,3 +328,11 @@ class Description(DescriptionBase):
 
     class Config:
         orm_mode = True
+
+class Token(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
