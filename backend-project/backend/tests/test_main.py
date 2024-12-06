@@ -16,7 +16,7 @@ class TestAdmin:
     username = os.getenv("ADMIN_USERNAME")
     password = os.getenv("ADMIN_PASSWORD")
 
-    def test_users():
+    def test_users(self):
         # Test read all users
         response = client.get("/sqlapp/users/")
         assert response.status_code == 200
@@ -58,7 +58,7 @@ class TestAdmin:
         assert response.status_code == 200
         assert len(response.json()) == num_users - 1   
 
-    def test_read_scenes():
+    def test_read_scenes(self):
         
         # Test read all scenes
         response = client.get("/sqlapp/scenes/")
@@ -75,7 +75,7 @@ class TestAdmin:
         scene_id = response.json()['id']
         assert scene_id > 0
 
-    def test_read_stories():
+    def test_read_stories(self):
         # login as admin
         response = client.post(
             "/sqlapp/login/",
@@ -106,7 +106,7 @@ class TestAdmin:
         assert response.status_code == 200
         assert len(response.json()) == num_stories + 1
 
-    def test_leaderboards():
+    def test_leaderboards(self):
         # Test read all leaderboards
         response = client.get("/sqlapp/leaderboards/")
         assert response.status_code == 200
@@ -162,7 +162,7 @@ class TestAdmin:
         assert response.status_code == 200
         assert len(response.json()) == num_leaderboards + 1
     
-    def test_chat():
+    def test_chat(self):
         # Get leaderboard id
         response = client.get("/sqlapp/leaderboards/")
         if not response.json():
@@ -182,7 +182,7 @@ class TestAdmin:
         assert response.status_code == 200
         print(f"chat: {response.json()}")
 
-    def test_image():
+    def test_image(self):
 
         # Get leaderboard id
         response = client.get("/sqlapp/leaderboards/")
@@ -210,7 +210,7 @@ class TestUser:
     username = os.getenv("USER_USERNAME")
     password = os.getenv("USER_PASSWORD")
     
-    def test_round():
+    def test_round(self):
         # Get leaderboard id
         response = client.get("/sqlapp/leaderboards/")
         if not response.json():
