@@ -7,7 +7,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from .schemas import TokenData
-import crud
+from . import crud
 
 # to get a string like this run:
 # openssl rand -hex 32
