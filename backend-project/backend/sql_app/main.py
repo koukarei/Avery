@@ -104,6 +104,7 @@ def create_admin_acc(db: Session):
             db=db,
             user=admin
         )
+        logger1.info("Admin account created")
     return
 
 
@@ -115,7 +116,9 @@ async def lifespan(app: FastAPI):
         stanza.download('en')
         nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = await model_load()
         logger1.info("Models loaded successfully")
-        create_admin_acc(SessionLocal())
+        init_session = get_db()
+        create_admin_acc(init_session)
+        del init_session
         yield
     except Exception as e:
         print(f"Error in lifespan startup: {e}")
