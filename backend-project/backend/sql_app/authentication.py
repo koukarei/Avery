@@ -6,7 +6,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from schemas import TokenData
+from .schemas import TokenData
 import crud
 
 # to get a string like this run:
