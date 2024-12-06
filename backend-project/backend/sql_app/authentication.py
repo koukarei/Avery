@@ -30,9 +30,9 @@ def get_password_hash(password):
 def authenticate_user(db, username: str, password: str):
     user = crud.get_user_by_username(db, username)
     if not user:
-        return False
+        raise HTTPException(status_code=400, detail="The user does not exist.")
     if not verify_password(password, user.hashed_password):
-        return False
+        raise HTTPException(status_code=400, detail="Incorrect password")
     return user
 
 def create_access_token(data: dict, expires_delta: Union[timedelta, None] = None):
