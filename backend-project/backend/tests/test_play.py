@@ -17,15 +17,13 @@ client = TestClient(app)
 class TestPlay:
     username = os.getenv("ADMIN_USERNAME")
     password = os.getenv("ADMIN_PASSWORD")
+    _client = client
 
-    def __init__(self) -> None:
-        self._client = client
-
-    def test_play(self,access_token):
+    def test_play(self):
         # Create leaderboards
         response = client.post(
             "/sqlapp/leaderboards/create",
-            headers={"Authorization": f"Bearer {access_token}"},
+            headers={"Authorization": f"Bearer {self.access_token}"},
         )
 
         picture_dir = 'initial/pic/'
@@ -33,7 +31,7 @@ class TestPlay:
         #Get scene id
         response = client.get(
             "/sqlapp/scenes/",
-            headers={"Authorization": f"Bearer {access_token}"}
+            headers={"Authorization": f"Bearer {self.access_token}"}
         )
         scene = response.json()[0]
         scene_id = scene['id']
@@ -41,7 +39,7 @@ class TestPlay:
         # Get story id
         response = client.get(
             "/sqlapp/stories/",
-            headers={"Authorization": f"Bearer {access_token}"}
+            headers={"Authorization": f"Bearer {self.access_token}"}
         )
         story = response.json()[0]
         story_id = story['id']
@@ -56,7 +54,7 @@ class TestPlay:
                 response = client.post(
                     "/sqlapp/leaderboards/image/",
                     files={"original_image": (filename, f, "image/jpeg")},
-                    headers={"Authorization": f"Bearer {access_token}"},
+                    headers={"Authorization": f"Bearer {self.access_token}"},
                 )
 
             assert response.status_code == 200
@@ -77,7 +75,7 @@ class TestPlay:
                 "/sqlapp/leaderboards/", 
                 json=new_leaderboard.copy(),
                 headers={"Content-Type": "application/json",
-                         "Authorization": f"Bearer {access_token}"}
+                         "Authorization": f"Bearer {self.access_token}"}
             )
             print(f"leaderboard created: {response.json()}")
             assert response.status_code == 200
@@ -85,7 +83,7 @@ class TestPlay:
             leaderboard_dict[title] = response.json()['id']
         
         # Test read all leaderboards
-        response = client.get("/sqlapp/leaderboards/", headers={"Authorization": f"Bearer {access_token}"})
+        response = client.get("/sqlapp/leaderboards/", headers={"Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 200
 
         # Read csv file
@@ -104,7 +102,7 @@ class TestPlay:
                     json=new_round.copy(),
                     headers={
                         "Content-Type": "application/json",
-                        "Authorization": f"Bearer {access_token}"
+                        "Authorization": f"Bearer {self.access_token}"
                     }
                 )
                 
@@ -122,7 +120,7 @@ class TestPlay:
                     f"/sqlapp/round/{round_id}",
                     json=new_generation.copy(),
                     headers={"Content-Type": "application/json",
-                             "Authorization": f"Bearer {access_token}"},
+                             "Authorization": f"Bearer {self.access_token}"},
                 )
                 
                 assert response.status_code == 200
@@ -139,7 +137,7 @@ class TestPlay:
                     f"/sqlapp/round/{round_id}/interpretation",
                     json=interpretation_generation.copy(),
                     headers={"Content-Type": "application/json",
-                             "Authorization": f"Bearer {access_token}"},
+                             "Authorization": f"Bearer {self.access_token}"},
                 )
                 assert response.status_code == 200
                 
@@ -151,7 +149,7 @@ class TestPlay:
                         "at":datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
                     },
                     headers={"Content-Type": "application/json",
-                             "Authorization": f"Bearer {access_token}"},
+                             "Authorization": f"Bearer {self.access_token}"},
                 )
                 assert response.status_code == 200
 
@@ -159,7 +157,7 @@ class TestPlay:
                 response = client.post(
                     f"/sqlapp/round/{round_id}/end",
                     headers={"Content-Type": "application/json",
-                             "Authorization": f"Bearer {access_token}"},
+                             "Authorization": f"Bearer {self.access_token}"},
                 )
                 assert response.status_code == 200
 
@@ -167,25 +165,18 @@ class TestPlay:
 class TestPlay2:
     username = os.getenv("USER_USERNAME")
     password = os.getenv("USER_PASSWORD")
+    _client = client
 
-    def __init__(self) -> None:
-        self._client = client
-
-    def test_play_2(self, access_token):
+    def test_play_2(self):
         # Get leaderboards
         response = client.get(
             "/sqlapp/leaderboards/",
-            headers={"Authorization": f"Bearer {access_token}"}
+            headers={"Authorization": f"Bearer {self.access_token}"}
         )
         if not response.json():
             assert False
         leaderboard = response.json()[0]
         leaderboard_id = leaderboard['id']
-
-        # Get user id
-        response = client.get("/sqlapp/users/")
-        user = response.json()[0]
-        user_id = user['id']
 
         # Read csv file
         with open('initial/entries/202408_Results.csv','r') as f:
@@ -198,11 +189,11 @@ class TestPlay2:
                 }
 
                 response = client.post(
-                    f"/sqlapp/round/?player_id={user_id}", 
+                    f"/sqlapp/round/", 
                     json=new_round.copy(),
                     headers={
                         "Content-Type": "application/json",
-                        "Authorization": f"Bearer {access_token}"
+                        "Authorization": f"Bearer {self.access_token}"
                     }
                 )
                 
@@ -220,7 +211,7 @@ class TestPlay2:
                     f"/sqlapp/round/{round_id}",
                     json=new_generation.copy(),
                     headers={"Content-Type": "application/json",
-                             "Authorization": f"Bearer {access_token}"},
+                             "Authorization": f"Bearer {self.access_token}"},
                 )
                 
                 assert response.status_code == 200
@@ -237,7 +228,7 @@ class TestPlay2:
                     f"/sqlapp/round/{round_id}/interpretation",
                     json=interpretation_generation.copy(),
                     headers={"Content-Type": "application/json",
-                             "Authorization": f"Bearer {access_token}"},
+                             "Authorization": f"Bearer {self.access_token}"},
                 )
                 assert response.status_code == 200
                 
@@ -249,7 +240,7 @@ class TestPlay2:
                         "at":datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
                     },
                     headers={"Content-Type": "application/json",
-                             "Authorization": f"Bearer {access_token}"},
+                             "Authorization": f"Bearer {self.access_token}"},
                 )
                 assert response.status_code == 200
 
@@ -257,6 +248,6 @@ class TestPlay2:
                 response = client.post(
                     f"/sqlapp/round/{round_id}/end",
                     headers={"Content-Type": "application/json",
-                             "Authorization": f"Bearer {access_token}"},
+                             "Authorization": f"Bearer {self.access_token}"},
                 )
                 assert response.status_code == 200
