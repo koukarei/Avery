@@ -12,6 +12,11 @@ from fastapi import UploadFile
 client = TestClient(app)
 
 def test_login():
+    username=os.getenv("ADMIN_USERNAME")
+    password=os.getenv("ADMIN_PASSWORD")
+    if username is None or password is None:
+        assert False
+
     # Test login as admin
     response = client.post(
         "/sqlapp/login/", 
@@ -343,7 +348,7 @@ def test_image():
         "/sqlapp/login/",
         data={"username": os.getenv("ADMIN_USERNAME"), "password": os.getenv("ADMIN_PASSWORD")}
     )
-    
+
     # Get leaderboard id
     response = client.get("/sqlapp/leaderboards/")
     if not response.json():
