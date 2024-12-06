@@ -13,6 +13,7 @@ import pytest
 
 client = TestClient(app)
 
+@pytest.mark.usefixtures("login")
 class TestPlay:
     username = os.getenv("ADMIN_USERNAME")
     password = os.getenv("ADMIN_PASSWORD")
