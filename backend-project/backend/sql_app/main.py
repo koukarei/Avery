@@ -89,7 +89,7 @@ def get_db():
     finally:
         db.close()
 
-def create_admin_acc(db: Session):
+def create_acc(db: Session):
     username = os.getenv("ADMIN_USERNAME")
     user=crud.get_user_by_username(db, username=username)
     if user is None:
@@ -105,6 +105,22 @@ def create_admin_acc(db: Session):
             user=admin
         )
         logger1.info("Admin account created")
+
+    username = os.getenv("USER_USERNAME")
+    user=crud.get_user_by_username(db, username=username)
+    if user is None:
+        user = schemas.UserCreate(
+            username=os.getenv("USER_USERNAME"),
+            email=os.getenv("USER_EMAIL"),
+            password=os.getenv("USER_PASSWORD"),
+            display_name="User",
+            is_admin=False
+        )
+        crud.create_user(
+            db=db,
+            user=user
+        )
+        logger1.info("User account created")
     return
 
 
@@ -117,7 +133,7 @@ async def lifespan(app: FastAPI):
         nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = await model_load()
         logger1.info("Models loaded successfully")
         init_session = get_db()
-        create_admin_acc(init_session)
+        create_acc(init_session)
         del init_session
         yield
     except Exception as e:
@@ -275,9 +291,9 @@ def read_users(admin: Annotated[schemas.User, Depends(get_admin)],skip: int = 0,
     return users
 
 @app.get("/users/{user_id}", tags=["User"], response_model=schemas.User)
-def read_user(admin: Annotated[schemas.User, Depends(get_admin)],user_id: int, db: Session = Depends(get_db)):
-    if not admin:
-        raise HTTPException(status_code=401, detail="You are not an admin")
+def read_user(current_user: Annotated[schemas.User, Depends(get_current_user)], user_id: int, db: Session = Depends(get_db)):
+    if current_user.id != user_id and not current_user.is_admin:
+            raise HTTPException(status_code=401, detail="You are not an admin")
     db_user = crud.get_user(db, user_id=user_id)
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")

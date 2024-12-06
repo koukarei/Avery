@@ -11,6 +11,27 @@ from fastapi import UploadFile
 
 client = TestClient(app)
 
+def test_login():
+    # Test login as admin
+    response = client.post(
+        "/sqlapp/login/", 
+        data={"username": os.getenv("ADMIN_USERNAME"), "password": os.getenv("ADMIN_PASSWORD")}
+    )
+
+    assert response.status_code == 200
+    assert "access_token" in response.json()
+    assert "refresh_token" in response.json()
+
+    # Test login as user
+    response = client.post(
+        "/sqlapp/login/", 
+        data={"username": os.getenv("USER_USERNAME"), "password": os.getenv("USER_PASSWORD")}
+    )
+
+    assert response.status_code == 200
+    assert "access_token" in response.json()
+    assert "refresh_token" in response.json()
+
 def test_users():
     # Test read all users
     response = client.get("/sqlapp/users/")
@@ -36,6 +57,10 @@ def test_users():
         data={"username": os.getenv("ADMIN_USERNAME"), "password": os.getenv("ADMIN_PASSWORD")}
     )
 
+    assert response.status_code == 200
+    access_token = response.json()['access_token']
+    refresh_token = response.json()['refresh_token']
+
     # Test read a user
     response = client.get(f"/sqlapp/users/{new_user_id}")
     assert response.status_code == 200
@@ -60,6 +85,12 @@ def test_users():
     assert len(response.json()) == num_users - 1   
 
 def test_read_scenes():
+    # login as admin
+    response = client.post(
+        "/sqlapp/login/",
+        data={"username": os.getenv("ADMIN_USERNAME"), "password": os.getenv("ADMIN_PASSWORD")}
+    )
+
     # Test read all scenes
     response = client.get("/sqlapp/scenes/")
     assert response.status_code == 200
@@ -76,6 +107,12 @@ def test_read_scenes():
     assert scene_id > 0
 
 def test_read_stories():
+    # login as admin
+    response = client.post(
+        "/sqlapp/login/",
+        data={"username": os.getenv("ADMIN_USERNAME"), "password": os.getenv("ADMIN_PASSWORD")}
+    )
+
     # Test read all stories
     response = client.get("/sqlapp/stories/")
     assert response.status_code == 200
@@ -157,6 +194,12 @@ def test_leaderboards():
     assert len(response.json()) == num_leaderboards + 1
 
 def test_round():
+    # login as user
+    response = client.post(
+        "/sqlapp/login/",
+        data={"username": os.getenv("USER_USERNAME"), "password": os.getenv("USER_PASSWORD")}
+    )
+
     # Get leaderboard id
     response = client.get("/sqlapp/leaderboards/")
     if not response.json():
@@ -269,17 +312,18 @@ def test_round():
     assert len(response.json()) == num_rounds + 1
 
 def test_chat():
+    # Login as admin
+    response = client.post(
+        "/sqlapp/login/",
+        data={"username": os.getenv("ADMIN_USERNAME"), "password": os.getenv("ADMIN_PASSWORD")}
+    )
+
     # Get leaderboard id
     response = client.get("/sqlapp/leaderboards/")
     if not response.json():
         return
     leaderboard = response.json()[0]
     leaderboard_id = leaderboard['id']
-
-    # Get user id
-    response = client.get("/sqlapp/users/")
-    user = response.json()[0]
-    user_id = user['id']
 
     # Get round id
     response = client.get(f"/sqlapp/leaderboards/{leaderboard_id}/rounds/")
@@ -294,6 +338,12 @@ def test_chat():
     print(f"chat: {response.json()}")
 
 def test_image():
+    # Login as admin
+    response = client.post(
+        "/sqlapp/login/",
+        data={"username": os.getenv("ADMIN_USERNAME"), "password": os.getenv("ADMIN_PASSWORD")}
+    )
+    
     # Get leaderboard id
     response = client.get("/sqlapp/leaderboards/")
     if not response.json():
