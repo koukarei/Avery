@@ -91,11 +91,13 @@ class LeaderboardBase(BaseModel):
     story_extract: str
     is_public: bool
 
-class LeaderboardCreate(LeaderboardBase):
+class LeaderboardCreateIn(LeaderboardBase):
     scene_id: int
     story_id: Optional[int]
     original_image_id: int
-    created_by_id: int
+
+class LeaderboardCreate(LeaderboardCreateIn):
+    created_by_id: int=0
 
 class VocabularyBase(BaseModel):
     word: str

@@ -183,24 +183,6 @@ async def get_current_user(db: Annotated[Session, Depends(get_db)],token: Annota
     else:
         raise credentials_exception
 
-async def get_admin(
-        db: Annotated[Session, Depends(get_db)],
-        token: Annotated[schemas.TokenData, Depends(oauth2_scheme)]
-):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="You are not an admin",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    if token:
-        user = get_current_user(db, token)
-        if user.is_admin:
-            return user
-        else:
-            raise credentials_exception
-    else:
-        raise credentials_exception
-
 @app.post("/token",response_model=schemas.Token)
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
@@ -275,8 +257,10 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     return crud.create_user(db=db, user=user)
 
 @app.delete("/users/{user_id}", tags=["User"], response_model=schemas.UserBase)
-def delete_user(admin: Annotated[schemas.User, Depends(get_admin)], user_id: int, db: Session = Depends(get_db), ):
-    if not admin:
+def delete_user(current_user: Annotated[schemas.User, Depends(get_current_user)], user_id: int, db: Session = Depends(get_db), ):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to delete user")
+    if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
     db_user = crud.get_user(db, user_id=user_id)
     if db_user is None:
@@ -284,8 +268,10 @@ def delete_user(admin: Annotated[schemas.User, Depends(get_admin)], user_id: int
     return crud.delete_user(db=db, user_id=user_id)
 
 @app.get("/users/", tags=["User"], response_model=list[schemas.User])
-def read_users(admin: Annotated[schemas.User, Depends(get_admin)],skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    if not admin:
+def read_users(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to delete user")
+    if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
     users = crud.get_users(db, skip=skip, limit=limit)
     return users
@@ -300,21 +286,27 @@ def read_user(current_user: Annotated[schemas.User, Depends(get_current_user)], 
     return db_user
 
 @app.get("/scenes/", tags=["Scene"], response_model=list[schemas.Scene])
-def read_scenes(admin: Annotated[schemas.User, Depends(get_admin)],skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    if not admin:
+def read_scenes(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to read scenes")
+    if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
     scenes = crud.get_scenes(db, skip=skip, limit=limit)
     return scenes
 
 @app.post("/scene/", tags=["Scene"], response_model=schemas.Scene)
-def create_scene(admin: Annotated[schemas.User, Depends(get_admin)],scene: schemas.SceneBase, db: Session = Depends(get_db)):
-    if not admin:
+def create_scene(current_user: Annotated[schemas.User, Depends(get_current_user)], scene: schemas.SceneBase, db: Session = Depends(get_db)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to create scene")
+    if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
     return crud.create_scene(db=db, scene=scene)
     
 @app.get("/stories/", tags=["Story"], response_model=list[schemas.StoryOut])
-def read_stories(admin: Annotated[schemas.User, Depends(get_admin)],skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    if not admin:
+def read_stories(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to read stories")
+    if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
     stories = crud.get_stories(db, skip=skip, limit=limit)
     return stories
@@ -322,13 +314,15 @@ def read_stories(admin: Annotated[schemas.User, Depends(get_admin)],skip: int = 
 
 @app.post("/story/", tags=["Story"], response_model=schemas.StoryOut)
 def create_story(
-    admin: Annotated[schemas.User, Depends(get_admin)],
+    current_user: Annotated[schemas.User, Depends(get_current_user)], 
     story_content_file: Annotated[UploadFile, File()],
     title: Annotated[str, Form()],
     scene_id: Annotated[int, Form()],
     db: Session = Depends(get_db),
 ):
-    if not admin:
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to create story")
+    if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
     os.makedirs(media_dir / "stories", exist_ok=True)
     if not os.path.exists(media_dir / "stories"):
@@ -373,17 +367,24 @@ def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_current_
 
 @app.post("/leaderboards/", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
 def create_leaderboard(
-    admin: Annotated[schemas.User, Depends(get_admin)],
-    leaderboard: schemas.LeaderboardCreate,
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    leaderboard: schemas.LeaderboardCreateIn,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    if not admin:
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to create a leaderboard")
+    if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
     story_id = leaderboard.story_id
     if story_id==0:
         story_id=None
     
+    leaderboard = schemas.LeaderboardCreate(
+        **leaderboard.model_dumps(),
+        created_by_id=current_user.id
+    )
+
     result = crud.create_leaderboard(
         db=db, 
         leaderboard=leaderboard,
@@ -411,11 +412,13 @@ def create_leaderboard(
 
 @app.post("/leaderboards/image", tags=["Leaderboard"], response_model=schemas.IdOnly)
 def create_leaderboard_image(
-    admin: Annotated[schemas.User, Depends(get_admin)],
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
     original_image: Annotated[UploadFile, File()],
     db: Session = Depends(get_db),
 ):
-    if not admin:
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to upload image")
+    if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
     
     timestamp = str(int(time.time()))
