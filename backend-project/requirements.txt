@@ -22,3 +22,5 @@ pandas
 scipy
 matplotlib
 webdataset
+python-jose[cryptography]
+passlib[bcrypt]

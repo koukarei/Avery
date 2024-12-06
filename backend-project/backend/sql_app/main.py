@@ -10,7 +10,7 @@ from . import crud, models, schemas
 from .database import SessionLocal, engine
 
 from .dependencies import sentence, gen_image, score, dictionary, openai_chatbot
-from authentication import *
+from .authentication import *
 import tracemalloc
 tracemalloc.start()
 

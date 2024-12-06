@@ -5,7 +5,7 @@ from . import models, schemas
 from typing import Union
 import datetime
 
-from authentication import get_password_hash
+from .authentication import get_password_hash
 
 def get_user(db: Session, user_id: int):
     return db.query(models.User).filter(models.User.id == user_id).first()

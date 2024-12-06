@@ -30,6 +30,12 @@ def test_users():
     print(f'create a user {response.json()}')
     new_user_id = response.json()['id']
 
+    # Test login as admin
+    response = client.post(
+        "/sqlapp/login/", 
+        data={"username": os.getenv("ADMIN_USERNAME"), "password": os.getenv("ADMIN_PASSWORD")}
+    )
+
     # Test read a user
     response = client.get(f"/sqlapp/users/{new_user_id}")
     assert response.status_code == 200
@@ -52,15 +58,6 @@ def test_users():
     response = client.get("/sqlapp/users/")
     assert response.status_code == 200
     assert len(response.json()) == num_users - 1   
-
-    if not [i['username'] for i in response.json() if i['username'] == 'admin']:
-        admin_user = {
-            "username": "admin",
-            "email": "admin@example.com",
-            "password": "hogehoge",
-            "display_name": "Admin"
-        }
-        response = client.post("/sqlapp/users/", json=admin_user.copy(),headers={"Content-Type": "application/json"})
 
 def test_read_scenes():
     # Test read all scenes
