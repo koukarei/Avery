@@ -1,7 +1,7 @@
 import os
 import sys
-import datetime
-import time
+import datetime, time
+import pytest
 sys.path.append(os.getcwd())
 
 from fastapi.testclient import TestClient
