@@ -86,6 +86,20 @@ class UserOut(BaseModel):
     display_name: str
     level: int
 
+class UserUpdateIn(BaseModel):
+    username: Optional[str]
+    email: Optional[str]
+    id: Optional[int]
+    is_admin: Optional[bool]
+    is_active: Optional[bool]
+    user_type: Optional[str]
+
+class UserUpdate(BaseModel):
+    id: int
+    is_admin: Optional[bool]
+    is_active: Optional[bool]
+    user_type: Optional[str]
+
 class LeaderboardBase(BaseModel):
     title: str
     story_extract: str

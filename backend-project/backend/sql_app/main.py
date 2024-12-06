@@ -10,7 +10,7 @@ from . import crud, models, schemas
 from .database import SessionLocal, engine
 
 from .dependencies import sentence, gen_image, score, dictionary, openai_chatbot
-from .authentication import *
+from .authentication import authenticate_user, create_access_token, oauth2_scheme, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, REFRESH_TOKEN_EXPIRE_MINUTES, JWTError, jwt
 import tracemalloc
 tracemalloc.start()
 
@@ -76,10 +76,10 @@ def model_load():
     if torch.cuda.is_available():
         perplexity_model.to('cuda')
     return en_nlp, tokenizer, perplexity_model
+
 # Define the directory where the images will be stored
 media_dir = Path(os.getenv("MEDIA_DIR", "/static"))
 media_dir.mkdir(parents=True, exist_ok=True)
-
 
 # Dependency
 def get_db():
@@ -89,41 +89,6 @@ def get_db():
     finally:
         db.close()
 
-def create_acc(db: Session):
-    username = os.getenv("ADMIN_USERNAME")
-    user=crud.get_user_by_username(db, username=username)
-    if user is None:
-        admin = schemas.UserCreate(
-            username=os.getenv("ADMIN_USERNAME"),
-            email=os.getenv("ADMIN_EMAIL"),
-            password=os.getenv("ADMIN_PASSWORD"),
-            display_name="Admin",
-            is_admin=True
-        )
-        crud.create_user(
-            db=db,
-            user=admin
-        )
-        logger1.info("Admin account created")
-
-    username = os.getenv("USER_USERNAME")
-    user=crud.get_user_by_username(db, username=username)
-    if user is None:
-        user = schemas.UserCreate(
-            username=os.getenv("USER_USERNAME"),
-            email=os.getenv("USER_EMAIL"),
-            password=os.getenv("USER_PASSWORD"),
-            display_name="User",
-            is_admin=False
-        )
-        crud.create_user(
-            db=db,
-            user=user
-        )
-        logger1.info("User account created")
-    return
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await logger1.info("Starting up")
@@ -132,9 +97,6 @@ async def lifespan(app: FastAPI):
         stanza.download('en')
         nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = await model_load()
         logger1.info("Models loaded successfully")
-        init_session = get_db()
-        create_acc(init_session)
-        del init_session
         yield
     except Exception as e:
         print(f"Error in lifespan startup: {e}")
@@ -148,7 +110,6 @@ app = FastAPI(
     title="AVERY",
     lifespan=lifespan,
 )
-
 
 @app.get("/")
 def hello_world():
@@ -253,6 +214,8 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = crud.get_user_by_username(db, username=user.username)
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
+    if user.username=="admin":
+        user.is_admin=True
     user.is_admin=False
     return crud.create_user(db=db, user=user)
 
@@ -266,6 +229,38 @@ def delete_user(current_user: Annotated[schemas.User, Depends(get_current_user)]
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return crud.delete_user(db=db, user_id=user_id)
+
+@app.put("/users/{user_id}", tags=["User"], response_model=schemas.User)
+def update_user(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    user: schemas.UserUpdateIn,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to update user")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    
+    if user.id:
+        db_user = crud.get_user(db, user_id=user.id)
+    elif user.username:
+        db_user = crud.get_user_by_username(db, username=user.username)
+    elif user.email:
+        db_user = crud.get_user_by_email(db, email=user.email)
+    else:
+        raise HTTPException(status_code=400, detail="Please provide an id, username, or email")
+    
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.id=db_user.id
+    user = schemas.UserUpdate(
+        **user.model_dump(
+            exclude={'email', 'username'},
+            exclude_none=True
+        )
+    )
+    return crud.update_user(db=db, user=user)
+
 
 @app.get("/users/", tags=["User"], response_model=list[schemas.User])
 def read_users(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
@@ -360,8 +355,9 @@ def create_story(
 
 @app.get("/leaderboards/", tags=["Leaderboard"], response_model=list[schemas.LeaderboardOut])
 def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_current_user)],skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    if current_user:
+    if not current_user:
         raise HTTPException(status_code=401, detail="Login to view leaderboards")
+    
     leaderboards = crud.get_leaderboards(db, skip=skip, limit=limit)
     return leaderboards
 
@@ -381,7 +377,7 @@ def create_leaderboard(
         story_id=None
     
     leaderboard = schemas.LeaderboardCreate(
-        **leaderboard.model_dumps(),
+        **leaderboard.model_dump(),
         created_by_id=current_user.id
     )
 
@@ -973,7 +969,8 @@ def delete_personal_dictionary(
 @app.get("/chat/{round_id}", tags=["Chat"], response_model=schemas.Chat)
 def read_chat(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
-    round_id: int, db: Session = Depends(get_db),
+    round_id: int, 
+    db: Session = Depends(get_db),
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view chat")
