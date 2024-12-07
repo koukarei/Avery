@@ -1,22 +1,23 @@
-import robot from './avery_robot.png';
+
 import './App.css';
 import  HorizontalLinearStepper  from './components/Steps';
-import {darktheme} from './styles/darktheme';
-import { createTheme, Snackbar, ThemeProvider } from "@mui/material";
+import Chat_Box from './components/Chatbox';
+import {cur_theme} from './styles/darktheme';
+import styles from './styles/component';
+import { createTheme, ThemeProvider } from "@mui/material";
+import { Container, Box } from '@mui/material';
+import { CardSpotlightEffect } from './components/Spotlight';
+
+const robotUrl = process.env.PUBLIC_URL + '/avery_robot.png';
 
 function App() {
-  const theme = createTheme(darktheme);
+  const theme = createTheme(cur_theme);
   return (
     <ThemeProvider theme={theme}>
-      <div className="App">
-      
-        <div className='Stepper'><HorizontalLinearStepper /></div>
+      <div className={`App`}>
+        <CardSpotlightEffect/>
+        <HorizontalLinearStepper/>
 
-        <div className='Conversation_box'>
-          
-        </div>
-      
-        <img src={robot} className="Robot" alt="robot" />
       </div>
     </ThemeProvider>
     

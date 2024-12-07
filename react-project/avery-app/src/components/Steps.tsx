@@ -83,7 +83,7 @@ export default function HorizontalLinearStepper() {
 
   return (
     <Box sx={{ width: '100%' }}>
-      <Container sx={{position:'absolute',top:'0', left:'0' ,width: '70vw'}}>
+      <Container sx={{position:'absolute',top:'7px', left:'0' ,width: '70vw'}}>
         <Stepper activeStep={activeStep}>
           {steps.map((label, index) => {
             const stepProps: { completed?: boolean } = {};
@@ -109,7 +109,7 @@ export default function HorizontalLinearStepper() {
       <Container sx={{position:'absolute',top:'0', right:'0' ,width: '30vw'}}>
         {MessageToUser(activeStep)}
       </Container>
-      <Container sx={{position:'absolute',bottom:'0', right:'0' ,width: '50vw'}}>
+      <Container sx={{position:'absolute',bottom:'7px', right:'0' ,width: '50vw'}}>
         {activeStep === steps.length ? (
           <React.Fragment>
             <Box sx={{ display: 'flex', flexDirection: 'row', pt: 2 }}>
@@ -120,9 +120,8 @@ export default function HorizontalLinearStepper() {
         ) : (
           <React.Fragment>
             
-            <Box sx={{ display: 'flex', flexDirection: 'row', pt: 2 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'row', pt: 5 }}>
               <Button
-                color="inherit"
                 disabled={activeStep === 0}
                 onClick={handleBack}
                 sx={{ mr: 1 }}
@@ -131,7 +130,7 @@ export default function HorizontalLinearStepper() {
               </Button>
               <Box sx={{ flex: '1 1 auto' }} />
               {isStepOptional(activeStep) && (
-                <Button color="inherit" onClick={handleSkip} sx={{ mr: 1 }}>
+                <Button onClick={handleSkip} sx={{ mr: 1 }}>
                   Skip
                 </Button>
               )}

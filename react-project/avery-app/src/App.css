@@ -2,36 +2,84 @@ body {
   transition: background-color 0.5s ease;
 }
 
-.App {
-  text-align: center;
-  background-color: black;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
-  position: relative;
-}
-
-.Stepper{
-  top: 1vh;
-  left: 0;
-  height: 95vh;
-  position: absolute;
-  width: 100vw;
-}
-
 .Robot {
   position: absolute;
   height: 30vmin;
   pointer-events: auto;
-  position: absolute;
   bottom: 0;
   left: 0;
   margin: 10px;
-  pointer-events: auto;
+  z-index: 1;
+}
+
+.Stepper{
+  top: 2vh;
+  left: 0px;
+  height: 95vh;
+  width: 95vw;
+  position: absolute;
+}
+
+.App {
+  font-size: calc(10px + 2vmin);
+  top: 0px;
+  left: 0px;
+  padding: auto;
+  position: absolute;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.background-container {
+  position: absolute;
+  overflow: hidden;
+  top:0px;
+  left:0px;
+  height: 100%;
+  width: 100%;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  z-index: 0;
+  background-color: black;
+}
+
+.background-effect {
+  position: absolute;
+  pointer-events:none;
+  opacity: 0;
+  inset:-1px;
+  transition: opacity 300ms;
+}
+
+.background-img {
+  position: absolute;
+  top:0%;
+  left:0%;
+  height: 100%;
+  width: 100%;
+  background-size: stretch;
+  background-image: url('/public/background.png');
+}
+
+.Chatbox {
+  min-height: 90vh;
+  flex: 1;
+  left: 2px;
+  width: 50vw;
+
+}
+.Interaction {
+  flex: 1;
+  right: 2px;
+  width: 50vw;
+  min-height: 90vh;
+}
+
+.Content {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  bottom: 20px;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -40,12 +88,12 @@ body {
   }
 }
 
-.App-link {
-  color: #61dafb;
-}
-
 @keyframes Robot-updown {
   0% { bottom: 0; }
   50% { bottom: 2vh; }
   100% { bottom: 0; }
+}
+
+.Conversation_box {
+  background-color: antiquewhite;
 }
