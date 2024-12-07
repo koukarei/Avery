@@ -1,5 +1,9 @@
 import React, { useRef, useState } from "react";
+import { Container, Box } from "@mui/material";
 import "../App.css";
+import Chat_Box from "./Chatbox";
+
+const robotUrl = process.env.PUBLIC_URL + '/avery_robot.png';
 
 function generateRandomColor(): string {
     const letters = '0123456789ABCDEF';
@@ -16,7 +20,11 @@ function generateRandomGreyscale(): string {
     return `#${hexValue}${hexValue}${hexValue}`;
 }
 
-export const CardSpotlightEffect = () => {
+type Props = {
+  text: string;
+}
+
+const MainContentComponent: React.FC =() => {
   const divRef = useRef(null);
   const [isFocused, setIsFocused] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -68,7 +76,17 @@ export const CardSpotlightEffect = () => {
         }}
       />
       <div className='background-img'></div>
+      <Box className="Content">
+        <Container className='Chatbox'>
+          <Chat_Box robot={robotUrl} access_token="12"/>
+        </Container>
+        <Container className='Interaction'>
+          
+        </Container>
+      </Box>
     </div>
     </div>
   );
 };
+
+export default MainContentComponent;

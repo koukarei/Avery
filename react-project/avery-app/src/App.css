@@ -39,7 +39,6 @@ body {
   height: 100%;
   width: 100%;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  z-index: 0;
   background-color: black;
 }
 
@@ -60,13 +59,21 @@ body {
   background-size: stretch;
   background-image: url('/public/background.png');
 }
+.Content {
+  position: absolute;
+  display: flex;
+  flex-direction: row;
+  bottom: 5vh;
+  height: 90%;
+  width: 100%;
+}
 
 .Chatbox {
-  min-height: 90vh;
   flex: 1;
   left: 2px;
+  bottom: 0%;
   width: 50vw;
-
+  min-height: 90vh;
 }
 .Interaction {
   flex: 1;
@@ -75,12 +82,6 @@ body {
   min-height: 90vh;
 }
 
-.Content {
-  position: relative;
-  display: flex;
-  flex-direction: row;
-  bottom: 20px;
-}
 
 @media (prefers-reduced-motion: no-preference) {
   .Robot {
@@ -89,11 +90,14 @@ body {
 }
 
 @keyframes Robot-updown {
-  0% { bottom: 0; }
-  50% { bottom: 2vh; }
-  100% { bottom: 0; }
+  0% { bottom: -3vh; }
+  50% { bottom: -2vh; }
+  100% { bottom: -3vh; }
 }
 
 .Conversation_box {
-  background-color: antiquewhite;
+  bottom: 0%;
+  left:20vw;
+  width: min-content;
+  position: absolute;
 }

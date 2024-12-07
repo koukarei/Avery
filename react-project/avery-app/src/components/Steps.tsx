@@ -33,7 +33,7 @@ export default function HorizontalLinearStepper() {
 
   const MessageToUser = (step: number) => {
     return(
-      <Typography sx={{ mt: 2, mb: 1 }}>
+      <Typography variant='h3' sx={{ mt: 2, mb: 1, color: 'white'}}>
         {step === 2 && EnableRetried(triedTimes)? 'Do you want to describe the image again?':step === 3 ? 'Checkout other leaderboards!':''}
       </Typography>
     )

@@ -1,6 +1,6 @@
-import { ThemeOptions } from '@mui/material/styles';
+import { createTheme } from '@mui/material';
 
-export const cur_theme: ThemeOptions = {
+const cur_theme= createTheme({
   palette: {
     primary: {
       main: '#dce5ff',
@@ -21,4 +21,6 @@ export const cur_theme: ThemeOptions = {
       disabled: 'rgba(115,115,115,0.38)',
     },
   },
-};
+});
+
+export default cur_theme;
