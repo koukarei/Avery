@@ -6,17 +6,23 @@ import StepLabel from '@mui/material/StepLabel';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import Container from '@mui/material/Container';
+import { Theme } from '@mui/material/styles';
+import {steps} from '../types/Step';
+import { StepContext } from '../providers/StepProvider';
 
-export const steps = [
-  'Select leaderboards',
-  'Describe the image',
-  'Evaluation',
-]
+interface stepProps {
+  theme: Theme;
+}
 
-export default function HorizontalLinearStepper() {
-  const [activeStep, setActiveStep] = React.useState(0);
-  const [skipped, setSkipped] = React.useState(new Set<number>());
-  const [triedTimes, setTriedTimes] = React.useState(0);
+export default function HorizontalLinearStepper({theme}: stepProps) {
+  const {
+    activeStep,
+    setActiveStep,
+    skipped,
+    setSkipped,
+    triedTimes,
+    setTriedTimes
+  } = React.useContext(StepContext);
 
   const isStepOptional = (step: number) => {
     //return step === 1;
@@ -24,35 +30,33 @@ export default function HorizontalLinearStepper() {
   };
 
   const EnableRetried = (triedTimes: number) => {
-    if (triedTimes <3){
-      return true;
-    }else{
-      return false;
-    }
+    return triedTimes < 3;
   }
 
   const MessageToUser = (step: number) => {
     return(
-      <Typography variant='h3' sx={{ mt: 2, mb: 1, color: 'white'}}>
+      <Typography variant='h3' sx={{ mt: 2, mb: 1, color: theme.palette.text.primary}}>
         {step === 2 && EnableRetried(triedTimes)? 'Do you want to describe the image again?':step === 3 ? 'Checkout other leaderboards!':''}
       </Typography>
     )
   }
 
   const isStepSkipped = (step: number) => {
-    return skipped.has(step);
+    return skipped?.has(step)|| false;
   };
 
   const handleNext = () => {
     let newSkipped = skipped;
-    if (isStepSkipped(activeStep)) {
-      newSkipped = new Set(newSkipped.values());
-      newSkipped.delete(activeStep);
+    if (activeStep !== undefined && isStepSkipped(activeStep)) {
+      newSkipped = new Set(newSkipped?.values() || []);
+      if (activeStep !== undefined) {
+        newSkipped.delete(activeStep);
+      }
     }
 
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
     setSkipped(newSkipped);
-    if (activeStep === 3){
+    if (activeStep === 1){
       setTriedTimes((prevTriedTimes)=> prevTriedTimes + 1);
     }
   };
@@ -62,18 +66,20 @@ export default function HorizontalLinearStepper() {
   };
 
   const handleSkip = () => {
-    if (!isStepOptional(activeStep)) {
+    if (activeStep !== undefined && !isStepOptional(activeStep)) {
+
       // You probably want to guard against something like this,
       // it should never occur unless someone's actively trying to break something.
       throw new Error("You can't skip a step that isn't optional.");
     }
 
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
-    setSkipped((prevSkipped) => {
+    setSkipped((prevSkipped: Set<number>) => {
       const newSkipped = new Set(prevSkipped.values());
-      newSkipped.add(activeStep);
+      newSkipped.add(activeStep!);
       return newSkipped;
     });
+    
   };
 
   const handleReset = () => {
@@ -117,12 +123,12 @@ export default function HorizontalLinearStepper() {
               <Button onClick={handleReset}>Go</Button>
             </Box>
           </React.Fragment>
-        ) : (
+        ) : 
+        (
           <React.Fragment>
-            
             <Box sx={{ display: 'flex', flexDirection: 'row', pt: 5 }}>
               <Button
-                disabled={activeStep === 0}
+                disabled={activeStep === 0 || !EnableRetried(triedTimes)}
                 onClick={handleBack}
                 sx={{ mr: 1 }}
               >
@@ -135,7 +141,7 @@ export default function HorizontalLinearStepper() {
                 </Button>
               )}
               <Button onClick={handleNext}>
-                {activeStep === steps.length - 1 ? 'No' : 'Next'}
+                {activeStep === steps.length - 1 && EnableRetried(triedTimes) ? 'No' : 'Next'}
               </Button>
             </Box>
           </React.Fragment>

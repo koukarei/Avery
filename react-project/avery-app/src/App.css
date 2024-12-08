@@ -31,34 +31,6 @@ body {
   overflow: hidden;
 }
 
-.background-container {
-  position: absolute;
-  overflow: hidden;
-  top:0px;
-  left:0px;
-  height: 100%;
-  width: 100%;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  background-color: black;
-}
-
-.background-effect {
-  position: absolute;
-  pointer-events:none;
-  opacity: 0;
-  inset:-1px;
-  transition: opacity 300ms;
-}
-
-.background-img {
-  position: absolute;
-  top:0%;
-  left:0%;
-  height: 100%;
-  width: 100%;
-  background-size: stretch;
-  background-image: url('/public/background.png');
-}
 .Content {
   position: absolute;
   display: flex;

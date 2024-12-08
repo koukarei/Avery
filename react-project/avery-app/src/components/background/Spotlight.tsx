@@ -1,9 +1,10 @@
-import React, { useRef, useState } from "react";
-import { Container, Box } from "@mui/material";
-import "../App.css";
-import Chat_Box from "./Chatbox";
+import React, { Component, useRef, useState } from "react";
+/** @jsxImportSource @emotion/react */
+import { css } from "@emotion/react";
+import { Theme } from '@mui/material';
 
-const robotUrl = process.env.PUBLIC_URL + '/avery_robot.png';
+const backgroundImgUrl = process.env.PUBLIC_URL + '/background.png';
+
 
 function generateRandomColor(): string {
     const letters = '0123456789ABCDEF';
@@ -20,11 +21,15 @@ function generateRandomGreyscale(): string {
     return `#${hexValue}${hexValue}${hexValue}`;
 }
 
-type Props = {
-  text: string;
-}
+type MainContentProps = {
+  component: React.ReactNode;
+  theme: Theme;
+};
 
-const MainContentComponent: React.FC =() => {
+const MainContentProvider : React.FC<MainContentProps> = ({
+  component,
+  theme,
+}) => {
   const divRef = useRef(null);
   const [isFocused, setIsFocused] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -41,7 +46,7 @@ const MainContentComponent: React.FC =() => {
 
   const handleFocus = () => {
     setIsFocused(true);
-    setOpacity(1);
+    setOpacity(0.7);
   };
 
   const handleBlur = () => {
@@ -50,7 +55,7 @@ const MainContentComponent: React.FC =() => {
   };
 
   const handleMouseEnter = () => {
-    setOpacity(1);
+    setOpacity(0.7);
   };
 
   const handleMouseLeave = () => {
@@ -66,27 +71,49 @@ const MainContentComponent: React.FC =() => {
       onBlur={handleBlur}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className="background-container"
+      css={backgroundContainerStyle}
     >
       <div
-        className="background-effect"
+        css={backgroundEffectStyle}
         style={{
           opacity,
-          background: `radial-gradient(600px circle at ${position.x}px ${position.y}px, #444445, transparent 30%)`,
+          background: `radial-gradient(600px circle at ${position.x}px ${position.y}px, ${theme.palette.secondary.light}, transparent 50%)`,
         }}
       />
-      <div className='background-img'></div>
-      <Box className="Content">
-        <Container className='Chatbox'>
-          <Chat_Box robot={robotUrl} access_token="12"/>
-        </Container>
-        <Container className='Interaction'>
-          
-        </Container>
-      </Box>
+      <div css={backgroundImgStyle}></div>
+      {component}
     </div>
     </div>
   );
 };
 
-export default MainContentComponent;
+export default MainContentProvider;
+
+const backgroundEffectStyle = css`
+  position: absolute;
+  pointer-events:none;
+  opacity: 0;
+  inset:-1px;
+  transition: opacity 300ms;
+`;
+
+const backgroundImgStyle = css`
+  position: absolute;
+  top:0%;
+  left:0%;
+  height: 100%;
+  width: 100%;
+  background-size: stretch;
+  background-image: url(${backgroundImgUrl});
+`;
+
+const backgroundContainerStyle = (theme: Theme) => css`
+  position: absolute;
+  overflow: hidden;
+  top:0px;
+  left:0px;
+  height: 100%;
+  width: 100%;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  background-color: ${theme.palette.background.default};
+`;

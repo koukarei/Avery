@@ -10,9 +10,10 @@ const cur_theme= createTheme({
     },
     secondary: {
       main: '#a1887f',
+      light: '#28737d'
     },
     background: {
-      default: '#0c0b0b',
+      default: 'black',
       paper: '#484848',
     },
     text: {
