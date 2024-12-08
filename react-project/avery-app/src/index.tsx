@@ -14,7 +14,7 @@ root.render(
   <React.StrictMode>
     <MUThemeProvider theme={theme}>
       <ThemeProvider theme={theme}>
-        <App />
+        <App/>
       </ThemeProvider>
     </MUThemeProvider>
   </React.StrictMode>

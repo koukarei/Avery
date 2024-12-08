@@ -12,14 +12,6 @@ body {
   z-index: 1;
 }
 
-.Stepper{
-  top: 2vh;
-  left: 0px;
-  height: 95vh;
-  width: 95vw;
-  position: absolute;
-}
-
 .App {
   font-size: calc(10px + 2vmin);
   top: 0px;
@@ -31,30 +23,6 @@ body {
   overflow: hidden;
 }
 
-.Content {
-  position: absolute;
-  display: flex;
-  flex-direction: row;
-  bottom: 5vh;
-  height: 90%;
-  width: 100%;
-}
-
-.Chatbox {
-  flex: 1;
-  left: 2px;
-  bottom: 0%;
-  width: 50vw;
-  min-height: 90vh;
-}
-.Interaction {
-  flex: 1;
-  right: 2px;
-  width: 50vw;
-  min-height: 90vh;
-}
-
-
 @media (prefers-reduced-motion: no-preference) {
   .Robot {
     animation: Robot-updown infinite 5s linear;
@@ -65,11 +33,4 @@ body {
   0% { bottom: -3vh; }
   50% { bottom: -2vh; }
   100% { bottom: -3vh; }
-}
-
-.Conversation_box {
-  bottom: 0%;
-  left:20vw;
-  width: min-content;
-  position: absolute;
 }

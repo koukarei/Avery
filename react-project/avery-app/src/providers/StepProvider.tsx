@@ -1,6 +1,5 @@
 import { Step } from "../types/Step";
-import {act, useMemo, Dispatch, SetStateAction } from 'react';
-import { createContext, useState, useContext } from 'react'
+import { createContext, useState, useContext } from 'react';
 
 
 type StepContextType = {

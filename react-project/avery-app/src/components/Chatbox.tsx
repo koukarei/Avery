@@ -1,6 +1,9 @@
 import React from 'react';
 import { useState } from "react";
 import { Container, Box } from '@mui/material';
+/** @jsxImportSource @emotion/react */
+import { css } from "@emotion/react";
+import { Theme } from '@mui/material';
 
 // Define the props type
 interface ChatBoxProps {
@@ -34,7 +37,7 @@ export default function Chat_Box({ robot, access_token }: ChatBoxProps) {
 
   return (
     <Box>
-        <Container className='Conversation_box'>
+        <Container css={ConversationStyle}>
         <div style={{ padding: "2rem", fontFamily: "Arial, sans-serif" }}>
         <div style={{ border: "1px solid #ccc", padding: "1rem", marginBottom: "1rem" }}>
             {messages.map((msg, index) => (
@@ -61,3 +64,10 @@ export default function Chat_Box({ robot, access_token }: ChatBoxProps) {
     </Box>
   );
 }
+
+const ConversationStyle = css`
+  bottom: 0%;
+  left:20vw;
+  width: min-content;
+  position: absolute;
+`

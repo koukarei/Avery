@@ -1,82 +1,87 @@
-// import { Post, PostListParams, SubmitPost } from "../types/post";
-import { authAxios, authAxiosMultipart } from "./axios";
+import { Leaderboard, LeaderboardListParams, LeaderboardRecommendParams, SubmitLeaderboard } from "../types/leaderboard";
+import { authAxios } from "./axios";
 
-export class PostAPI {
-//   static async fetchPostList(params: PostListParams): Promise<Post[]> {
-//     const response = await authAxios.get("posts/", {
-//       params: params,
-//       paramsSerializer: { indexes: null },
-//       headers: sessionStorage.getItem("token")
-//         ? { Authorization: `Token ${sessionStorage.getItem("token")}` }
-//         : {},
-//     });
-//     // 画像の配列を画像の URL の配列に変換
-//     response.data = response.data.map((post: any) => {
-//       post.images = post.images.map((obj: any) => obj.image);
-//       return post;
-//     });
-//     return response.data;
-//   }
+export class LeaderboardAPI {
+  static async fetchLeaderboardList(params: LeaderboardListParams): Promise<Leaderboard[]> {
+    const response = await authAxios.get("Leaderboards/", {
+      params: params,
+      paramsSerializer: { indexes: null },
+      headers: sessionStorage.getItem("token")
+        ? { Authorization: `Token ${sessionStorage.getItem("token")}` }
+        : {},
+    });
+    return response.data;
+  }
 
-//   static async fetchPostDetail(id: number): Promise<Post> {
-//     const response = await authAxios.get(`posts/${id}/`, {
-//       headers: sessionStorage.getItem("token")
-//         ? { Authorization: `Token ${sessionStorage.getItem("token")}` }
-//         : {},
-//     });
-//     // 画像の配列を画像の URL の配列に変換
-//     response.data.images = response.data.images.map((obj: any) => obj.image);
-//     return response.data;
-//   }
+  static async fetchLeaderboardDetail(id: number): Promise<Leaderboard> {
+    const response = await authAxios.get(`Leaderboards/${id}/`, {
+      headers: sessionStorage.getItem("token")
+        ? { Authorization: `Token ${sessionStorage.getItem("token")}` }
+        : {},
+    });
+    return response.data;
+  }
 
-//   static async createPost(data: SubmitPost): Promise<Post> {
-//     const response = await authAxiosMultipart.post(`posts/`, data, {
-//       headers: sessionStorage.getItem("token")
-//         ? { Authorization: `Token ${sessionStorage.getItem("token")}` }
-//         : {},
-//     });
-//     return response.data;
-//   }
+  static async createLeaderboard(data: SubmitLeaderboard): Promise<Leaderboard> {
+    const response = await authAxios.post(`Leaderboards/`, data, {
+      headers: sessionStorage.getItem("token")
+        ? { Authorization: `Token ${sessionStorage.getItem("token")}` }
+        : {},
+    });
+    return response.data;
+  }
 
-//   static async deletePost(id: number): Promise<void> {
-//     await authAxios.delete(`posts/${id}/`, {
-//       headers: sessionStorage.getItem("token")
-//         ? { Authorization: `Token ${sessionStorage.getItem("token")}` }
-//         : {},
-//     });
-//   }
+  static async deleteLeaderboard(id: number): Promise<void> {
+    await authAxios.delete(`Leaderboards/${id}/`, {
+      headers: sessionStorage.getItem("token")
+        ? { Authorization: `Token ${sessionStorage.getItem("token")}` }
+        : {},
+    });
+  }
 
-//   static async like(id: number): Promise<void> {
-//     await authAxios.post(
-//       `posts/${id}/like/`,
-//       {},
-//       {
-//         headers: sessionStorage.getItem("token")
-//           ? { Authorization: `Token ${sessionStorage.getItem("token")}` }
-//           : {},
-//       }
-//     ).catch(() => { });
-//   }
+  static async publishLeaderboard(id: number): Promise<void> {
+    await authAxios.post(
+      `Leaderboards/${id}/publish/`,
+      {},
+      {
+        headers: sessionStorage.getItem("token")
+          ? { Authorization: `Token ${sessionStorage.getItem("token")}` }
+          : {},
+      }
+    );
+  }
 
-//   static async unlike(id: number): Promise<void> {
-//     await authAxios.post(
-//       `posts/${id}/unlike/`,
-//       {},
-//       {
-//         headers: sessionStorage.getItem("token")
-//           ? { Authorization: `Token ${sessionStorage.getItem("token")}` }
-//           : {},
-//       }
-//     ).catch(() => { });
-//   }
+  static async like(id: number): Promise<void> {
+    await authAxios.post(
+      `Leaderboards/${id}/like/`,
+      {},
+      {
+        headers: sessionStorage.getItem("token")
+          ? { Authorization: `Token ${sessionStorage.getItem("token")}` }
+          : {},
+      }
+    ).catch(() => { });
+  }
 
-//   static async fetchTagRecommend(data: SubmitPost): Promise<string[]> {
-//     const response = await authAxiosMultipart.post("posts/tag_recommend/", data, {
-//       headers: sessionStorage.getItem("token")
-//         ? { Authorization: `Token ${sessionStorage.getItem("token")}` }
-//         : {},
-//     });
-//     console.log(response.data);
-//     return response.data.recommend_tags ?? [];
-//   }
+  static async unlike(id: number): Promise<void> {
+    await authAxios.post(
+      `Leaderboards/${id}/unlike/`,
+      {},
+      {
+        headers: sessionStorage.getItem("token")
+          ? { Authorization: `Token ${sessionStorage.getItem("token")}` }
+          : {},
+      }
+    ).catch(() => { });
+  }
+
+  static async fetchLeaderboardRecommend(params: LeaderboardRecommendParams): Promise<Leaderboard[]> {
+    const response = await authAxios.get(`Leaderboards/recommend/`, {
+      params: params,
+      headers: sessionStorage.getItem("token")
+        ? { Authorization: `Token ${sessionStorage.getItem("token")}` }
+        : {},
+    });
+    return response.data;
+  }
 }
