@@ -3,4 +3,6 @@ WORKDIR /code/
 # 先にpackage.jsonとpackage-lock.jsonをマウントさせる
 COPY package*.json .
 
-# RUN npm install
+RUN npm install -g npm
+
+RUN npm install
