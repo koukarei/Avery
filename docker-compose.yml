@@ -21,7 +21,7 @@ services:
     volumes:
       - ./react-project/avery-app:/code
       - node_modules:/avery-app/node_modules
-    command: sh -c "npm start"
+    # command: sh -c "npm start"
     ports:
       - "7873:3000"
     tty: true
