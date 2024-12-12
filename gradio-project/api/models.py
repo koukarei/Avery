@@ -32,8 +32,6 @@ class Leaderboard(BaseModel):
     title: str
     story_extract: str
     is_public: bool
-    original_image_id: int
-    created_by_id: int
     vocabularies: list[Vocabulary]=[]
 
 class LeaderboardDetail(BaseModel):
@@ -44,9 +42,7 @@ class LeaderboardDetail(BaseModel):
     scene_id: int
     story_id: Optional[int]
     original_image_id: int
-    created_by_id: int=0
-    original_image_id: int
-    created_by_id: int
+    created_by: int=0
     vocabularies: list[Vocabulary]=[]
 
 class MessageSend(BaseModel):

@@ -4,6 +4,9 @@ import gradio as gr
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import FastAPI, Request, Depends, status, HTTPException
 from typing import Annotated
+from PIL import Image as PILImage
+import io
+
 from api import models
 
 BACKEND_URL = os.getenv("BACKEND_URL")
@@ -20,8 +23,6 @@ class BearerAuth(httpx.Auth):
 
     def auth_flow(self, request):
         request.headers["Authorization"] = f"Bearer {self.access_token}"
-        print(f"Request: {request}")
-        print(f"Headers: {request.headers}")
         response = yield request
         if response.status_code == 401:
 
@@ -89,9 +90,8 @@ async def read_leaderboard(request: Request):
             auth=auth,
             follow_redirects=True
         )
-        print(f"Response: {response.json()}")
         response.raise_for_status()
-        output = models.Leaderboard(**response.json())
+        output = [models.Leaderboard(**leaderboard) for leaderboard in response.json()]
         return output
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code, detail=e.response.json())
@@ -103,7 +103,8 @@ async def get_original_images(leaderboard_id: int, request: Request, ):
     )
     if response.status_code != 200:
         return None
-    return response
+    image = PILImage.open(io.BytesIO(response.content))
+    return image
 
 async def create_round(new_round: models.RoundStart, request: Request, ):
     response = await http_client.post(

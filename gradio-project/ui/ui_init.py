@@ -1,8 +1,5 @@
 import gradio as gr
-import google.generativeai as genai
-import google.ai.generativelanguage_v1beta.types.content as genlang_content
-# https://ai.google.dev/api/python/google/generativeai/GenerativeModel?_gl=1*7pk6lc*_up*MQ..*_ga*NzQwNTA2OTc0LjE3MjA1MDg0Mzc.*_ga_P1DBVKWT6V*MTcyMDUwODQzNi4xLjAuMTcyMDUwODQzNi4wLjAuMTI4MjQwOTIyMQ..
-# 必要モジュールのインポート
+
 import io
 import requests
 import base64
@@ -10,11 +7,7 @@ import PIL.Image
 from PIL.PngImagePlugin import PngImageFile
 from PIL.JpegImagePlugin import JpegImageFile
 import os
-from dotenv import load_dotenv
 import datetime
-
-# .envファイルの内容を読み込見込む
-load_dotenv()
 
 # os.environを用いて環境変数を表示させます
 GENAI_API_KEY=os.environ['GEMINI_API_KEY']
