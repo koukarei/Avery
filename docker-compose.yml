@@ -1,17 +1,24 @@
 services:
-  # gradio:
-  #   env_file:
-  #     - gradio-project/.env
-  #   container_name: frontend
-  #   build:
-  #     context: gradio-project
-  #     dockerfile: Dockerfile
-  #   command: python3 gradio_app.py
-  #   ports:
-  #     - "7870:7860"
-  #   tty: true
-  #   volumes:
-  #     - ./gradio-project:/app/gradio
+  gradio:
+    env_file:
+      - gradio-project/.env
+    container_name: gradio
+    build:
+      context: gradio-project
+      dockerfile: Dockerfile
+    # command: gradio gradio_app.py
+    ports:
+      - "7870:7870"
+    tty: true
+    volumes:
+      - ./gradio-project:/app
+    command: uvicorn gradio_test:app --host 0.0.0.0 --port 7870
+    networks:
+      - avery-network
+    depends_on:
+      backend-project:
+        condition: service_healthy
+
 
   react_front:
     container_name: react_front
@@ -19,9 +26,8 @@ services:
       context: react-project
       dockerfile: Dockerfile
     volumes:
-      - ./react-project/avery-app:/code
-      - node_modules:/avery-app/node_modules
-    command: sh -c "npm start"
+      - ./react-project/app:/app
+      - ./app/node_modules:/app/node_modules
     ports:
       - "7873:3000"
     tty: true
@@ -45,6 +51,11 @@ services:
         # ★ ローカルのscriptディレクトリにマウントします
         - ./db-project/init:/docker-entrypoint-initdb.d 
     tty: true
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
     networks:
       - avery-network
       
@@ -58,12 +69,31 @@ services:
     volumes:
       - ./backend-project/backend:/backend
       - ./backend-project/media:/static
-    command: fastapi dev --host 0.0.0.0 --port 8000 /backend/main.py
+    command: "fastapi dev --host 0.0.0.0 --port 8000 /backend/main.py"
+    # command: >
+    #   sh -c "
+    #     echo 'Waiting for database to be ready...'
+    #     while ! nc -z db 3306; do
+    #       sleep 1
+    #     done
+    #     echo 'Database is ready!'
+    #     ls
+    #     fastapi dev --host 0.0.0.0 --port 8000 /backend/main.py
+    #   " 
     ports:
       - "7871:8000"
     tty: true
+    healthcheck:
+      test: ["CMD", "curl", "http://localhost:8000/sqlapp/", "-X", "GET"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 90s
     networks:
       - avery-network
+    depends_on:
+      db:
+        condition: service_healthy
 
   blip2-project:
     container_name: blip2

@@ -1,8 +1,8 @@
-FROM node:22.3.0
-WORKDIR /code/
+FROM node:23-bookworm-slim
+
+RUN mkdir /app
+
+WORKDIR /app
+
 # 先にpackage.jsonとpackage-lock.jsonをマウントさせる
-COPY package*.json .
-
-RUN npm install -g npm
-
-RUN npm install
+COPY package*.json ./

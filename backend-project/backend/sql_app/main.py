@@ -113,16 +113,17 @@ app = FastAPI(
 
 @app.get("/")
 def hello_world():
-    logger1.info("Hello World")
     return {"message": "Hello World"}
 
 async def get_current_user(db: Annotated[Session, Depends(get_db)],token: Annotated[schemas.TokenData, Depends(oauth2_scheme)]):
+#async def get_current_user(db: Annotated[Session, Depends(get_db)],username: str):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     if token:
+    #if username:
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             username: str = payload.get("sub")
@@ -1043,7 +1044,7 @@ def update_chat(
     else:
         raise HTTPException(status_code=400, detail="Error in chatbot response")
 
-@app.get("/original_image/{leaderboard_id}", tags=["Image"])
+@app.get("/original_image/{leaderboard_id}", tags=["Image"], response_class=responses.FileResponse)
 async def get_original_image(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: int, 
@@ -1062,11 +1063,11 @@ async def get_original_image(
     # Check if the file exists
     if os.path.isfile(image_path):
         # Return the image as a file response
-        return responses.FileResponse(image_path, media_type="image/jpeg")
+        return image_path
     else:
         raise HTTPException(status_code=404, detail="Image not found")
     
-@app.get("/interpreted_image/{generation_id}", tags=["Image"])
+@app.get("/interpreted_image/{generation_id}", tags=["Image"], response_class=responses.FileResponse)
 async def get_interpreted_image(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     generation_id: int, 
@@ -1095,7 +1096,7 @@ async def get_interpreted_image(
     # Check if the file exists
     if os.path.isfile(image_path):
         # Return the image as a file response
-        return responses.FileResponse(image_path, media_type="image/jpeg")
+        return image_path
     else:
         raise HTTPException(status_code=404, detail="Image not found")
     

@@ -1,7 +1,7 @@
 import gradio as gr
 from typing import List, Dict
 
-from dependencies.round import Round
+from api.auth import auth
 
 from ui.ui_init import Guidance
 from ui.ui_gallery import Gallery
@@ -20,57 +20,19 @@ with gr.Blocks() as demo:
         {"name":"Results","Interactive":False},
         #{"name":"Leaderboard","Interactive":False},
         ]
-    initial_data={
-        "round_id":None,
-        "original_picture_path":None,
-        "original_picture":None,
-        "interpreted_picture":None,
-        "story":None,
-        "sentence":None,
-        "corrected_sentence":None,
-        "ai_play":None,
-        "is_draft":True,
-        "phrases":None,
-        "semantic_score":None,
-        "vocab_score":None,
-        "effectiveness_score":None,
-        "total":None,
-        "rank":None,
-        "chat_history":[]
-    }
     def initialize_steps():
         return step_list_start.copy()
     
-    round=Round()
-    def initialize_data(rd:Round,chat_history=None):
-        greetingmsg="""
-Greetings, human. 🤖 I am Avery the Robot. 📸
-
-Let's try to select an image and get the best scoring! 🛠️
-
-1. Select image. 🖼️
-2. Use complete sentence to describe the image. 🗣️
-3. Skyler the Robot will process and generate an image based on your sentence. Verify its output. ✅
-4. Your sentences will be scored by relevance, vocabulary and grammar. 📊
-"""
-        if chat_history:
-            initial_data["chat_history"]=chat_history
-        else:
-            initial_data["chat_history"]=[[None,greetingmsg]]
-        initial_data["round_id"]=rd.set_id()
-        return initial_data.copy()
-    cur_round=Round()
     gallery=Gallery()
     sentence=Sentence()
     interpreted_image=InterpretedImage()
     result=Result()
     
-    game_data=gr.State(initialize_data(cur_round))
     steps=gr.State(initialize_steps())
     guidance=Guidance()
     with gr.Row(equal_height=True,show_progress=True,elem_classes='whole'):
         with gr.Column(min_width=200,elem_classes='bot'):
-            guidance.create_guidance(chat_history=game_data.value['chat_history'])
+            guidance.create_guidance(chat_history=gr.Request)
             gr.on(triggers=[guidance.msg.submit,guidance.submit.click],
                   fn=guidance.slow_echo,
                   inputs=[guidance.msg,guidance.chat,game_data],
@@ -178,5 +140,5 @@ Let's try to select an image and get the best scoring! 🛠️
                             leaderboard=gr.Textbox(value='Release soon...?',interactive=False)
             
 if __name__ == "__main__":
-    demo.launch(share=True,server_name="0.0.0.0",server_port=7860)
+    demo.launch(share=True,server_name="0.0.0.0",server_port=7860, auth=auth)
     

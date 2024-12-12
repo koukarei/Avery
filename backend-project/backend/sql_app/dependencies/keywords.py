@@ -2,10 +2,6 @@ import base64
 import requests
 import os
 import re
-from dotenv import load_dotenv
-
-# .envファイルの内容を読み込見込む
-load_dotenv()
 
 from PIL import Image
 from io import BytesIO
