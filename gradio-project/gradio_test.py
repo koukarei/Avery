@@ -1,51 +1,79 @@
+from ui import ui_gallery
+
+from ui.ui_chatbot import Guidance
+from ui.ui_sentence import Sentence
+
 import gradio as gr
 import os
+import datetime
+
 from starlette.applications import Starlette
 from starlette.middleware.sessions import SessionMiddleware
-from api.connection import *
+from api.connection import get_original_images, create_generation
+from api.connection import models
 
 from app import app as fastapi_app
 
-#from ui.ui_init import Guidance
-from ui.ui_gallery import Gallery
-# from ui.ui_sentence import Sentence
-# from ui.ui_interpreted_image import InterpretedImage
-# from ui.ui_result import Result
 
 with gr.Blocks() as avery_gradio:
-    
-    step_list_start= [
-        {"name":"Select/Upload Image","Interactive":True},
-        {"name":"Sentence","Interactive":False},
-        {"name":"Verify","Interactive":False},
-        {"name":"Results","Interactive":False},
-    ]
-
-    async def initialize_game(request: gr.Request):
-        leaderboards = await read_leaderboard(request)
-        return [
-            await get_original_images(leaderboard.id, request) 
-            for leaderboard in leaderboards
-        ]
-    
-    gallery=Gallery()
-    # sentence=Sentence()
-    # interpreted_image=InterpretedImage()
-    # result=Result()
-
-    gallery.create_gallery()
-
-    avery_gradio.load(initialize_game, inputs=[
-    ], outputs=gallery.gallery)
-    avery_gradio.queue(max_size=128, default_concurrency_limit=50)
 
     app = gr.mount_gradio_app(
         fastapi_app, 
         avery_gradio, 
-        path="/game", 
+        path="/answer", 
     )
 
     app.add_middleware(
         SessionMiddleware,
         secret_key=os.getenv("SECRET_KEY"),
     )
+
+    async def obtain_original_image(request: gr.Request):
+        return await get_original_images(int(app.state.selected_leaderboard.id), request)
+
+    gr.Markdown(
+    """
+    # この絵を英語で説明しましょう！
+    """
+    )
+
+    with gr.Row(equal_height=True,show_progress=True,elem_classes='whole'):
+        with gr.Column(min_width=200,elem_classes='bot'):
+            guidance=Guidance()
+            guidance.create_guidance()
+            gr.on(triggers=[guidance.msg.submit,guidance.submit.click],
+                  fn=guidance.slow_echo,
+                  inputs=[guidance.msg,guidance.chat,game_data],
+                  outputs=[guidance.msg,guidance.chat,game_data])
+
+        with gr.Column(min_width=300,elem_classes='interactive'):
+            sentence=Sentence()
+            sentence.create_sentence()
+
+            async def submit_answer(sentence: str, request: gr.Request):
+                generated_time = int(app.state.generated_time) + 1
+
+                generation = models.GenerationStart(
+                    round_id=app.state.round.id,
+                    created_at=datetime.datetime.now(datetime.timezone.utc),
+                    generated_time=generated_time,
+                    sentence=sentence,
+                )
+                output = await create_generation(generation, request)
+                if output:
+                    app.state.generated_time = generated_time
+                    app.state.generation = output
+                    return output
+
+            gr.on(triggers=[sentence.submit_btn.click, sentence.sentence.submit],
+                  fn=submit_answer,
+                  inputs=[sentence.sentence],
+                  outputs=None)
+
+
+    avery_gradio.load(obtain_original_image, inputs=[], outputs=[sentence.image])
+    avery_gradio.queue(max_size=128, default_concurrency_limit=50)
+
+
+
+

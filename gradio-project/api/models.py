@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 class Token(BaseModel):
@@ -79,7 +79,7 @@ class Round(BaseModel):
     generations: list[IdOnly]=[]
 
 class RoundStart(BaseModel):
-    model: str
+    model: Optional[str]="gpt-4o-mini"
     leaderboard_id: int
     created_at: datetime
 

@@ -1,4 +1,5 @@
 import gradio as gr
+from PIL import Image
 
 class Sentence:
     """Combine keywords into a sentence.
@@ -7,28 +8,17 @@ class Sentence:
 
     def __init__(self):
         self.sentence=None
-        self.check_btn=None
-        self.checked_sentence=None
         self.submit_btn=None
         self.image=None
 
-    def create_image(self,image):
-        if isinstance(image,gr.components.Image):
-            from PIL import Image as Im
-            image=Im.fromarray(image.value)
+    def create_sentence(self):
         self.image=gr.Image(
-            image,
-            label="Type sentence to describe the image.",
+            None,
+            label="英作文を入力してください",
             interactive=False,
         )
+        self.sentence=gr.Textbox(label='英作文',interactive=True)
 
-    def create_sentence(self,image_path):
-        self.create_image(image_path)
-        self.sentence=gr.Textbox(label='Your Sentence',interactive=True)
-        self.check_btn=gr.Button("Check your sentence",scale=0)
-
-        self.checked_sentence=gr.Textbox(label='Checked Sentence',interactive=False)
-        
-        self.submit_btn=gr.Button("Send to Skyler",scale=0)
+        self.submit_btn=gr.Button("送信",scale=0)
         
     

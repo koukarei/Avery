@@ -51,10 +51,23 @@ async def login_form(request: Request):
         request.session["token"] = token.model_dump()
         request.session["username"] = form_data["username"]
 
-        return RedirectResponse(url='/game', status_code=status.HTTP_303_SEE_OTHER)
+        # app.state.token = token.model_dump()
+        # app.state.username = form_data["username"]
+
+        return RedirectResponse(url='/', status_code=status.HTTP_303_SEE_OTHER)
         
     return templates.TemplateResponse("login_form.html", {"request": request})
 
 @app.post("/token")
 def token(request: Request):
     return request.session["token"]["access_token"]
+
+@app.get("/")
+async def redirect_page(request: Request):
+    if "token" not in request.session:
+        return RedirectResponse(url="/login_html", status_code=status.HTTP_303_SEE_OTHER)
+    elif not hasattr(request.app.state, "selected_leaderboard") or not hasattr(request.app.state, "generated_time"):
+        return RedirectResponse(url="/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
+    elif "round_id" not in request.session:
+        return RedirectResponse(url="/answer", status_code=status.HTTP_303_SEE_OTHER)
+    

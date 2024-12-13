@@ -44,6 +44,14 @@ class BearerAuth(httpx.Auth):
         self.access_token = data["access_token"]
         self.refresh_token = data["refresh_token"]
 
+def convert_json(mdl: models.BaseModel):
+    json_data = mdl.model_dump()
+    if "created_at" in json_data:
+        json_data["created_at"] = json_data["created_at"].isoformat()
+    if "at" in json_data:
+        json_data["at"] = json_data["at"].isoformat()
+    return json_data
+
 async def create_user(newuser: models.UserCreate):
     url = f"{BACKEND_URL}users"
 
@@ -96,7 +104,7 @@ async def read_leaderboard(request: Request):
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code, detail=e.response.json())
 
-async def get_original_images(leaderboard_id: int, request: Request, ):
+async def get_original_images(leaderboard_id: int, request: Request):
     response = await http_client.get(
         f"{BACKEND_URL}original_image/{leaderboard_id}",
         auth=get_auth(request),
@@ -107,9 +115,10 @@ async def get_original_images(leaderboard_id: int, request: Request, ):
     return image
 
 async def create_round(new_round: models.RoundStart, request: Request, ):
+    json_data = convert_json(new_round)
     response = await http_client.post(
         f"{BACKEND_URL}round/", 
-        json=new_round.model_dump(),
+        json=json_data,
         headers={
             "Content-Type": "application/json",
         },
@@ -144,9 +153,10 @@ async def send_message(round_id: int, new_message:models.MessageSend, request: R
     return output
 
 async def create_generation(new_generation: models.GenerationStart, request: Request, ):
+    json_data = convert_json(new_generation)
     response = await http_client.put(
         f"{BACKEND_URL}round/{new_generation.round_id}",
-        json=new_generation.model_dump(),
+        json=json_data,
         headers={"Content-Type": "application/json",
         },
         auth=get_auth(request),
@@ -180,10 +190,10 @@ async def get_interpreted_image(generation_id: int, request: Request, ):
     return response
 
 async def complete_generation(round_id: int, generation: models.GenerationCompleteCreate, request: Request, ):
-    #Test get scores
+    json_data = convert_json(generation)
     response = await http_client.put(
         f"{BACKEND_URL}round/{round_id}/complete",
-        json=generation.model_dump(),
+        json=json_data,
         headers={"Content-Type": "application/json",
         },
         auth=get_auth(request),
