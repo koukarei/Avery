@@ -140,11 +140,22 @@ async def read_unfinished_rounds(request: Request):
     return output
 
 async def send_message(round_id: int, new_message:models.MessageSend, request: Request, ):
+    json_data = convert_json(new_message)
     response = await http_client.put(
         f"{BACKEND_URL}round/{round_id}/chat",
-        json=new_message.model_dump(),
+        json=json_data,
         headers={"Content-Type": "application/json",
         },
+        auth=get_auth(request),
+    )
+    if response.status_code != 200:
+        return None
+    output = models.Chat(**response.json())
+    return output
+
+async def get_chat(round_id: int, request: Request, ):
+    response = await http_client.get(
+        f"{BACKEND_URL}chat/{round_id}",
         auth=get_auth(request),
     )
     if response.status_code != 200:

@@ -117,3 +117,6 @@ with gr.Blocks() as avery_gradio:
         outputs=[new_round, gallery.next_btn],
     )
 
+
+
+

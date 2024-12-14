@@ -68,6 +68,8 @@ async def redirect_page(request: Request):
         return RedirectResponse(url="/login_html", status_code=status.HTTP_303_SEE_OTHER)
     elif not hasattr(request.app.state, "selected_leaderboard") or not hasattr(request.app.state, "generated_time"):
         return RedirectResponse(url="/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
-    elif "round_id" not in request.session:
+    elif not hasattr(request.app.state, "generation"):
         return RedirectResponse(url="/answer", status_code=status.HTTP_303_SEE_OTHER)
+    else:
+        return RedirectResponse(url="/result", status_code=status.HTTP_303_SEE_OTHER)
     

@@ -17,7 +17,7 @@ class Sentence:
             label="英作文を入力してください",
             interactive=False,
         )
-        self.sentence=gr.Textbox(label='英作文',interactive=True)
+        self.sentence=gr.Textbox(label='英作文',interactive=True, max_length=180)
 
         self.submit_btn=gr.Button("送信",scale=0)
         
