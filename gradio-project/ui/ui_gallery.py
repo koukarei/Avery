@@ -6,7 +6,7 @@ import datetime
 from starlette.applications import Starlette
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import RedirectResponse, Response
-from api.connection import read_leaderboard, get_original_images, create_round
+from api.connection import read_leaderboard, get_original_images, get_interpreted_image, get_rounds, get_generation
 from api.connection import models
 
 from app import app as fastapi_app
@@ -25,10 +25,14 @@ class Gallery:
     
     def create_gallery(self):
         with gr.Column(elem_classes="gallery"):
-            self.gallery = gr.Gallery(None, label="Original", interactive=False)
             with gr.Row():
-                self.submit_btn = gr.Button("送信", scale=0, interactive=False)
-                self.next_btn = gr.Button("次へ", scale=0, visible=False, link="/")
+                with gr.Column():
+                    self.gallery = gr.Gallery(None, label="Original", interactive=False)
+                with gr.Column():
+                    self.info = gr.Markdown(None)
+                    self.generated_img = gr.Gallery(None, label="record")
+            with gr.Row():
+                self.submit_btn = gr.Button("送信", scale=0, interactive=False, link="/go_to_answer")
 
     def upload_picture(self, image):
         return image[0][0]
@@ -60,7 +64,7 @@ with gr.Blocks() as avery_gradio:
 
     leaderboards = gr.State()
     selected_leaderboard = gr.State()
-    new_round = gr.State()
+    related_generations = gr.State()
 
     gallery.create_gallery()
 
@@ -81,40 +85,59 @@ with gr.Blocks() as avery_gradio:
         secret_key=os.getenv("SECRET_KEY"),
     )
 
-    def select_leaderboard(evt: gr.SelectData, leaderboards):
+    async def select_leaderboard(evt: gr.SelectData, leaderboards, request: gr.Request):
         select_leaderboard = leaderboards[evt.index]
-        round_start = models.RoundStart(
-            leaderboard_id=select_leaderboard.id,
-            created_at=datetime.datetime.now(datetime.timezone.utc),
-        )
+
         app.state.selected_leaderboard = select_leaderboard
-        
-        return select_leaderboard, gr.update(interactive=True), round_start
+        info = f"## {select_leaderboard.title}"
+        rounds = await get_rounds(select_leaderboard.id, request=request)
+        if rounds:
+            generations = [generation for round in rounds for generation in round.generations]
+            interpreted_images = []
+            not_working = []
+            for generation in generations:
+                interpreted_img = await get_interpreted_image(generation_id=generation.id, request=request)
+                if interpreted_img:
+                    interpreted_images.append(interpreted_img)
+                else:
+                    not_working.append(generation)
+            if not_working:
+                generations = [generation for generation in generations if generation not in not_working]
+        else:
+            interpreted_images = None
+            generations = None
+        return select_leaderboard, gr.update(interactive=True), info, interpreted_images, generations
+
+    async def select_interpreted_image(evt: gr.SelectData, generations, select_leaderboard, request: gr.Request):
+        selected_interpreted = generations[evt.index]
+        selected = await get_generation(selected_interpreted.id, request)
+        if selected:
+            md = f"""## {select_leaderboard.title}
+            
+            英作文：{selected.sentence} ({selected_interpreted.id})
+
+            合計点：{selected.total_score}
+            
+            ランク：{selected.rank}"""
+        else:
+            md = f"## {select_leaderboard.title}"
+        return md
+            
 
     # Set the selected leaderboard
     gr.on(
         triggers=[gallery.gallery.select],
         fn=select_leaderboard,
         inputs=[leaderboards],
-        outputs=[selected_leaderboard, gallery.submit_btn, new_round],
+        outputs=[selected_leaderboard, gallery.submit_btn, gallery.info, gallery.generated_img, related_generations],
     )
 
-    async def create_new_round(new_round: models.RoundStart, request: gr.Request):
-        output = await create_round(
-            new_round=new_round,
-            request=request,
-        )
-        
-        app.state.round = output
-        app.state.generated_time = 0
-        return output, gr.update(visible=True)
-
-    # Create a new round
+    # Set the selected interpreted image
     gr.on(
-        triggers=[gallery.submit_btn.click],
-        fn=create_new_round,
-        inputs=[new_round],
-        outputs=[new_round, gallery.next_btn],
+        triggers=[gallery.generated_img.select],
+        fn=select_interpreted_image,
+        inputs=[related_generations, selected_leaderboard],
+        outputs=[gallery.info],
     )
 
 

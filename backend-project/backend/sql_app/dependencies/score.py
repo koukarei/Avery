@@ -10,6 +10,9 @@ import torch
 
 import os
 
+import cv2
+from skimage.metrics import structural_similarity as ssim
+
 import stanza
 import language_tool_python
 import time
@@ -114,7 +117,7 @@ def frequency_word_ngram(words,n_gram=2):
                          'type':'ngram' if '%20' in ngram else 'word',
                          'freq':freq})
           if i != len(ngrams)-1:
-            time.sleep(1.5)
+            time.sleep(3)
       else:
         print(f"Error: {response.status_code}")
   if not output:
@@ -211,7 +214,7 @@ def calculate_score(
     output['vividness_score'] = output['vividness_score'] if output['vividness_score'] < 8 else 8
     output['vividness_score'] = output['vividness_score'] / 8 * 5
 
-    perplexity_score = perplexity*100
+    perplexity_score = perplexity
     f_bigram = f_bigram if f_bigram < 5 else 5
     convention = f_bigram-perplexity_score
     output['convention']= convention
@@ -261,38 +264,45 @@ def calculate_score_init(
 
    return factors, output
 
-# def semantic_similarity(sentence:str,corrected_sentence:str):
-#     semantic_score=Levenshtein.ratio(sentence,corrected_sentence)
-#     return semantic_score
+def image_similarity(image1_path, image2_path):
+    # Read images using OpenCV
+    img1 = cv2.imread(image1_path)
+    img2 = cv2.imread(image2_path)
 
-# def cosine_similarity_to_ai(ai_play: List[str],corrected_sentence:str):
-    
-#     avg_embedding = lambda list: np.mean(list, axis=0)
+    # Check if images were read successfully
+    if img1 is None or img2 is None:
+        raise ValueError("Could not read one or both images")
 
-#     user_embedding = get_embedding(text=corrected_sentence)
+    # Get image dimensions
+    height = min(img1.shape[0], img2.shape[0])
+    width = min(img1.shape[1], img2.shape[1])
 
-#     result=cosine_similarity(
-#         user_embedding,
-#         avg_embedding([get_embedding(text=i) for i in ai_play])
-#     )
+    # Resize images
+    img1 = cv2.resize(img1, (width, height))
+    img2 = cv2.resize(img2, (width, height))
 
-#     return float(result[0]) if isinstance(result, np.ndarray) else float(result)
+    # Convert to grayscale
+    gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+    gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
 
-# def vocab_difficulty(corrected_sentence:str):
-#     few_shot=predict_cefr_en_level(corrected_sentence)
-#     if few_shot == "A1":
-#         vocab_score=0.1
-#     elif few_shot == "A2":
-#         vocab_score=0.3
-#     elif few_shot == "B1":
-#         vocab_score=0.5
-#     elif few_shot == "B2":
-#         vocab_score=0.7
-#     elif few_shot == "C1":
-#         vocab_score=0.9
-#     elif few_shot == "C2":
-#         vocab_score=1.0
-#     return vocab_score
+    # Calculate histograms
+    hist1 = cv2.calcHist([gray1], [0], None, [256], [0, 256])
+    hist2 = cv2.calcHist([gray2], [0], None, [256], [0, 256])
+
+    # Normalize histograms
+    cv2.normalize(hist1, hist1, 0, 1, cv2.NORM_MINMAX)
+    cv2.normalize(hist2, hist2, 0, 1, cv2.NORM_MINMAX)
+
+    # Compare histograms
+    similarity = cv2.compareHist(hist1, hist2, cv2.HISTCMP_CORREL)
+
+    # Calculate SSIM
+    ssim_score = ssim(gray1, gray2)
+
+    return {
+        "hist_similarity": similarity,
+        "ssim_score": ssim_score
+    }
 
 def rank(total_score):
     if total_score>2100:

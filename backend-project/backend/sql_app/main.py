@@ -77,6 +77,8 @@ def model_load():
         perplexity_model.to('cuda')
     return en_nlp, tokenizer, perplexity_model
 
+nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = model_load()
+
 # Define the directory where the images will be stored
 media_dir = Path(os.getenv("MEDIA_DIR", "/static"))
 media_dir.mkdir(parents=True, exist_ok=True)
@@ -571,6 +573,7 @@ def get_user_answer(
                 sender="assistant",
                 created_at=datetime.datetime.now(tz=timezone.utc)
             ),
+            chat_id=db_round.chat_history
         )
     elif status == 2:
         crud.create_message(
@@ -582,10 +585,10 @@ def get_user_answer(
             ),
             chat_id=db_round.chat_history
         )
-    return None
+    raise HTTPException(status_code=400, detail="Invalid sentence")
 
 @app.put("/round/{round_id}/interpretation", tags=["Round"], response_model=schemas.GenerationInterpretation)
-def get_interpretation(
+async def get_interpretation(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     round_id: int,
     generation: schemas.GenerationCorrectSentence,
@@ -598,9 +601,7 @@ def get_interpretation(
     if current_user.id != db_round.player_id:
         raise HTTPException(status_code=401, detail="You are not authorized to get interpretation")
     
-    tracker_interpretation = memory_tracker(message=f"Round id: {round_id}, Generation id: {generation.id} - Get interpretation")
     try:
-
         # Image generation
         interpreted_image_url = gen_image.generate_interpretion(
             sentence=generation.correct_sentence
@@ -653,8 +654,8 @@ def get_interpretation(
         # Safe background task addition with error handling
         try:
 
-            if 'en_nlp' not in nlp_models or 'perplexity_model' not in nlp_models or 'tokenizer' not in nlp_models:
-                nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = model_load()
+            # if 'en_nlp' not in nlp_models or 'perplexity_model' not in nlp_models or 'tokenizer' not in nlp_models:
+            #     nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = model_load()
 
             # Update scores in background
             background_tasks.add_task(
@@ -705,13 +706,11 @@ def get_interpretation(
             chat_id=db_round.chat_history
         )
 
-        tracker_interpretation.get_top_stats(message=f"Round id: {round_id}, Generation id: {generation.id}")
-        del tracker_interpretation
         return db_generation
 
     except HTTPException:
         # Re-raise HTTP exceptions
-        raise
+        raise HTTPException(status_code=400, detail="Invalid image file")
     except Exception as e:
         # Catch and log any unexpected errors
         logger1.error(f"Unexpected error in get_interpretation: {str(e)}")
@@ -741,8 +740,8 @@ def complete_generation(
     db_chat = crud.get_chat(db=db,chat_id=db_round.chat_history)
     cb=openai_chatbot.Hint_Chatbot()
 
-    if 'en_nlp' not in nlp_models or 'perplexity_model' not in nlp_models or 'tokenizer' not in nlp_models:
-        nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = model_load()
+    # if 'en_nlp' not in nlp_models or 'perplexity_model' not in nlp_models or 'tokenizer' not in nlp_models:
+    #     nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = model_load()
 
     factors, scores_dict = calculate_score(
         db=db,
@@ -775,20 +774,20 @@ def complete_generation(
 
     if evaluation:
         score_message = """あなたの回答：{user_sentence}
-        Grammar Score: {grammar_score} (out of 5)
-        Spelling Score: {spelling_score} (out of 5)
-        Vividness Score: {vividness_score} (out of 5)
-        Convention Score: {convention} (out of 5)
-        Structure Score: {structure_score} (out of 3)
-        Content Comprehensive Score: {content_score} (out of 100)
-        Total Score: {total_score} (out of 2300)
-        Rank: {rank}
+        文法得点: {grammar_score} (満点5)
+        スペリング得点: {spelling_score} (満点5)
+        鮮明さ: {vividness_score} (満点5)
+        自然さ: {convention} (満点5)
+        構造性: {structure_score} (満点3)
+        内容得点: {content_score} (満点100)
+        合計点: {total_score} (満点2300)
+        ランク: {rank}　(A-最高, B-上手, C-良い, D-普通, E-悪い, F-最悪)
         """.format(
             user_sentence=db_generation.sentence,
-            grammar_score=scores_dict['grammar_score'],
-            spelling_score=scores_dict['spelling_score'],
-            vividness_score=scores_dict['vividness_score'],
-            convention=scores_dict['convention'],
+            grammar_score=round(scores_dict['grammar_score'],2),
+            spelling_score=round(scores_dict['spelling_score'],2),
+            vividness_score=round(scores_dict['vividness_score'],2),
+            convention=round(scores_dict['convention'],2),
             structure_score=scores_dict['structure_score'],
             content_score=scores_dict['content_score'],
             total_score=scores_dict['total_score'],
@@ -1086,9 +1085,11 @@ async def get_interpreted_image(
         round_id=db_generation.round_id
     )
 
-    if current_user.id != db_round.player_id and not current_user.is_admin:
-        raise HTTPException(status_code=401, detail="You are not authorized to view images")
-
+    # if current_user.id != db_round.player_id and not current_user.is_admin:
+    #     raise HTTPException(status_code=401, detail="You are not authorized to view images")
+    if db_generation.interpreted_image is None:
+        raise HTTPException(status_code=404, detail="Interpreted image not found")
+    
     image_name = db_generation.interpreted_image.image_path.split('/')[-1]
     # Construct the image path
     image_path = os.path.join('/static','interpreted_images', image_name)
@@ -1100,3 +1101,70 @@ async def get_interpreted_image(
     else:
         raise HTTPException(status_code=404, detail="Image not found")
     
+@app.get("/image_similarity/{generation_id}", tags=["Image"], response_model=schemas.ImageSimilarity)
+def get_image_similarity(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    generation_id: int, 
+    db: Session = Depends(get_db)
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to get image similarity")
+    
+    db_generation = crud.get_generation(
+        db=db,
+        generation_id=generation_id
+    )
+
+    db_round = crud.get_round(
+        db=db,
+        round_id=db_generation.round_id
+    )
+
+    # if current_user.id != db_round.player_id and not current_user.is_admin:
+    #     raise HTTPException(status_code=401, detail="You are not authorized to view images")
+
+    db_leaderboard = crud.get_leaderboard(
+        db=db,
+        leaderboard_id=db_round.leaderboard_id
+    )
+
+    semantic1 = score.calculate_content_score(
+        image_path=db_leaderboard.original_image.image_path,
+        sentence=db_generation.sentence
+    )
+
+    semantic2 = score.calculate_content_score(
+        image_path=db_generation.interpreted_image.image_path,
+        sentence=db_generation.sentence
+    )
+
+    denominator = semantic1['content_score']+semantic2['content_score']
+    if denominator == 0:
+        blip2_score = 0
+    else:
+        blip2_score = abs(semantic1['content_score'] - semantic2['content_score'])/(semantic1['content_score']+semantic2['content_score'])
+        blip2_score = 1 - blip2_score
+
+    image_similarity = schemas.ImageSimilarity(
+        semantic_score_original=semantic1['content_score'],
+        semantic_score_interpreted=semantic2['content_score'],
+        blip2_score=blip2_score
+    )
+
+    return image_similarity
+
+@app.get("/generation/{generation_id}", tags=["Generation"], response_model=schemas.GenerationOut)
+def read_generation(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    generation_id: int, 
+    db: Session = Depends(get_db)
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view generation")
+    db_generation = crud.get_generation(
+        db=db,
+        generation_id=generation_id
+    )
+    if db_generation is None:
+        raise HTTPException(status_code=404, detail="Generation not found")
+    return db_generation

@@ -1,7 +1,8 @@
 from ui import ui_gallery
+from ui import ui_sentence
 
 from ui.ui_chatbot import Guidance
-from ui.ui_sentence import Sentence
+from ui.ui_result import Result
 
 import gradio as gr
 import os
@@ -10,7 +11,7 @@ import time
 
 from starlette.applications import Starlette
 from starlette.middleware.sessions import SessionMiddleware
-from api.connection import get_original_images, create_generation, get_chat, send_message
+from api.connection import get_original_images, get_image_similarity, get_chat, send_message, get_interpreted_image, complete_generation, end_round
 from api.connection import models
 
 from app import app as fastapi_app
@@ -35,7 +36,7 @@ with gr.Blocks() as avery_gradio:
     app = gr.mount_gradio_app(
         fastapi_app, 
         avery_gradio, 
-        path="/answer", 
+        path="/result", 
     )
 
     app.add_middleware(
@@ -43,22 +44,40 @@ with gr.Blocks() as avery_gradio:
         secret_key=os.getenv("SECRET_KEY"),
     )
 
-    async def obtain_original_image(request: gr.Request):
+    async def obtain_image(request: gr.Request):
         if not hasattr(app.state, 'selected_leaderboard'):
             return None
-        return await get_original_images(int(app.state.selected_leaderboard.id), request)
+        elif not hasattr(app.state, 'generation'):
+            return None
+        
+        original_img = await get_original_images(int(app.state.selected_leaderboard.id), request)
+        ai_img = await get_interpreted_image(int(app.state.generation.id), request)
+        similarity = await get_image_similarity(int(app.state.generation.id), request)
+        print(similarity)
+        if similarity:
+            similarity = float(similarity["blip2_score"])*100
+        similarity_md = "# 類似度: {:^10.2f} ".format(similarity)
+        return original_img, ai_img, similarity_md
     
     async def load_chat_content(request: gr.Request):
+        # complete the generation and get the chat
+        if not hasattr(app.state, 'generation'):
+            raise Exception("Generation not found")
+        
         if not hasattr(app.state, 'round'):
             raise Exception("Round not found")
-        
+
         if app.state.round:
             chat = await get_chat(
                 round_id=app.state.round.id,
                 request=request,
             )
+
             if chat:
-                yield convert_history(chat)
+                check_generated_time = app.state.generated_time < 3
+                show_restart = gr.update(visible=check_generated_time)
+                show_end = gr.update(visible=True)
+                yield convert_history(chat), show_restart, show_end
                 return
             else:
                 yield None
@@ -76,48 +95,28 @@ with gr.Blocks() as avery_gradio:
 
     gr.Markdown(
     """
-    # この絵を英語で説明しましょう！
+    # 評価
     """
     )
 
-    with gr.Row(equal_height=True,show_progress=True,elem_classes='whole'):
-        with gr.Column(min_width=200,elem_classes='bot'):
-            guidance=Guidance()
-            guidance.create_guidance()
+    with gr.Column(show_progress=True,elem_classes='whole'):
 
-            gr.on(triggers=[guidance.msg.submit,guidance.submit.click],
-                  fn=ask_hint,
-                  inputs=[guidance.msg, guidance.chat],
-                  outputs=[guidance.msg, guidance.chat]
-            )
+        guidance=Guidance()
+        guidance.create_guidance()
 
-        with gr.Column(min_width=300,elem_classes='interactive'):
-            sentence=Sentence()
-            sentence.create_sentence()
+        gr.on(triggers=[guidance.msg.submit,guidance.submit.click],
+                fn=ask_hint,
+                inputs=[guidance.msg, guidance.chat],
+                outputs=[guidance.msg, guidance.chat],
+                queue=False
+        )
 
-            async def submit_answer(sentence: str, request: gr.Request):
-                generated_time = int(app.state.generated_time) + 1
-
-                generation = models.GenerationStart(
-                    round_id=request.app.state.round.id,
-                    created_at=datetime.datetime.now(datetime.timezone.utc),
-                    generated_time=generated_time,
-                    sentence=sentence,
-                )
-                output = await create_generation(generation, request)
-                if output:
-                    app.state.generated_time = generated_time
-                    app.state.generation = output
-                    return output
-
-            gr.on(triggers=[sentence.submit_btn.click, sentence.sentence.submit],
-                  fn=submit_answer,
-                  inputs=[sentence.sentence],
-                  outputs=None)
+        result=Result()
+        result.create_result()
 
 
-    avery_gradio.load(obtain_original_image, inputs=[], outputs=[sentence.image])
-    avery_gradio.load(load_chat_content, inputs=[], outputs=[guidance.chat])
+    avery_gradio.load(obtain_image, inputs=[], outputs=[result.image, result.ai_image, result.similarity])
+    avery_gradio.load(load_chat_content, inputs=[], outputs=[guidance.chat, result.restart_btn, result.end_btn])
     avery_gradio.queue(max_size=128, default_concurrency_limit=50)
 
 

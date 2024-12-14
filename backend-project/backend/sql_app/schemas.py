@@ -205,8 +205,8 @@ class GenerationComplete(BaseModel):
     is_completed: bool
 
 class GenerationOut(GenerationComplete):
-    sentence: str
-    correct_sentence: str
+    sentence: Optional[str] = None
+    correct_sentence: Optional[str] = None
     interpreted_image: InterpretedImage
 
     class Config:
@@ -352,3 +352,8 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+
+class ImageSimilarity(BaseModel):
+    semantic_score_original: float
+    semantic_score_interpreted: float
+    blip2_score: float

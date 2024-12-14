@@ -92,7 +92,7 @@
             const errorMessage = document.getElementById('error-message');
 
             // Validate username
-            const usernamePattern = /^[a-zA-Z0-9]{5,29}$/;
+            const usernamePattern = /^[a-zA-Z0-9]{4,29}$/;
             if (!usernamePattern.test(username)) {
                 errorMessage.textContent = 'The username must be between 5 and 30 characters long and contain only letters and numbers.';
                 errorMessage.style.display = 'block';

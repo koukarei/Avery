@@ -7,6 +7,7 @@ from starlette.middleware.sessions import SessionMiddleware
 import os
 import json
 from typing import Annotated
+import datetime
 
 from api import models
 from api.connection import *
@@ -66,10 +67,63 @@ def token(request: Request):
 async def redirect_page(request: Request):
     if "token" not in request.session:
         return RedirectResponse(url="/login_html", status_code=status.HTTP_303_SEE_OTHER)
-    elif not hasattr(request.app.state, "selected_leaderboard") or not hasattr(request.app.state, "generated_time"):
-        return RedirectResponse(url="/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
-    elif not hasattr(request.app.state, "generation"):
-        return RedirectResponse(url="/answer", status_code=status.HTTP_303_SEE_OTHER)
     else:
-        return RedirectResponse(url="/result", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url="/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
     
+@app.get("/retry")
+async def retry(request: Request):
+    request.app.state.generation=None
+    return RedirectResponse(url="/answer", status_code=status.HTTP_303_SEE_OTHER)    
+
+@app.get("/new_game")
+async def new_game(request: Request):
+    res = await end_round(request.app.state.round.id, request)
+    if res:
+        request.app.state.round = None
+        request.app.state.generated_time = 0
+        request.app.state.generation = None
+        request.app.state.selected_leaderboard = None
+        return RedirectResponse(url="/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
+    raise HTTPException(status_code=500, detail="Failed to end round")
+
+@app.get("/go_to_answer")
+async def redirect_to_answer(request: Request):
+    if not hasattr(request.app.state, 'selected_leaderboard'):
+        return RedirectResponse(url="/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
+    selected_leaderboard_id = request.app.state.selected_leaderboard.id
+    output = await create_round(
+        new_round=models.RoundStart(
+            leaderboard_id=selected_leaderboard_id,
+            created_at=datetime.datetime.now(datetime.timezone.utc),
+        ),
+        request=request,
+    )
+    request.app.state.round = output
+    request.app.state.generated_time = 0
+    return RedirectResponse(url="/answer", status_code=status.HTTP_303_SEE_OTHER)
+
+@app.get("/go_to_result")
+async def redirect_to_result(request: Request):
+    if (not hasattr(request.app.state, 'generation') or not request.app.state.generation) and request.app.state.generated_time < 3:
+        return RedirectResponse(url="/answer", status_code=status.HTTP_303_SEE_OTHER)
+    
+    output = await complete_generation(
+        round_id=request.app.state.round.id,
+        generation=models.GenerationCompleteCreate(
+            id=request.app.state.generation.id,
+            at=datetime.datetime.now(datetime.timezone.utc),
+        ),
+        request=request,
+    )
+    if not output:
+        raise HTTPException(status_code=500, detail="Generation not completed")
+
+    if request.app.state.generated_time > 2:
+        output = await end_round(
+            round_id=request.app.state.round.id, 
+            request=request
+        )
+        if not output:
+            raise HTTPException(status_code=500, detail="Round not ended")
+    
+    return RedirectResponse(url="/result", status_code=status.HTTP_303_SEE_OTHER)

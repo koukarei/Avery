@@ -133,3 +133,7 @@ class GenerationComplete(BaseModel):
     duration: int
     is_completed: bool
 
+class GenerationOut(GenerationComplete):
+    sentence: str
+    correct_sentence: str
+    interpreted_image: Image

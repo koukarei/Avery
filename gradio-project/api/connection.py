@@ -147,6 +147,7 @@ async def send_message(round_id: int, new_message:models.MessageSend, request: R
         headers={"Content-Type": "application/json",
         },
         auth=get_auth(request),
+        timeout=10
     )
     if response.status_code != 200:
         return None
@@ -178,13 +179,14 @@ async def create_generation(new_generation: models.GenerationStart, request: Req
     return output
 
 async def get_interpretation(round_id: int, interpretation: models.GenerationCorrectSentence, request: Request, ):
-    # Test get interpretation
+    # get interpretation
     response = await http_client.put(
         f"{BACKEND_URL}round/{round_id}/interpretation",
         json=interpretation.model_dump(),
         headers={"Content-Type": "application/json",
         },
         auth=get_auth(request),
+        timeout=90
     )
     if response.status_code != 200:
         return None
@@ -198,7 +200,8 @@ async def get_interpreted_image(generation_id: int, request: Request, ):
     )
     if response.status_code != 200:
         return None
-    return response
+    image = PILImage.open(io.BytesIO(response.content))
+    return image
 
 async def complete_generation(round_id: int, generation: models.GenerationCompleteCreate, request: Request, ):
     json_data = convert_json(generation)
@@ -208,6 +211,7 @@ async def complete_generation(round_id: int, generation: models.GenerationComple
         headers={"Content-Type": "application/json",
         },
         auth=get_auth(request),
+        timeout=120
     )
     if response.status_code != 200:
         return None
@@ -225,4 +229,35 @@ async def end_round(round_id: int, request: Request, ):
     if response.status_code != 200:
         return None
     output = models.Round(**response.json())
+    return output
+
+async def get_image_similarity(generation_id: int, request: Request, ):
+    response = await http_client.get(
+        f"{BACKEND_URL}image_similarity/{generation_id}",
+        auth=get_auth(request),
+    )
+    if response.status_code != 200:
+        return None
+    print(response.json())
+    return response.json()
+
+async def get_rounds(leaderboard_id: int, request: Request):
+    response = await http_client.get(
+        f"{BACKEND_URL}leaderboards/{leaderboard_id}/rounds",
+        auth=get_auth(request),
+        follow_redirects=True
+    )
+    if response.status_code != 200:
+        return None
+    output = [models.Round(**round) for round in response.json()]
+    return output
+
+async def get_generation(generation_id: int, request: Request):
+    response = await http_client.get(
+        f"{BACKEND_URL}generation/{generation_id}",
+        auth=get_auth(request),
+    )
+    if response.status_code != 200:
+        return None
+    output = models.GenerationOut(**response.json())
     return output
