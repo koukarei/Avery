@@ -12,7 +12,7 @@ services:
     tty: true
     volumes:
       - ./gradio-project:/app
-    command: uvicorn gradio_test:app --host 0.0.0.0 --port 7870
+    command: uvicorn gradio_app:app --host 0.0.0.0 --port 7870
     networks:
       - avery-network
     depends_on:

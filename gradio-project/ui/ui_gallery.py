@@ -114,7 +114,7 @@ with gr.Blocks() as avery_gradio:
         if selected:
             md = f"""## {select_leaderboard.title}
             
-            英作文：{selected.sentence} ({selected_interpreted.id})
+            英作文：{selected.sentence}
 
             合計点：{selected.total_score}
             

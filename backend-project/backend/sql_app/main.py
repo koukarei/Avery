@@ -1168,3 +1168,26 @@ def read_generation(
     if db_generation is None:
         raise HTTPException(status_code=404, detail="Generation not found")
     return db_generation
+
+@app.get("/generation/{generation_id}/score", tags=["Generation"], response_model=schemas.GenerationScore)
+def get_generation_score(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    generation_id: int, 
+    db: Session = Depends(get_db)
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view generation")
+    db_generation = crud.get_generation(
+        db=db,
+        generation_id=generation_id
+    )
+    if db_generation is None:
+        raise HTTPException(status_code=404, detail="Generation not found")
+    scores = score.calculate_score(
+        **schemas.GenerationComplete(
+            db_generation
+        ).model_dump()
+    )
+    scores['id'] = generation_id
+    scores['sentence'] = db_generation.sentence
+    return scores

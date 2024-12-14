@@ -212,6 +212,18 @@ class GenerationOut(GenerationComplete):
     class Config:
         orm_mode = True
 
+class GenerationScore(BaseModel):
+    id: int
+    sentence: str
+    grammar_score: float
+    spelling_score: float
+    vividness_score: float
+    convention: float
+    structure_score: int
+    content_score: int
+    total_score: int
+    rank: str
+
 class RoundComplete(BaseModel):
     id: int
     last_generation_id: int

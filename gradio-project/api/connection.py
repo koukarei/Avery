@@ -261,3 +261,12 @@ async def get_generation(generation_id: int, request: Request):
         return None
     output = models.GenerationOut(**response.json())
     return output
+
+async def get_generation_score(generation_id: int, request: Request):
+    response = await http_client.get(
+        f"{BACKEND_URL}generation/{generation_id}/score",
+        auth=get_auth(request),
+    )
+    if response.status_code != 200:
+        return None
+    return response.json()
