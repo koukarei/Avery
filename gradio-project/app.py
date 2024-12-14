@@ -37,7 +37,7 @@ app.add_middleware(SessionMiddleware, secret_key=os.environ.get('SECRET_KEY'))
 templates = Jinja2Templates(directory="templates")
 
 
-@app.route("/login_html", methods=["GET", "POST"])
+@app.route("/login", methods=["GET", "POST"])
 async def login_form(request: Request):
     if request.method == "POST":
 
@@ -66,7 +66,7 @@ def token(request: Request):
 @app.get("/")
 async def redirect_page(request: Request):
     if "token" not in request.session:
-        return RedirectResponse(url="/login_html", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
     else:
         return RedirectResponse(url="/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
     
@@ -127,3 +127,7 @@ async def redirect_to_result(request: Request):
             raise HTTPException(status_code=500, detail="Round not ended")
     
     return RedirectResponse(url="/result", status_code=status.HTTP_303_SEE_OTHER)
+
+@app.exception_handler(Exception)
+async def exception_handler(request: Request, exc: Exception):
+    return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
