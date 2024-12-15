@@ -1191,3 +1191,30 @@ def get_generation_score(
     scores['id'] = generation_id
     scores['sentence'] = db_generation.sentence
     return scores
+
+@app.get("/leaderboards/{leaderboard_id}/playable", tags=["Leaderboard"], response_model=schemas.LeaderboardPlayable)
+def check_leaderboard_playable(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    leaderboard_id: int, 
+    db: Session = Depends(get_db)
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to check leaderboard")
+    
+    if not current_user.is_admin:
+        db_rounds = crud.get_rounds(
+            db=db,
+            leaderboard_id=leaderboard_id,
+            player_id=current_user.id
+        )
+
+        if db_rounds:
+            return schemas.LeaderboardPlayable(
+                id=leaderboard_id,
+                is_playable=False
+            )
+    
+    return schemas.LeaderboardPlayable(
+        id=leaderboard_id,
+        is_playable=True
+    )

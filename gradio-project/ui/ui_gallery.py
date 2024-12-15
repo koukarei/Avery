@@ -6,7 +6,7 @@ import datetime
 from starlette.applications import Starlette
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import RedirectResponse, Response
-from api.connection import read_leaderboard, get_original_images, get_interpreted_image, get_rounds, get_generation
+from api.connection import read_leaderboard, get_original_images, get_interpreted_image, get_rounds, get_generation, check_playable
 from api.connection import models
 
 from app import app as fastapi_app
@@ -91,6 +91,7 @@ with gr.Blocks() as avery_gradio:
         app.state.selected_leaderboard = select_leaderboard
         info = f"## {select_leaderboard.title}"
         rounds = await get_rounds(select_leaderboard.id, request=request)
+        playable = await check_playable(select_leaderboard.id, request=request)
         if rounds:
             generations = [generation for round in rounds for generation in round.generations]
             interpreted_images = []
@@ -106,7 +107,7 @@ with gr.Blocks() as avery_gradio:
         else:
             interpreted_images = None
             generations = None
-        return select_leaderboard, gr.update(interactive=True), info, interpreted_images, generations
+        return select_leaderboard, gr.update(interactive=playable), info, interpreted_images, generations
 
     async def select_interpreted_image(evt: gr.SelectData, generations, select_leaderboard, request: gr.Request):
         selected_interpreted = generations[evt.index]

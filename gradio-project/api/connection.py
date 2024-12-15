@@ -270,3 +270,16 @@ async def get_generation_score(generation_id: int, request: Request):
     if response.status_code != 200:
         return None
     return response.json()
+
+async def check_playable(
+        leaderboard_id: int, 
+        request: Request,
+):
+    response = await http_client.get(
+        f"{BACKEND_URL}leaderboards/{leaderboard_id}/playable",
+        auth=get_auth(request),
+    )
+    
+    if response.status_code != 200:
+        return None
+    return response.json()['is_playable']
