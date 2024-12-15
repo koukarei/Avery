@@ -53,14 +53,21 @@ with gr.Blocks() as avery_gradio:
             for leaderboard in leaderboards
         ], leaderboards
 
-    gr.Markdown(
-    """
-    # AVERYにようこそ！
-    このゲームは、Averyと一緒に画像を解釈するゲームです。
+    with gr.Row():
+        gr.Markdown(
+        """
+        # AVERYにようこそ！
+        このゲームは、Averyと一緒に画像を解釈するゲームです。
 
-    まずは、ギャラリーから画像を選択してください。
-    """
-    )
+        まずは、ギャラリーから画像を選択してください。
+        """
+        )
+
+        gr.Button(
+            "ダッシュボード",
+            scale=0,
+            link="/dashboard",
+        )
 
     leaderboards = gr.State()
     selected_leaderboard = gr.State()

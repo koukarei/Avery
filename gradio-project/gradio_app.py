@@ -46,12 +46,19 @@ with gr.Blocks() as avery_gradio:
         secret_key=os.getenv("SECRET_KEY"),
     )
 
+    with gr.Row():
+        gr.Markdown(
+        """
+        # ダッシュボード
+        """
+        )
 
-    gr.Markdown(
-    """
-    # ダッシュボード
-    """
-    )
+        gr.Button(
+            "リーダーボード",
+            scale=0,
+            link="/leaderboards",
+        )
+
 
     with gr.Column(show_progress=True,elem_classes='whole'):
         gr.Textbox(
