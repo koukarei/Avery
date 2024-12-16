@@ -11,13 +11,17 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True)
+    lti = Column(Boolean, default=False)
+    lti_user_id = Column(Integer, nullable=True)
+    lti_username = Column(String(100), nullable=True)
+    school = Column(String(100), nullable=True)
     email = Column(String(255), unique=True, index=True)
     username = Column(String(100), unique=True, index=True)
-    hashed_password = Column(String(255))
+    hashed_password = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
     profile_id = Column(Integer, ForeignKey("user_profiles.id"))
-    user_type = Column(String(25))
+    user_type = Column(String(25), default='student')
 
     profiles = relationship("UserProfile", back_populates="user")
 

@@ -62,6 +62,16 @@ async def create_user(newuser: models.UserCreate):
     )
     return response
 
+async def create_user_lti(newuser: models.UserCreateLti):
+    url = f"{BACKEND_URL}users/lti"
+
+    response = await http_client.post(
+        url, 
+        json=newuser.model_dump(),
+        headers={"Content-Type": "application/json"}
+    )
+    return response
+
 async def get_access_token_from_backend(
         form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ):
@@ -81,6 +91,25 @@ async def get_access_token_from_backend(
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code)
     
+async def get_access_token_from_backend_lti(
+        form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+):
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{BACKEND_URL}token", 
+                data={
+                "user_id": form_data.user_id,
+                "school": form_data.school,
+                }, 
+                follow_redirects=True
+            )
+            response.raise_for_status()
+            token = models.Token(**response.json())  
+            return token
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=e.response.status_code)
+
 def get_auth(request: Request):
     bearer = BearerAuth(
         access_token=request.session["token"]["access_token"],

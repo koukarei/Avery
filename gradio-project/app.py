@@ -3,6 +3,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from lti import validate_lti_request
 
 import os
 import json
@@ -58,6 +59,70 @@ async def login_form(request: Request):
         return RedirectResponse(url='/', status_code=status.HTTP_303_SEE_OTHER)
         
     return templates.TemplateResponse("login_form.html", {"request": request})
+
+@app.post('/lti/login')
+async def lti_login(request: Request):
+    valid = await validate_lti_request(request)
+    if not valid:
+        return {'error': 'Invalid LTI request'} 
+
+    # Extracting additional fields from the form data
+    form_data = await request.form()
+
+    user_id = form_data.get('user_id')
+    oauth_consumer_key = form_data.get('oauth_consumer_key')
+
+    if user_id:
+        school = "School not provided"
+        if oauth_consumer_key == "saikyo_consumer_key":
+            school = "saikyo"
+        elif oauth_consumer_key == "hikone_consumer_key":
+            school = "hikone"
+        elif oauth_consumer_key == "lms_consumer_key":
+            school = "lms"
+
+        user_login = models.UserLoginLti(
+            user_id=form_data.get('user_id'),
+            username=form_data.get('ext_user_username'),
+            display_name=form_data.get('lis_person_name_full', 'Unknown User'),
+            roles=form_data.get('roles', ''),
+            email=form_data.get('lis_person_contact_email_primary', ''),
+            school=school,
+        )
+
+        response = await get_access_token_from_backend_lti(form_data=user_login)
+        
+        if response.status_code ==401:
+            # Create user
+            response = await create_user_lti(form_data=user_login)
+
+        response = await get_access_token_from_backend_lti(form_data=user_login)
+
+        if response.status_code != 200:
+            raise HTTPException(status_code=500, detail="Failed to login")
+        
+        token = models.Token(**json.loads(response.json()))
+
+        request.session["token"] = token.model_dump()
+        request.session["username"] = form_data["username"]
+
+    raise HTTPException(status_code=500, detail="Failed to login")
+
+@app.route('/logout')
+async def logout(request: Request):
+
+    school = request.session.pop('school', None)
+
+    token = request.session.pop('token', None)
+
+    username = request.session.pop('username', None)
+
+    if school == "saikyo":
+        return RedirectResponse(url='https://sk.let.media.kyoto-u.ac.jp')
+    elif school == "hikone":
+        return RedirectResponse(url='https://leaf02.uchida.co.jp/moodle/')
+    else:
+        return RedirectResponse(url='/login')
 
 @app.post("/token")
 def token(request: Request):

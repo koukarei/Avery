@@ -6,6 +6,35 @@ from typing import Union, List, Annotated, Optional
 from fastapi import HTTPException
 from datetime import timezone
 
+import logging, time
+
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
+logger = logging.getLogger(__name__)
+
+class computing_time_tracker:
+    def __init__(self, message=None):
+        self.filehandler = logging.FileHandler("logs/computing_time.log", mode="a", encoding=None, delay=False)
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.setLevel(logging.INFO)
+        self.logger.addHandler(self.filehandler)
+        self.filehandler.setFormatter(formatter)
+        self.message = message
+        self.start_time = time.time()
+
+    def stop_timer(self):
+        duration = time.time() - self.start_time
+        if self.message:
+            message = f"{self.message} - Duration: {duration} - Start time: {self.start_time}"
+        else:
+            message = f"Duration: {duration} - Start time: {self.start_time}"
+        self.logger.info(message)
+
 def generateDescription(db: Session, leaderboard_id: int, image: str, story: Optional[str], model_name: str="gpt-4o-mini"):
     
     contents = sentence.genSentences(
@@ -208,7 +237,6 @@ def update_n_words(
         is_completed=False
        )
    )
-
    return
 
 def update_grammar_spelling(

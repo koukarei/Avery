@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone,date
-from typing import Annotated, Union,Literal
+from typing import Annotated, Union,Literal, Optional
 
 from fastapi import Depends,HTTPException, status, Header,Cookie
 from fastapi.security import OAuth2PasswordBearer
@@ -27,12 +27,26 @@ def verify_password(plain_password, hashed_password):
 def get_password_hash(password):
     return pwd_context.hash(password)
 
-def authenticate_user(db, username: str, password: str):
+def authenticate_user(
+        db, 
+        username: str, 
+        password: str
+):
     user = crud.get_user_by_username(db, username)
     if not user:
         raise HTTPException(status_code=400, detail="The user does not exist.")
     if not verify_password(password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect password")
+    return user
+
+def authenticate_user_2(
+        db,
+        lti_user_id: int,
+        school: str
+):
+    user = crud.get_user_by_lti(db, lti_user_id, school)
+    if not user:
+        raise HTTPException(status_code=400, detail="The user does not exist.")
     return user
 
 def create_access_token(data: dict, expires_delta: Union[timedelta, None] = None):

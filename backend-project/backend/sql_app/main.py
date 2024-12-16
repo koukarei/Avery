@@ -10,7 +10,7 @@ from . import crud, models, schemas
 from .database import SessionLocal, engine
 
 from .dependencies import sentence, gen_image, score, dictionary, openai_chatbot
-from .authentication import authenticate_user, create_access_token, oauth2_scheme, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, REFRESH_TOKEN_EXPIRE_MINUTES, JWTError, jwt
+from .authentication import authenticate_user, authenticate_user_2, create_access_token, oauth2_scheme, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, REFRESH_TOKEN_EXPIRE_MINUTES, JWTError, jwt
 import tracemalloc
 tracemalloc.start()
 
@@ -152,7 +152,17 @@ async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Session = Depends(get_db),
 ):
-    user = authenticate_user(db, form_data.username, form_data.password)
+    if not hasattr(form_data,'school'):
+        user = authenticate_user(db, form_data.username, form_data.password)
+        if user.lti:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Please use Moodle login",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    else:
+        user = authenticate_user_2(db, form_data.user_id, form_data.school)
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -221,6 +231,13 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         user.is_admin=True
     user.is_admin=False
     return crud.create_user(db=db, user=user)
+
+@app.post("/users/lti/", tags=["User"], response_model=schemas.User)
+def create_user_lti(user: schemas.UserCreateLti, db: Session = Depends(get_db)):
+    db_user = crud.get_user_by_lti(db, user_id=user.user_id, school=user.school)
+    if db_user:
+        raise HTTPException(status_code=400, detail="This account already exists")
+    return crud.create_user_lti(db=db, user=user)
 
 @app.delete("/users/{user_id}", tags=["User"], response_model=schemas.UserBase)
 def delete_user(current_user: Annotated[schemas.User, Depends(get_current_user)], user_id: int, db: Session = Depends(get_db), ):

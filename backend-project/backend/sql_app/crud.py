@@ -17,6 +17,9 @@ def get_user_by_email(db: Session, email: str):
 def get_user_by_username(db: Session, username: str):
     return db.query(models.User).filter(models.User.username == username).first()
 
+def get_user_by_lti(db: Session, lti_user_id: int, school: str):
+    return db.query(models.User).filter(models.User.lti_user_id == lti_user_id).filter(models.User.school == school).first()
+
 def get_users(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.User).offset(skip).limit(limit).all()
 
@@ -42,6 +45,52 @@ def create_user(db: Session, user: schemas.UserCreate):
         is_active=True,
         profile_id=db_userprofile.id,
         is_admin=user.is_admin
+    )
+
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+
+    return db_user
+
+def create_user_lti(db: Session, user: schemas.UserCreateLti):
+    random_password = str(datetime.datetime.now())
+    hashed_password = get_password_hash(random_password)
+    db_userprofile = models.UserProfile(
+        display_name=user.display_name,
+        bio="",
+        avatar="",
+        level=1,
+        xp=0
+    )
+
+    db.add(db_userprofile)
+    db.commit()
+    db.refresh(db_userprofile)
+
+    internal_username = f"{user.username}_{user.school}"
+    check_username = True
+    counter = 0
+    while check_username:
+        db_user = db.query(models.User).filter(models.User.username == internal_username).first()
+        if db_user:
+            counter += 1
+            internal_username = f"{user.username}_{user.school}{counter}"
+        else:
+            check_username = False
+
+    db_user = models.User(
+        lti=True,
+        lti_user_id=user.user_id,
+        lti_username=user.username,
+        school=user.school,
+        email=user.email,
+        username=internal_username, 
+        hashed_password=hashed_password,
+        is_active=True,
+        profile_id=db_userprofile.id,
+        is_admin=False,
+        user_type=user.roles
     )
 
     db.add(db_user)

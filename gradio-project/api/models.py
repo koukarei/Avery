@@ -11,11 +11,27 @@ class UserLogin(BaseModel):
     username: str
     password: str
 
+class UserLoginLti(BaseModel):
+    oauth_consumer_key: str
+    display_name: str
+    username: str
+
+    email: str
+
 class UserCreate(BaseModel):
     username: str
     password: str
     email: str
     display_name: str
+
+class UserCreateLti(BaseModel):
+    user_id: int
+    username: str
+    display_name: str
+    roles: str
+    email: str
+    school: str
+
 
 class Image(BaseModel):
     id: int
