@@ -92,16 +92,13 @@ async def get_access_token_from_backend(
         raise HTTPException(status_code=e.response.status_code)
     
 async def get_access_token_from_backend_lti(
-        form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+        user: models.UserCreateLti,
 ):
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"{BACKEND_URL}token", 
-                data={
-                "user_id": form_data.user_id,
-                "school": form_data.school,
-                }, 
+                f"{BACKEND_URL}lti/token", 
+                data=user.model_dump(), 
                 follow_redirects=True
             )
             response.raise_for_status()
@@ -158,9 +155,14 @@ async def create_round(new_round: models.RoundStart, request: Request, ):
     output = models.RoundStartOut(**response.json())
     return output
     
-async def read_unfinished_rounds(request: Request):
+async def read_my_rounds(request: Request, is_completed: bool = False, leaderboard_id: int = None):
+    if leaderboard_id is None:
+        url = f"{BACKEND_URL}my_rounds/?is_completed={is_completed}"
+    else:
+        url = f"{BACKEND_URL}my_rounds/?is_completed={is_completed}&leaderboard_id={leaderboard_id}"
+
     response = await http_client.get(
-        f"{BACKEND_URL}unfinished_rounds/",
+        url,
         auth=get_auth(request),
     )
     if response.status_code != 200:
@@ -267,7 +269,7 @@ async def get_image_similarity(generation_id: int, request: Request, ):
     )
     if response.status_code != 200:
         return None
-    print(response.json())
+    
     return response.json()
 
 async def get_rounds(leaderboard_id: int, request: Request):

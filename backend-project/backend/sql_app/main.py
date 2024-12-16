@@ -152,23 +152,52 @@ async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Session = Depends(get_db),
 ):
-    if not hasattr(form_data,'school'):
-        user = authenticate_user(db, form_data.username, form_data.password)
-        if user.lti:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Please use Moodle login",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-    else:
-        user = authenticate_user_2(db, form_data.user_id, form_data.school)
-
+    user = authenticate_user(db, form_data.username, form_data.password)
+    
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    if user.lti:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Please use Moodle login",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    
+    refresh_token = create_refresh_token(user.username)
+    
+    return schemas.Token(access_token=access_token,refresh_token=refresh_token, token_type="bearer")
+
+
+@app.post("/lti/token",response_model=schemas.Token)
+async def login_for_access_token(
+    user: schemas.UserCreateLti,
+    db: Session = Depends(get_db),
+):
+    user = authenticate_user_2(db, user_id=user.user_id, school=user.school)
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No such user found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if not user.lti:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No LTI account found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires
@@ -496,9 +525,11 @@ def get_rounds_by_leaderboard(
         leaderboard_id=leaderboard_id,
     )
 
-@app.get("/unfinished_rounds/", tags=["Round"], response_model=list[schemas.RoundOut])
-def get_unfinished_rounds(
+@app.get("/my_rounds/", tags=["Round"], response_model=list[schemas.RoundOut])
+def get_my_rounds(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
+    leaderboard_id: Optional[int] = None,
+    is_completed: Optional[bool] = True,
     db: Session = Depends(get_db),
 ):
     if not current_user:
@@ -506,8 +537,9 @@ def get_unfinished_rounds(
     player_id = current_user.id
     return crud.get_rounds(
         db=db,
-        is_completed=False,
-        player_id=player_id
+        is_completed=is_completed,
+        player_id=player_id,
+        leaderboard_id=leaderboard_id,
     )
 
 @app.post("/round/", tags=["Round"], response_model=schemas.Round)

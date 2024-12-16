@@ -215,7 +215,7 @@ class GenerationComplete(BaseModel):
 class GenerationOut(GenerationComplete):
     sentence: Optional[str] = None
     correct_sentence: Optional[str] = None
-    interpreted_image: InterpretedImage
+    interpreted_image: Optional[InterpretedImage]=None
 
     class Config:
         orm_mode = True

@@ -11,13 +11,6 @@ class UserLogin(BaseModel):
     username: str
     password: str
 
-class UserLoginLti(BaseModel):
-    oauth_consumer_key: str
-    display_name: str
-    username: str
-
-    email: str
-
 class UserCreate(BaseModel):
     username: str
     password: str

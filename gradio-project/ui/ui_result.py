@@ -67,7 +67,7 @@ with gr.Blocks() as avery_gradio:
         original_img = await get_original_images(int(app.state.selected_leaderboard.id), request)
         ai_img = await get_interpreted_image(int(app.state.generation.id), request)
         similarity = await get_image_similarity(int(app.state.generation.id), request)
-        print(similarity)
+        
         if similarity:
             similarity = float(similarity["blip2_score"])*100
         similarity_md = "# 類似度: {:^10.2f} ".format(similarity)

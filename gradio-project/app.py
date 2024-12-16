@@ -81,11 +81,16 @@ async def lti_login(request: Request):
         elif oauth_consumer_key == "lms_consumer_key":
             school = "lms"
 
+        if "instructor" in form_data.get('roles', ''):
+            role = "instructor"
+        else:
+            role = "student"
+
         user_login = models.UserLoginLti(
             user_id=form_data.get('user_id'),
             username=form_data.get('ext_user_username'),
             display_name=form_data.get('lis_person_name_full', 'Unknown User'),
-            roles=form_data.get('roles', ''),
+            roles=role,
             email=form_data.get('lis_person_contact_email_primary', ''),
             school=school,
         )
@@ -103,6 +108,7 @@ async def lti_login(request: Request):
         
         token = models.Token(**json.loads(response.json()))
 
+        request.session["school"] = school
         request.session["token"] = token.model_dump()
         request.session["username"] = form_data["username"]
 
@@ -132,13 +138,67 @@ def token(request: Request):
 async def redirect_page(request: Request):
     if "token" not in request.session:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
-    else:
-        return RedirectResponse(url="/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url="/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
     
 @app.get("/retry")
 async def retry(request: Request):
     request.app.state.generation=None
     return RedirectResponse(url="/answer", status_code=status.HTTP_303_SEE_OTHER)    
+
+@app.get("/resume_game")
+async def resume_game(request: Request):
+    leaderboard_id = request.app.state.selected_leaderboard.id
+    res = await read_my_rounds(
+        request=request,
+        is_completed=False,
+        leaderboard_id=leaderboard_id,
+    )
+
+    if not res:
+        return RedirectResponse(url="/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
+    last_round = res[0]
+    request.app.state.round = last_round
+
+    if not last_round.last_generation_id:
+        request.app.state.generated_time = 0
+        return RedirectResponse(url="/answer", status_code=status.HTTP_303_SEE_OTHER)
+
+    last_gen = await get_generation(
+        generation_id=last_round.last_generation_id,
+        request=request,
+    )
+    if last_gen:
+        request.app.state.generation=last_gen
+        if last_gen.is_completed:
+            request.app.state.generated_time = len(last_round.generations)
+            if request.app.state.generated_time > 2:
+                output = await end_round(
+                    round_id=last_round.id,
+                    request=request,
+                )
+                if not output:
+                    raise HTTPException(status_code=500, detail="Failed to end round")
+            return RedirectResponse(url="/result", status_code=status.HTTP_303_SEE_OTHER)
+        if last_gen.correct_sentence:
+            if last_gen.interpreted_image:
+                return RedirectResponse(url="/go_to_result", status_code=status.HTTP_303_SEE_OTHER)
+            
+            output = await get_interpretation(
+                round_id=last_round.id,
+                interpretation=models.GenerationCorrectSentence(
+                    id=last_gen.id,
+                    correct_sentence=last_gen.correct_sentence,
+                ),
+                request=request,
+            )
+
+            if not output:
+                raise HTTPException(status_code=500, detail="Failed to get interpretation")
+            return RedirectResponse(url="/go_to_result", status_code=status.HTTP_303_SEE_OTHER)
+        request.app.state.generation=last_gen
+        request.app.state.generated_time = len(last_round.generations-1)
+    return RedirectResponse(url="/answer", status_code=status.HTTP_303_SEE_OTHER)
+
 
 @app.get("/new_game")
 async def new_game(request: Request):

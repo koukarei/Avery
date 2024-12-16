@@ -203,13 +203,13 @@ def get_round(db: Session, round_id: int):
 
 def get_rounds(db: Session, skip: int = 0, limit: int = 100, player_id: int = None,is_completed: bool = True, leaderboard_id: int = None):
     if leaderboard_id and player_id:
-        return db.query(models.Round).filter(models.Round.is_completed == is_completed).filter(models.Round.leaderboard_id == leaderboard_id).filter(models.Round.player_id==player_id).offset(skip).limit(limit).all()
+        return db.query(models.Round).filter(models.Round.is_completed == is_completed).filter(models.Round.leaderboard_id == leaderboard_id).filter(models.Round.player_id==player_id).order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
     elif leaderboard_id:
-        return db.query(models.Round).filter(models.Round.is_completed == is_completed).filter(models.Round.leaderboard_id == leaderboard_id).offset(skip).limit(limit).all()
+        return db.query(models.Round).filter(models.Round.is_completed == is_completed).filter(models.Round.leaderboard_id == leaderboard_id).order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
     elif player_id:
-        return db.query(models.Round).filter(models.Round.is_completed == is_completed).filter(models.Round.player_id==player_id).offset(skip).limit(limit).all()
+        return db.query(models.Round).filter(models.Round.is_completed == is_completed).filter(models.Round.player_id==player_id).order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
     else:
-        return db.query(models.Round).filter(models.Round.is_completed == is_completed).offset(skip).limit(limit).all()
+        return db.query(models.Round).filter(models.Round.is_completed == is_completed).order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
 
 def create_round(db: Session, leaderboard_id:int, user_id: int, created_at: datetime.datetime, model_name: str="gpt-4o-mini"):
     db_chat=models.Chat()

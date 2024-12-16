@@ -1,12 +1,13 @@
 import gradio as gr
 import os
+from typing import Optional
 import requests
 import datetime
 
 from starlette.applications import Starlette
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import RedirectResponse, Response
-from api.connection import read_leaderboard, get_original_images, get_interpreted_image, get_rounds, get_generation, check_playable
+from api.connection import read_leaderboard, get_original_images, get_interpreted_image, get_rounds, get_generation, check_playable, read_my_rounds
 from api.connection import models
 
 from app import app as fastapi_app
@@ -32,7 +33,7 @@ class Gallery:
                     self.info = gr.Markdown(None)
                     self.generated_img = gr.Gallery(None, label="record")
             with gr.Row():
-                self.submit_btn = gr.Button("送信", scale=0, interactive=False, link="/go_to_answer")
+                self.submit_btn = gr.Button("始める", scale=0, interactive=False, link="/go_to_answer")
 
     def upload_picture(self, image):
         return image[0][0]
@@ -45,6 +46,8 @@ class Gallery:
 with gr.Blocks() as avery_gradio:
     
     gallery=Gallery()
+
+    unfinished = gr.State()
     
     async def initialize_game(request: gr.Request):
         leaderboards = await read_leaderboard(request)
@@ -52,6 +55,15 @@ with gr.Blocks() as avery_gradio:
             await get_original_images(leaderboard.id, request) 
             for leaderboard in leaderboards
         ], leaderboards
+    
+    async def get_unfinished_rounds_from_backend(request: gr.Request, leaderboard_id: int):
+        rounds = await read_my_rounds(
+            request=request,
+            is_completed=False,
+            leaderboard_id=leaderboard_id,
+        )
+        
+        return rounds
 
     with gr.Row():
         gr.Markdown(
@@ -79,6 +91,7 @@ with gr.Blocks() as avery_gradio:
         avery_gradio.load(initialize_game, inputs=[], outputs=[gallery.gallery,leaderboards])
     except Exception as e:
         RedirectResponse(url="/")
+
     avery_gradio.queue(max_size=128, default_concurrency_limit=50)
 
     app = gr.mount_gradio_app(
@@ -98,7 +111,6 @@ with gr.Blocks() as avery_gradio:
         app.state.selected_leaderboard = select_leaderboard
         info = f"## {select_leaderboard.title}"
         rounds = await get_rounds(select_leaderboard.id, request=request)
-        playable = await check_playable(select_leaderboard.id, request=request)
         if rounds:
             generations = [generation for round in rounds for generation in round.generations]
             interpreted_images = []
@@ -114,7 +126,17 @@ with gr.Blocks() as avery_gradio:
         else:
             interpreted_images = None
             generations = None
-        return select_leaderboard, gr.update(interactive=playable), info, interpreted_images, generations
+        
+        # Check if the player played the game before
+        playable = await check_playable(select_leaderboard.id, request=request)
+        start_btn = gr.update(value="始める",interactive=playable, link="/go_to_answer")
+        unfinished_rounds = None
+        if not playable:
+            unfinished_rounds = await get_unfinished_rounds_from_backend(request, select_leaderboard.id)
+            if unfinished_rounds:
+                start_btn = gr.update(value="再開", link="/resume_game",interactive=True)
+            
+        return select_leaderboard, start_btn, info, interpreted_images, generations, unfinished_rounds
 
     async def select_interpreted_image(evt: gr.SelectData, generations, select_leaderboard, request: gr.Request):
         selected_interpreted = generations[evt.index]
@@ -137,7 +159,7 @@ with gr.Blocks() as avery_gradio:
         triggers=[gallery.gallery.select],
         fn=select_leaderboard,
         inputs=[leaderboards],
-        outputs=[selected_leaderboard, gallery.submit_btn, gallery.info, gallery.generated_img, related_generations],
+        outputs=[selected_leaderboard, gallery.submit_btn, gallery.info, gallery.generated_img, related_generations, unfinished],
     )
 
     # Set the selected interpreted image
