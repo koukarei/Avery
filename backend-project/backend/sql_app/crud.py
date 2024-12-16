@@ -68,16 +68,7 @@ def create_user_lti(db: Session, user: schemas.UserCreateLti):
     db.commit()
     db.refresh(db_userprofile)
 
-    internal_username = f"{user.username}_{user.school}"
-    check_username = True
-    counter = 0
-    while check_username:
-        db_user = db.query(models.User).filter(models.User.username == internal_username).first()
-        if db_user:
-            counter += 1
-            internal_username = f"{user.username}_{user.school}{counter}"
-        else:
-            check_username = False
+    internal_username = f"{user.user_id}_{user.school}"
 
     db_user = models.User(
         lti=True,
