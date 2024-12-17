@@ -13,7 +13,9 @@ import datetime
 from api import models
 from api.connection import *
 
-app = FastAPI()
+app = FastAPI(
+    root_path="/avery",
+)
 
 @app.on_event("shutdown")
 async def shutdown_client():
