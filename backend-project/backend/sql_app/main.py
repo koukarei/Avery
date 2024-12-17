@@ -259,6 +259,7 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     user.is_admin=False
     if user.username=="admin":
         user.is_admin=True
+        user.user_type="instructor"
     return crud.create_user(db=db, user=user)
 
 @app.post("/users/lti/", tags=["User"], response_model=schemas.User)

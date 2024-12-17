@@ -60,6 +60,7 @@ class UserBase(BaseModel):
     username: str
     email: str
     is_admin: Optional[bool] = False
+    user_type: Optional[str] = "student"
 
 class UserCreate(UserBase):
     password: str
