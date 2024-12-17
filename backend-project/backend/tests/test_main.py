@@ -214,67 +214,6 @@ class TestAdmin:
         response = client.get("/sqlapp/leaderboards/", headers={"Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 200, response.json()
         assert len(response.json()) == num_leaderboards + 1
-    
-    def test_chat(self):
-        # Get leaderboard id
-        response = client.get("/sqlapp/leaderboards/", headers={"Authorization": f"Bearer {self.access_token}"})
-        if not response.json():
-            return
-        leaderboard = response.json()[0]
-        leaderboard_id = leaderboard['id']
-
-        # Get round id
-        response = client.get(
-            f"/sqlapp/leaderboards/{leaderboard_id}/rounds/",
-            headers={"Authorization": f"Bearer {self.access_token}"}
-        )
-        if not response.json():
-            return
-        thisround = response.json()[0]
-
-        # Get chat
-        response = client.get(
-            f"/sqlapp/chat/{thisround['id']}",
-            headers={"Authorization": f"Bearer {self.access_token}"}
-        )
-        assert response.status_code == 200, response.json()
-        print(f"chat: {response.json()}")
-
-    def test_image(self):
-
-        # Get leaderboard id
-        response = client.get(
-            "/sqlapp/leaderboards/",
-            headers={"Authorization": f"Bearer {self.access_token}"}
-        )
-        if not response.json():
-            assert False
-        leaderboard = response.json()[0]
-        leaderboard_id = leaderboard['id']
-
-        # Get original image
-        response = client.get(
-            f"/sqlapp/original_image/{leaderboard_id}",
-            headers={"Authorization": f"Bearer {self.access_token}"}
-        )
-        assert response.status_code == 200, response.json()
-
-        # Get round id
-        response = client.get(
-            f"/sqlapp/leaderboards/{leaderboard_id}/rounds/",
-            headers={"Authorization": f"Bearer {self.access_token}"}
-        )
-        assert response.status_code == 200, response.json()
-        print(f"rounds: {response.json()}")
-        
-        generation_id = response.json()[0]['last_generation_id']
-
-        # Get generated image
-        response = client.get(
-            f"/sqlapp/interpreted_image/{generation_id}",
-            headers={"Authorization": f"Bearer {self.access_token}"}
-        )
-        assert response.status_code == 200, response.json()
 
 @pytest.mark.usefixtures("login")
 class TestUser:
@@ -397,6 +336,67 @@ class TestUser:
         response = client.get(f"/sqlapp/leaderboards/{leaderboard_id}/rounds/", headers={"Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 200, response.json()
         assert len(response.json()) == num_rounds + 1
+    
+    def test_chat(self):
+        # Get leaderboard id
+        response = client.get("/sqlapp/leaderboards/", headers={"Authorization": f"Bearer {self.access_token}"})
+        if not response.json():
+            return
+        leaderboard = response.json()[0]
+        leaderboard_id = leaderboard['id']
+
+        # Get round id
+        response = client.get(
+            f"/sqlapp/leaderboards/{leaderboard_id}/rounds/",
+            headers={"Authorization": f"Bearer {self.access_token}"}
+        )
+        if not response.json():
+            return
+        thisround = response.json()[0]
+
+        # Get chat
+        response = client.get(
+            f"/sqlapp/chat/{thisround['id']}",
+            headers={"Authorization": f"Bearer {self.access_token}"}
+        )
+        assert response.status_code == 200, response.json()
+        print(f"chat: {response.json()}")
+
+    def test_image(self):
+
+        # Get leaderboard id
+        response = client.get(
+            "/sqlapp/leaderboards/",
+            headers={"Authorization": f"Bearer {self.access_token}"}
+        )
+        if not response.json():
+            assert False
+        leaderboard = response.json()[0]
+        leaderboard_id = leaderboard['id']
+
+        # Get original image
+        response = client.get(
+            f"/sqlapp/original_image/{leaderboard_id}",
+            headers={"Authorization": f"Bearer {self.access_token}"}
+        )
+        assert response.status_code == 200, response.json()
+
+        # Get round id
+        response = client.get(
+            f"/sqlapp/leaderboards/{leaderboard_id}/rounds/",
+            headers={"Authorization": f"Bearer {self.access_token}"}
+        )
+        assert response.status_code == 200, response.json()
+        print(f"rounds: {response.json()}")
+        
+        generation_id = response.json()[0]['last_generation_id']
+
+        # Get generated image
+        response = client.get(
+            f"/sqlapp/interpreted_image/{generation_id}",
+            headers={"Authorization": f"Bearer {self.access_token}"}
+        )
+        assert response.status_code == 200, response.json()
 
 def test_content_score():
     test_image_filename="cut_ham_for_test.jpg"
