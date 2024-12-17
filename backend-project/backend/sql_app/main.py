@@ -256,9 +256,9 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = crud.get_user_by_username(db, username=user.username)
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
+    user.is_admin=False
     if user.username=="admin":
         user.is_admin=True
-    user.is_admin=False
     return crud.create_user(db=db, user=user)
 
 @app.post("/users/lti/", tags=["User"], response_model=schemas.User)
@@ -707,14 +707,14 @@ async def get_interpretation(
             #     nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = model_load()
 
             # Update scores in background
-            background_tasks.add_task(
-                update_perplexity,
-                db=db,
-                en_nlp=nlp_models['en_nlp'],
-                perplexity_model=nlp_models['perplexity_model'],
-                tokenizer=nlp_models['tokenizer'],
-                generation=generation_complete
-            )
+            # background_tasks.add_task(
+            #     update_perplexity,
+            #     db=db,
+            #     en_nlp=nlp_models['en_nlp'],
+            #     perplexity_model=nlp_models['perplexity_model'],
+            #     tokenizer=nlp_models['tokenizer'],
+            #     generation=generation_complete
+            # )
             
             background_tasks.add_task(
                 update_content_score,
@@ -722,12 +722,12 @@ async def get_interpretation(
                 generation=generation_complete
             )
 
-            background_tasks.add_task(
-                update_frequency_word,
-                db=db,
-                en_nlp=nlp_models['en_nlp'],
-                generation=generation_complete
-            )
+            # background_tasks.add_task(
+            #     update_frequency_word,
+            #     db=db,
+            #     en_nlp=nlp_models['en_nlp'],
+            #     generation=generation_complete
+            # )
 
             background_tasks.add_task(
                 update_n_words,
