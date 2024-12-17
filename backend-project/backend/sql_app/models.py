@@ -133,8 +133,8 @@ class Generation(Base):
 
     id = Column(Integer, primary_key=True)
 
-    sentence = Column(String(200), index=True,nullable=True)
-    correct_sentence = Column(String(200), index=True,nullable=True)
+    sentence = Column(MEDIUMTEXT, index=True,nullable=True)
+    correct_sentence = Column(MEDIUMTEXT, index=True,nullable=True)
 
     n_words = Column(Integer, default=0,nullable=True)
     n_conjunctions = Column(Integer, default=0,nullable=True)
