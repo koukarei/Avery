@@ -1,5 +1,5 @@
 import os
-import httpx
+import httpx, threading
 import gradio as gr
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import FastAPI, Request, Depends, status, HTTPException
@@ -20,24 +20,26 @@ class BearerAuth(httpx.Auth):
         self.access_token = access_token
         self.refresh_token = refresh_token
         self.refresh_url = refresh_url
+        self._sync_lock = threading.RLock()
 
     def auth_flow(self, request):
         request.headers["Authorization"] = f"Bearer {self.access_token}"
         response = yield request
         if response.status_code == 401:
-
-            refresh_response = yield self.build_refresh_request()
+            
+            refresh_response = self.build_refresh_request()
             self.update_tokens(refresh_response)
 
             request.headers["Authorization"] = f"Bearer {self.access_token}"
             yield request
 
     def build_refresh_request(self):
-        response = http_client.post(
-            self.refresh_url,
-            data={"refresh_token": self.refresh_token}
-        )
-        return response
+        with self._sync_lock:
+            response = http_client.post(
+                self.refresh_url,
+                data={"refresh_token": self.refresh_token}
+            )
+            return response
     
     def update_tokens(self, response):
         data = response.json()

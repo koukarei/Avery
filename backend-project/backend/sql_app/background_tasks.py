@@ -78,10 +78,10 @@ def check_factors_done(
     if db_generation.total_score==0:
         if (not db_generation.n_words) or (not db_generation.n_clauses):
             update_n_words(db=db, en_nlp=en_nlp, generation=generation)
-        if (not db_generation.f_word) or (not db_generation.f_bigram):
-            update_frequency_word(db=db, en_nlp=en_nlp, generation=generation)
-        if not db_generation.perplexity:
-            update_perplexity(db=db, en_nlp=en_nlp, perplexity_model=perplexity_model, tokenizer=tokenizer, generation=generation)
+        # if (not db_generation.f_word) or (not db_generation.f_bigram):
+        #     update_frequency_word(db=db, en_nlp=en_nlp, generation=generation)
+        # if not db_generation.perplexity:
+        #     update_perplexity(db=db, en_nlp=en_nlp, perplexity_model=perplexity_model, tokenizer=tokenizer, generation=generation)
         if not db_generation.content_score:
             update_content_score(db=db, generation=generation)
         
