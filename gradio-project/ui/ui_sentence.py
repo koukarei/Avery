@@ -125,7 +125,8 @@ with gr.Blocks() as avery_gradio:
             gr.Examples(
                 examples=[
                     ["この部屋の英語は何？"],
-                    ["このネズミの色は何？"],
+                    ["この生物の色は何？"],
+                    ["関連動詞を提示してください"],
                     ["The mouse is cutting a ham with a fork and knife."],
                 ],
                 inputs=[guidance.msg]

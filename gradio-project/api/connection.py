@@ -3,7 +3,7 @@ import httpx
 import gradio as gr
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import FastAPI, Request, Depends, status, HTTPException
-from typing import Annotated
+from typing import Annotated, Optional
 from PIL import Image as PILImage
 import io
 
@@ -314,3 +314,35 @@ async def check_playable(
     if response.status_code != 200:
         return None
     return response.json()['is_playable']
+
+async def get_users(request: Request):
+    response = await http_client.get(
+        f"{BACKEND_URL}users",
+        auth=get_auth(request),
+    )
+    if response.status_code != 200:
+        return None
+    output = [models.User(**user) for user in response.json()]
+    return output
+
+async def get_generations(
+    request: Request,
+    leaderboard_id: Optional[int] = None, 
+    player_id: Optional[int] = None, 
+):
+    if leaderboard_id and player_id:
+        url = f"{BACKEND_URL}generations/?leaderboard_id={leaderboard_id}&player_id={player_id}"
+    elif leaderboard_id:
+        url = f"{BACKEND_URL}generations/?leaderboard_id={leaderboard_id}"
+    elif player_id:
+        url = f"{BACKEND_URL}generations/?player_id={player_id}"
+    else:
+        url = f"{BACKEND_URL}generations"
+    response = await http_client.get(
+        url,
+        auth=get_auth(request),
+    )
+    if response.status_code != 200:
+        return None
+    output = [models.GenerationRound(**generation) for generation in response.json()]
+    return output

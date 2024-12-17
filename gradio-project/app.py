@@ -52,6 +52,7 @@ async def login_form(request: Request):
 
         request.session["token"] = token.model_dump()
         request.session["username"] = form_data["username"]
+        request.session["roles"] = "instructor" if form_data["username"] == "admin" else "student"
 
         # app.state.token = token.model_dump()
         # app.state.username = form_data["username"]
@@ -111,6 +112,7 @@ async def lti_login(request: Request):
         request.session["school"] = school
         request.session["token"] = token.model_dump()
         request.session["username"] = form_data["username"]
+        request.session["roles"] = role
 
     raise HTTPException(status_code=500, detail="Failed to login")
 
@@ -122,6 +124,8 @@ async def logout(request: Request):
     token = request.session.pop('token', None)
 
     username = request.session.pop('username', None)
+
+    role = request.session.pop('roles', None)
 
     if school == "saikyo":
         return RedirectResponse(url='https://sk.let.media.kyoto-u.ac.jp')

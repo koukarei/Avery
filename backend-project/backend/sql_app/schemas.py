@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, field_validator
 
 import datetime
-from typing import Optional
+from typing import Optional, List, Tuple
 
 class ImageBase(BaseModel):
     image_path: str
@@ -60,6 +60,7 @@ class UserBase(BaseModel):
     username: str
     email: str
     is_admin: Optional[bool] = False
+    user_type: Optional[str] = "student"
 
 class UserCreate(UserBase):
     password: str
@@ -244,6 +245,12 @@ class RoundOut(BaseModel):
     last_generation_id: Optional[int]=None
     chat_history: int
     generations: list[IdOnly]=[]
+
+    class Config:
+        orm_mode = True
+
+class GenerationRoundOut(BaseModel):
+    result: Tuple[GenerationOut, RoundOut]
 
     class Config:
         orm_mode = True

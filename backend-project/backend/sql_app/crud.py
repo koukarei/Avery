@@ -233,6 +233,78 @@ def create_round(db: Session, leaderboard_id:int, user_id: int, created_at: date
 def get_generation(db: Session, generation_id: int):
     return db.query(models.Generation).filter(models.Generation.id == generation_id).first()
 
+def get_generations(db: Session, skip: int = 0, limit: int = 100, player_id: int = None, leaderboard_id: int = None, order_by: str = "id"):
+    if order_by == "id":
+        if leaderboard_id and player_id:
+            generations = db.query(
+                models.Generation,
+                models.Round
+            ).\
+            join(models.Round, models.Generation.round_id == models.Round.id).\
+            filter(models.Round.leaderboard_id == leaderboard_id).\
+            filter(models.Round.player_id == player_id).\
+            order_by(models.Generation.id.desc()).offset(skip).limit(limit).all()
+        elif leaderboard_id:
+            generations = db.query(
+                models.Generation,
+                models.Round
+            ).\
+            join(models.Round, models.Generation.round_id == models.Round.id).\
+            filter(models.Round.leaderboard_id == leaderboard_id).\
+            order_by(models.Generation.id.desc()).offset(skip).limit(limit).all()
+        elif player_id:
+            generations = db.query(
+                models.Generation,
+                models.Round
+            ).\
+            join(models.Round, models.Generation.round_id == models.Round.id).\
+            filter(models.Round.player_id == player_id).\
+            order_by(models.Generation.id.desc()).offset(skip).limit(limit).all()
+        else:
+            generations = db.query(
+                models.Generation,
+                models.Round
+            ).\
+            join(models.Round, models.Generation.round_id == models.Round.id).\
+            order_by(models.Generation.id.desc()).offset(skip).limit(limit).all()
+            
+    elif order_by == "total_score":
+        if leaderboard_id and player_id:
+            generations = db.query(
+                models.Generation,
+                models.Round
+            ).\
+            join(models.Round, models.Generation.round_id == models.Round.id).\
+            filter(models.Round.leaderboard_id == leaderboard_id).\
+            filter(models.Round.player_id == player_id).\
+            order_by(models.Generation.total_score.desc()).offset(skip).limit(limit).all()
+        elif leaderboard_id:
+            generations = db.query(
+                models.Generation,
+                models.Round
+            ).\
+            join(models.Round, models.Generation.round_id == models.Round.id).\
+            filter(models.Round.leaderboard_id == leaderboard_id).\
+            order_by(models.Generation.total_score.desc()).offset(skip).limit(limit).all()
+        elif player_id:
+            generations = db.query(
+                models.Generation,
+                models.Round
+            ).\
+            join(models.Round, models.Generation.round_id == models.Round.id).\
+            filter(models.Round.player_id == player_id).\
+            order_by(models.Generation.total_score.desc()).offset(skip).limit(limit).all()
+        else:
+            generations = db.query(
+                models.Generation,
+                models.Round
+            ).\
+            join(models.Round, models.Generation.round_id == models.Round.id).\
+            order_by(models.Generation.total_score.desc()).offset(skip).limit(limit).all()
+    else:
+        raise ValueError("Invalid order_by value")
+    return generations
+
 def create_generation(db: Session, round_id: int, generation: schemas.GenerationCreate):
     db_round = db.query(models.Round).filter(models.Round.id == round_id).first()
     

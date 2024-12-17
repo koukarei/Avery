@@ -14,7 +14,7 @@ from .authentication import authenticate_user, authenticate_user_2, create_acces
 import tracemalloc
 tracemalloc.start()
 
-from typing import Union, List, Annotated, Optional
+from typing import Tuple, List, Annotated, Optional
 from datetime import timezone, timedelta
 import torch, stanza
 from contextlib import asynccontextmanager
@@ -315,8 +315,8 @@ def update_user(
 def read_users(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to delete user")
-    if not current_user.is_admin:
-        raise HTTPException(status_code=401, detail="You are not an admin")
+    if current_user.user_type == "student":
+        raise HTTPException(status_code=401, detail="You are not allowed to view users")
     users = crud.get_users(db, skip=skip, limit=limit)
     return users
 
@@ -1217,6 +1217,32 @@ def read_generation(
     if db_generation is None:
         raise HTTPException(status_code=404, detail="Generation not found")
     return db_generation
+
+@app.get("/generations/", tags=["Generation"], response_model=list[Tuple[schemas.GenerationOut, schemas.RoundOut]])
+def read_generations(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    player_id: Optional[int] = None,
+    leaderboard_id: Optional[int] = None,
+    order_by: Optional[str] = "total_score",
+    skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view generations")
+    if player_id != current_user.id and current_user.user_type == "student":
+        raise HTTPException(status_code=401, detail="You are not authorized to view generations")
+    if player_id is None and current_user.user_type == "student":
+        player_id = current_user.id
+
+    generations = crud.get_generations(
+        db=db,
+        skip=skip,
+        limit=limit,
+        player_id=player_id,
+        leaderboard_id=leaderboard_id,
+        order_by=order_by
+    )
+    
+    return generations
 
 @app.get("/generation/{generation_id}/score", tags=["Generation"], response_model=schemas.GenerationScore)
 def get_generation_score(

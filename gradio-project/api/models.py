@@ -25,6 +25,20 @@ class UserCreateLti(BaseModel):
     email: str
     school: str
 
+class UserProfile(BaseModel):
+    id: int
+    display_name: str
+    bio: str
+    avatar: str
+
+class User(BaseModel):
+    id: int
+    is_active: bool
+    profiles: UserProfile
+    username: str
+    email: str
+    is_admin: bool
+    user_type: str
 
 class Image(BaseModel):
     id: int
@@ -146,3 +160,7 @@ class GenerationOut(GenerationComplete):
     sentence: str
     correct_sentence: str
     interpreted_image: Image
+
+class GenerationRound(BaseModel):
+    generation: GenerationOut
+    round: Round

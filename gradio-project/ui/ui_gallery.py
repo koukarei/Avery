@@ -130,11 +130,10 @@ with gr.Blocks() as avery_gradio:
         # Check if the player played the game before
         playable = await check_playable(select_leaderboard.id, request=request)
         start_btn = gr.update(value="始める",interactive=playable, link="/go_to_answer")
-        unfinished_rounds = None
-        if not playable:
-            unfinished_rounds = await get_unfinished_rounds_from_backend(request, select_leaderboard.id)
-            if unfinished_rounds:
-                start_btn = gr.update(value="再開", link="/resume_game",interactive=True)
+
+        unfinished_rounds = await get_unfinished_rounds_from_backend(request, select_leaderboard.id)
+        if unfinished_rounds:
+            start_btn = gr.update(value="再開", link="/resume_game",interactive=True)
             
         return select_leaderboard, start_btn, info, interpreted_images, generations, unfinished_rounds
 
