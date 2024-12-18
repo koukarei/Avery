@@ -115,7 +115,7 @@ with gr.Blocks() as avery_gradio:
         gr.Button(
             "リーダーボード",
             scale=0,
-            link="/leaderboards",
+            link="/avery/leaderboards",
         )
 
     with gr.Row():
