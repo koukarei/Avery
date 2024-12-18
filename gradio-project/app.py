@@ -63,7 +63,7 @@ async def login_form(request: Request):
         
     return templates.TemplateResponse("login_form.html", {"request": request})
 
-@app.post('/lti/login')
+@app.route('/lti/login')
 async def lti_login(request: Request):
     valid = await validate_lti_request(request)
     if not valid:
