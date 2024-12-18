@@ -28,6 +28,8 @@ class BearerAuth(httpx.Auth):
         if response.status_code == 401:
             
             refresh_response = self.build_refresh_request()
+            if refresh_response.status_code != 200:
+                raise HTTPException(status_code=302, detail="Redirect to login page", headers={"Location": "/avery/login"})
             self.update_tokens(refresh_response)
 
             request.headers["Authorization"] = f"Bearer {self.access_token}"
