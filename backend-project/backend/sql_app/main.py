@@ -708,14 +708,14 @@ async def get_interpretation(
             #     nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = model_load()
 
             # Update scores in background
-            # background_tasks.add_task(
-            #     update_perplexity,
-            #     db=db,
-            #     en_nlp=nlp_models['en_nlp'],
-            #     perplexity_model=nlp_models['perplexity_model'],
-            #     tokenizer=nlp_models['tokenizer'],
-            #     generation=generation_complete
-            # )
+            background_tasks.add_task(
+                update_perplexity,
+                db=db,
+                en_nlp=nlp_models['en_nlp'],
+                perplexity_model=nlp_models['perplexity_model'],
+                tokenizer=nlp_models['tokenizer'],
+                generation=generation_complete
+            )
             
             background_tasks.add_task(
                 update_content_score,
