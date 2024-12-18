@@ -40,7 +40,7 @@ app.add_middleware(SessionMiddleware, secret_key=os.environ.get('SECRET_KEY'))
 templates = Jinja2Templates(directory="templates")
 
 
-@app.route("/avery/login", methods=["GET", "POST"])
+@app.route("/login", methods=["GET", "POST"])
 async def login_form(request: Request):
     if request.method == "POST":
 
