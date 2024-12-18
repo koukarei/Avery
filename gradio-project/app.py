@@ -118,7 +118,7 @@ async def lti_login(request: Request):
 
     raise HTTPException(status_code=500, detail="Failed to login")
 
-@app.route('/avery/logout')
+@app.route('/logout')
 async def logout(request: Request):
 
     school = request.session.pop('school', None)
@@ -143,7 +143,11 @@ def token(request: Request):
 @app.get("/")
 async def redirect_page(request: Request):
     if "token" not in request.session:
-        return RedirectResponse(url="/avery/login", status_code=status.HTTP_303_SEE_OTHER)
+        try:
+            response = await read_leaderboard(request)
+            assert response.status_code == 401
+        except:
+            return RedirectResponse(url="/avery/logout", status_code=status.HTTP_303_SEE_OTHER)
     return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
     
 @app.get("/retry")
