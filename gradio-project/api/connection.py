@@ -66,7 +66,7 @@ async def create_user(newuser: models.UserCreate):
     )
     return response
 
-async def create_user_lti(newuser: models.UserCreateLti):
+async def create_user_lti(newuser: models.UserLti):
     url = f"{BACKEND_URL}users/lti"
 
     response = await http_client.post(
@@ -96,7 +96,7 @@ async def get_access_token_from_backend(
         raise HTTPException(status_code=e.response.status_code)
     
 async def get_access_token_from_backend_lti(
-        user: models.UserCreateLti,
+        user: models.UserLti,
 ):
     try:
         async with httpx.AsyncClient() as client:

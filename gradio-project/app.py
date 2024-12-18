@@ -89,7 +89,7 @@ async def lti_login(request: Request):
         else:
             role = "student"
 
-        user_login = models.UserLoginLti(
+        user_login = models.UserLti(
             user_id=form_data.get('user_id'),
             username=form_data.get('ext_user_username'),
             display_name=form_data.get('lis_person_name_full', 'Unknown User'),

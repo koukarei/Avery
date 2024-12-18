@@ -17,7 +17,7 @@ class UserCreate(BaseModel):
     email: str
     display_name: str
 
-class UserCreateLti(BaseModel):
+class UserLti(BaseModel):
     user_id: int
     username: str
     display_name: str
