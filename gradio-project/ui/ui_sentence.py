@@ -43,7 +43,7 @@ class Sentence:
             visible=False,
         )
 
-        self.next_btn=gr.Button("評価",scale=0,visible=False, link="/go_to_result")
+        self.next_btn=gr.Button("評価",scale=0,visible=False, link="/avery/go_to_result")
         
 
 def convert_history(chat_mdl: models.Chat):

@@ -33,7 +33,7 @@ class Gallery:
                     self.info = gr.Markdown(None)
                     self.generated_img = gr.Gallery(None, label="record")
             with gr.Row():
-                self.submit_btn = gr.Button("始める", scale=0, interactive=False, link="/go_to_answer")
+                self.submit_btn = gr.Button("始める", scale=0, interactive=False, link="/avery/go_to_answer")
 
     def upload_picture(self, image):
         return image[0][0]
@@ -78,7 +78,7 @@ with gr.Blocks() as avery_gradio:
         gr.Button(
             "ダッシュボード",
             scale=0,
-            link="/dashboard",
+            link="/avery/dashboard",
         )
 
     leaderboards = gr.State()
@@ -129,11 +129,11 @@ with gr.Blocks() as avery_gradio:
         
         # Check if the player played the game before
         playable = await check_playable(select_leaderboard.id, request=request)
-        start_btn = gr.update(value="始める",interactive=playable, link="/go_to_answer")
+        start_btn = gr.update(value="始める",interactive=playable, link="/avery/go_to_answer")
 
         unfinished_rounds = await get_unfinished_rounds_from_backend(request, select_leaderboard.id)
         if unfinished_rounds:
-            start_btn = gr.update(value="再開", link="/resume_game",interactive=True)
+            start_btn = gr.update(value="再開", link="/avery/resume_game",interactive=True)
             
         return select_leaderboard, start_btn, info, interpreted_images, generations, unfinished_rounds
 

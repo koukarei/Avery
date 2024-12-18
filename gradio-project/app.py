@@ -40,7 +40,7 @@ app.add_middleware(SessionMiddleware, secret_key=os.environ.get('SECRET_KEY'))
 templates = Jinja2Templates(directory="templates")
 
 
-@app.route("/login", methods=["GET", "POST"])
+@app.route("/avery/login", methods=["GET", "POST"])
 async def login_form(request: Request):
     if request.method == "POST":
 
@@ -59,7 +59,7 @@ async def login_form(request: Request):
         # app.state.token = token.model_dump()
         # app.state.username = form_data["username"]
 
-        return RedirectResponse(url='/', status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url='/avery/', status_code=status.HTTP_303_SEE_OTHER)
         
     return templates.TemplateResponse("login_form.html", {"request": request})
 
@@ -118,7 +118,7 @@ async def lti_login(request: Request):
 
     raise HTTPException(status_code=500, detail="Failed to login")
 
-@app.route('/logout')
+@app.route('/avery/logout')
 async def logout(request: Request):
 
     school = request.session.pop('school', None)
@@ -143,13 +143,13 @@ def token(request: Request):
 @app.get("/")
 async def redirect_page(request: Request):
     if "token" not in request.session:
-        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
-    return RedirectResponse(url="/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url="/avery/login", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
     
 @app.get("/retry")
 async def retry(request: Request):
     request.app.state.generation=None
-    return RedirectResponse(url="/answer", status_code=status.HTTP_303_SEE_OTHER)    
+    return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)    
 
 @app.get("/resume_game")
 async def resume_game(request: Request):
@@ -161,13 +161,13 @@ async def resume_game(request: Request):
     )
 
     if not res:
-        return RedirectResponse(url="/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
     last_round = res[0]
     request.app.state.round = last_round
 
     if not last_round.last_generation_id:
         request.app.state.generated_time = 0
-        return RedirectResponse(url="/answer", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
 
     last_gen = await get_generation(
         generation_id=last_round.last_generation_id,
@@ -184,10 +184,10 @@ async def resume_game(request: Request):
                 )
                 if not output:
                     raise HTTPException(status_code=500, detail="Failed to end round")
-            return RedirectResponse(url="/result", status_code=status.HTTP_303_SEE_OTHER)
+            return RedirectResponse(url="/avery/result", status_code=status.HTTP_303_SEE_OTHER)
         if last_gen.correct_sentence:
             if last_gen.interpreted_image:
-                return RedirectResponse(url="/go_to_result", status_code=status.HTTP_303_SEE_OTHER)
+                return RedirectResponse(url="/avery/go_to_result", status_code=status.HTTP_303_SEE_OTHER)
             
             output = await get_interpretation(
                 round_id=last_round.id,
@@ -200,10 +200,10 @@ async def resume_game(request: Request):
 
             if not output:
                 raise HTTPException(status_code=500, detail="Failed to get interpretation")
-            return RedirectResponse(url="/go_to_result", status_code=status.HTTP_303_SEE_OTHER)
+            return RedirectResponse(url="/avery/go_to_result", status_code=status.HTTP_303_SEE_OTHER)
         request.app.state.generation=last_gen
         request.app.state.generated_time = len(last_round.generations-1)
-    return RedirectResponse(url="/answer", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.get("/new_game")
@@ -214,13 +214,13 @@ async def new_game(request: Request):
         request.app.state.generated_time = 0
         request.app.state.generation = None
         request.app.state.selected_leaderboard = None
-        return RedirectResponse(url="/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
     raise HTTPException(status_code=500, detail="Failed to end round")
 
 @app.get("/go_to_answer")
 async def redirect_to_answer(request: Request):
     if not hasattr(request.app.state, 'selected_leaderboard'):
-        return RedirectResponse(url="/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
     selected_leaderboard_id = request.app.state.selected_leaderboard.id
     output = await create_round(
         new_round=models.RoundStart(
@@ -231,12 +231,12 @@ async def redirect_to_answer(request: Request):
     )
     request.app.state.round = output
     request.app.state.generated_time = 0
-    return RedirectResponse(url="/answer", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
 
 @app.get("/go_to_result")
 async def redirect_to_result(request: Request):
     if (not hasattr(request.app.state, 'generation') or not request.app.state.generation) and request.app.state.generated_time < 3:
-        return RedirectResponse(url="/answer", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
     
     output = await complete_generation(
         round_id=request.app.state.round.id,
@@ -257,8 +257,8 @@ async def redirect_to_result(request: Request):
         if not output:
             raise HTTPException(status_code=500, detail="Round not ended")
     
-    return RedirectResponse(url="/result", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url="/avery/result", status_code=status.HTTP_303_SEE_OTHER)
 
 @app.exception_handler(Exception)
 async def exception_handler(request: Request, exc: Exception):
-    return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url="/avery/login", status_code=status.HTTP_303_SEE_OTHER)

@@ -28,8 +28,8 @@ class Result:
             self.ai_image=gr.Image(None,label="Interpreted",interactive=False)
         
         with gr.Row():
-            self.restart_btn=gr.Button("もう一回！",scale=0, link="/retry", visible=False)
-            self.end_btn=gr.Button("やめる",scale=0,link='/new_game', visible=False)
+            self.restart_btn=gr.Button("もう一回！",scale=0, link="/avery/retry", visible=False)
+            self.end_btn=gr.Button("やめる",scale=0,link="/avery/new_game", visible=False)
 
 def convert_history(chat_mdl: models.Chat):
     output = []
