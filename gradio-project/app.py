@@ -65,7 +65,7 @@ async def login_form(request: Request):
 
 @app.route('/lti/login',methods=["POST"])
 async def lti_login(request: Request):
-    print("LTI login")
+    print(f"Validating LTI request. Request headers: {dict(request.headers)}")
     valid = await validate_lti_request(request)
     if not valid:
         return {'error': 'Invalid LTI request'} 
