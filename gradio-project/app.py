@@ -68,7 +68,8 @@ async def lti_login(request: Request):
     valid = await validate_lti_request(request)
     if not valid:
         return {'error': 'Invalid LTI request'} 
-
+    print(f"Valid LTI request: {valid}")
+    print(request.form())
     # Extracting additional fields from the form data
     form_data = await request.form()
 
