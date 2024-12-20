@@ -183,7 +183,7 @@ async def resume_game(request: Request):
         request.app.state.generation=last_gen
         if last_gen.is_completed:
             request.app.state.generated_time = len(last_round.generations)
-            if request.app.state.generated_time > 2:
+            if request.app.state.generated_time > 4:
                 output = await end_round(
                     round_id=last_round.id,
                     request=request,
@@ -255,7 +255,7 @@ async def redirect_to_result(request: Request):
     if not output:
         raise HTTPException(status_code=500, detail="Generation not completed")
 
-    if request.app.state.generated_time > 2:
+    if request.app.state.generated_time > 4:
         output = await end_round(
             round_id=request.app.state.round.id, 
             request=request

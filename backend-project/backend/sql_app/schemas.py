@@ -384,6 +384,8 @@ class ImageSimilarity(BaseModel):
     semantic_score_original: float
     semantic_score_interpreted: float
     blip2_score: float
+    ssim: float
+    similarity: float
 
 class LeaderboardPlayable(BaseModel):
     id: int
