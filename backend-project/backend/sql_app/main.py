@@ -178,7 +178,7 @@ async def login_for_access_token(
 
 
 @app.post("/lti/token",response_model=schemas.Token)
-async def login_for_access_token(
+async def login_for_access_token_lti(
     user: schemas.UserCreateLti,
     db: Session = Depends(get_db),
 ):

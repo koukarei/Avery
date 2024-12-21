@@ -214,6 +214,7 @@ def update_n_words(
     en_nlp,
     generation: schemas.GenerationCompleteCreate,
 ):
+   t = computing_time_tracker("Update n_words")
    db_generation = crud.get_generation(db, generation_id=generation.id)
 
    doc = en_nlp(db_generation.sentence)
@@ -237,12 +238,14 @@ def update_n_words(
         is_completed=False
        )
    )
+   t.stop_timer()
    return
 
 def update_grammar_spelling(
         db: Session,
         generation: schemas.GenerationCompleteCreate,
 ):
+    t = computing_time_tracker("Update grammar spelling")
     db_generation = crud.get_generation(db, generation_id=generation.id)
 
     factors = score.grammar_spelling_errors(db_generation.sentence)
@@ -256,7 +259,7 @@ def update_grammar_spelling(
             is_completed=False
         )
     )
-
+    t.stop_timer()
     return
 
 def update_frequency_word(
@@ -264,6 +267,7 @@ def update_frequency_word(
         en_nlp,
         generation: schemas.GenerationCompleteCreate,
 ):
+    t = computing_time_tracker("Update frequency word")
     db_generation = crud.get_generation(db, generation_id=generation.id)
 
     doc = en_nlp(db_generation.sentence)
@@ -280,6 +284,7 @@ def update_frequency_word(
         )
     )
 
+    t.stop_timer()
     return
 
 def update_perplexity(
@@ -289,6 +294,7 @@ def update_perplexity(
         tokenizer,
         generation: schemas.GenerationCompleteCreate,
 ):
+    t = computing_time_tracker("Update perplexity")
     db_generation = crud.get_generation(db, generation_id=generation.id)
     doc = en_nlp(db_generation.sentence)
     words=[w for s in doc.sentences for w in s.words]
@@ -311,12 +317,15 @@ def update_perplexity(
         )
     )
 
+    t.stop_timer()
     return
 
 def update_content_score(
     db: Session,
     generation: schemas.GenerationCompleteCreate,
 ):
+    t = computing_time_tracker("Update content score")
+
     db_generation = crud.get_generation(db, generation_id=generation.id)
 
     db_round = crud.get_round(db, round_id=db_generation.round_id)
@@ -336,5 +345,5 @@ def update_content_score(
             is_completed=False
         )
     )
-
+    t.stop_timer()
     return

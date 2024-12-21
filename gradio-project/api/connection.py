@@ -48,7 +48,6 @@ class BearerAuth(httpx.Auth):
     def update_tokens(self, response):
         data = response.json()
         self.access_token = data["access_token"]
-        self.refresh_token = data["refresh_token"]
 
 def convert_json(mdl: models.BaseModel):
     json_data = mdl.model_dump()
