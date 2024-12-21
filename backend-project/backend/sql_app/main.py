@@ -1200,7 +1200,7 @@ def get_image_similarity(
         image2_path=db_generation.interpreted_image.image_path
     )["ssim_score"]
 
-    similarity = blip2_score*0.7 + ssim*0.3
+    similarity = blip2_score*0.8 + ssim*0.2
 
     image_similarity = schemas.ImageSimilarity(
         semantic_score_original=semantic1['content_score'],

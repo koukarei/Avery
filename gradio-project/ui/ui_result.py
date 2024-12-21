@@ -12,6 +12,8 @@ from api.connection import models
 
 from app import app as fastapi_app
 
+MAX_GENERATION = int(os.getenv("MAX_GENERATION", 5))
+
 class Result:
     def __init__(self):
         self.image=None
@@ -70,15 +72,16 @@ with gr.Blocks() as avery_gradio:
         
         if similarity:
             similarity = float(similarity.similarity)*100
-            if similarity > 70:
-                css = "color: green;"
-            elif similarity > 50:
-                css = "color: orange;"
+            if similarity > 80:
+                emoji = "🎉"
+            elif similarity > 60:
+                emoji = "👍"
+            elif similarity > 40:
+                emoji = "🤔"
             else:
-                css = "color: red;"
-        md_color = gr.update(css=css)
-        similarity_md = "# 類似度: {:^10.2f} ".format(similarity)
-        return original_img, ai_img, similarity_md, md_color
+                emoji = "😢"
+        similarity_md = "# 類似度: {:^10.2f} {}".format(similarity, emoji)
+        return original_img, ai_img, similarity_md
     
     async def load_chat_content(request: gr.Request):
         # complete the generation and get the chat
@@ -95,7 +98,7 @@ with gr.Blocks() as avery_gradio:
             )
 
             if chat:
-                check_generated_time = app.state.generated_time < 3
+                check_generated_time = app.state.generated_time < MAX_GENERATION
                 show_restart = gr.update(visible=check_generated_time)
                 show_end = gr.update(visible=True)
                 yield convert_history(chat), show_restart, show_end
@@ -136,7 +139,7 @@ with gr.Blocks() as avery_gradio:
         result.create_result()
 
 
-    avery_gradio.load(obtain_image, inputs=[], outputs=[result.image, result.ai_image, result.similarity, result.similarity])
+    avery_gradio.load(obtain_image, inputs=[], outputs=[result.image, result.ai_image, result.similarity])
     avery_gradio.load(load_chat_content, inputs=[], outputs=[guidance.chat, result.restart_btn, result.end_btn])
     avery_gradio.queue(max_size=128, default_concurrency_limit=50)
 

@@ -39,7 +39,7 @@ app.add_middleware(SessionMiddleware, secret_key=os.environ.get('SECRET_KEY'))
 
 templates = Jinja2Templates(directory="templates")
 
-MAX_GENERATION = os.getenv("MAX_GENERATION")
+MAX_GENERATION = int(os.getenv("MAX_GENERATION"))
 
 @app.route("/login", methods=["GET", "POST"])
 async def login_form(request: Request):
