@@ -164,3 +164,10 @@ class GenerationOut(GenerationComplete):
 class GenerationRound(BaseModel):
     generation: GenerationOut
     round: Round
+
+class ImageSimilarity(BaseModel):
+    semantic_score_original: float
+    semantic_score_interpreted: float
+    blip2_score: float
+    ssim: float
+    similarity: float

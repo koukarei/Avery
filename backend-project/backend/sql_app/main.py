@@ -1196,9 +1196,9 @@ def get_image_similarity(
         blip2_score = 1 - blip2_score
 
     ssim = score.image_similarity(
-        image1=db_leaderboard.original_image.image_path,
-        image2=db_generation.interpreted_image.image_path
-    )["ssim_score"]*100
+        image1_path=db_leaderboard.original_image.image_path,
+        image2_path=db_generation.interpreted_image.image_path
+    )["ssim_score"]
 
     similarity = blip2_score*0.7 + ssim*0.3
 

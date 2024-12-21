@@ -274,8 +274,8 @@ async def get_image_similarity(generation_id: int, request: Request, ):
     )
     if response.status_code != 200:
         return None
-    
-    return response.json()
+    output = models.ImageSimilarity(**response.json())
+    return output
 
 async def get_rounds(leaderboard_id: int, request: Request):
     response = await http_client.get(
