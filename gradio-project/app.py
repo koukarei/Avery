@@ -209,7 +209,10 @@ async def resume_game(request: Request):
                 raise HTTPException(status_code=500, detail="Failed to get interpretation")
             return RedirectResponse(url="/avery/go_to_result", status_code=status.HTTP_303_SEE_OTHER)
         request.app.state.generation=last_gen
-        request.app.state.generated_time = len(last_round.generations-1)
+        if len(last_round.generations) > 1:
+            request.app.state.generated_time = len(last_round.generations)-1
+        else:
+            request.app.state.generated_time = 0
     return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
 
 

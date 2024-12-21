@@ -81,6 +81,12 @@ with gr.Blocks() as avery_gradio:
             link="/avery/dashboard",
         )
 
+        gr.Button(
+            "ログアウト",
+            scale=0,
+            link="/avery/logout",
+        )
+
     leaderboards = gr.State()
     selected_leaderboard = gr.State()
     related_generations = gr.State()

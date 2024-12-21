@@ -157,9 +157,9 @@ class GenerationComplete(BaseModel):
     is_completed: bool
 
 class GenerationOut(GenerationComplete):
-    sentence: str
-    correct_sentence: str
-    interpreted_image: Image
+    sentence: Optional[str]=None
+    correct_sentence: Optional[str]=None
+    interpreted_image: Optional[Image]=None
 
 class GenerationRound(BaseModel):
     generation: GenerationOut

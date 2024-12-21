@@ -14,6 +14,8 @@ from app import app as fastapi_app
 
 MAX_GENERATION = int(os.getenv("MAX_GENERATION", 5))
 
+import gradio as gr
+
 class Result:
     def __init__(self):
         self.image=None
@@ -21,6 +23,7 @@ class Result:
         self.ai_image=None
         self.restart_btn=None
         self.end_btn=None
+        self.checkbox=None
 
 
     def create_result(self):
@@ -30,8 +33,25 @@ class Result:
             self.ai_image=gr.Image(None,label="Interpreted",interactive=False)
         
         with gr.Row():
+            self.confirm_txt=gr.Markdown("この画像を一度終了すると、再度再生することはできません。",visible=False)
+        with gr.Row():
             self.restart_btn=gr.Button("もう一回！",scale=0, link="/avery/retry", visible=False)
-            self.end_btn=gr.Button("やめる",scale=0,link="/avery/new_game", visible=False)
+            
+            self.end_btn=gr.Button("やめる",scale=0, visible=False)
+            self.confirm_btn=gr.Button("確認",scale=0,link="/avery/new_game", visible=False)
+            self.cancel_btn=gr.Button("キャンセル",scale=0, visible=False)
+
+            self.end_btn.click(
+                lambda :[gr.update(visible=False), gr.update(visible=False), gr.update(visible=True), gr.update(visible=True), gr.update(visible=True)], 
+                None, 
+                [self.end_btn, self.restart_btn, self.confirm_txt, self.confirm_btn, self.cancel_btn]
+            )
+
+            self.cancel_btn.click(
+                lambda :[gr.update(visible=True), gr.update(visible=True), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)], 
+                None, 
+                [self.end_btn, self.restart_btn, self.confirm_txt, self.confirm_btn, self.cancel_btn]
+            )
 
 def convert_history(chat_mdl: models.Chat):
     output = []
@@ -100,8 +120,14 @@ with gr.Blocks() as avery_gradio:
             if chat:
                 check_generated_time = app.state.generated_time < MAX_GENERATION
                 show_restart = gr.update(visible=check_generated_time)
-                show_end = gr.update(visible=True)
-                yield convert_history(chat), show_restart, show_end
+                if check_generated_time:
+                    show_end = gr.update(visible=True, link=None)
+                    restart_value = "もう一回！({:.0f}/{:.0f})".format(MAX_GENERATION - app.state.generated_time, MAX_GENERATION)
+                else:
+                    show_end = gr.update(visible=True, link="/avery/new_game")
+                    restart_value = "もう一回！"
+
+                yield convert_history(chat), show_restart, show_end, restart_value
                 return
             else:
                 yield None
@@ -140,7 +166,7 @@ with gr.Blocks() as avery_gradio:
 
 
     avery_gradio.load(obtain_image, inputs=[], outputs=[result.image, result.ai_image, result.similarity])
-    avery_gradio.load(load_chat_content, inputs=[], outputs=[guidance.chat, result.restart_btn, result.end_btn])
+    avery_gradio.load(load_chat_content, inputs=[], outputs=[guidance.chat, result.restart_btn, result.end_btn, result.restart_btn])
     avery_gradio.queue(max_size=128, default_concurrency_limit=50)
 
 

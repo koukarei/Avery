@@ -675,6 +675,9 @@ async def get_interpretation(
             at=db_generation.created_at
         )
 
+        # Get descriptions
+        descriptions =  crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
+
         # Safe background task addition with error handling
         try:
 
@@ -688,7 +691,8 @@ async def get_interpretation(
                 en_nlp=nlp_models['en_nlp'],
                 perplexity_model=nlp_models['perplexity_model'],
                 tokenizer=nlp_models['tokenizer'],
-                generation=generation_complete
+                generation=generation_complete,
+                descriptions=descriptions
             )
             
             background_tasks.add_task(
@@ -773,7 +777,7 @@ def complete_generation(
         perplexity_model=nlp_models['perplexity_model'],
         tokenizer=nlp_models['tokenizer'],
         generation=generation,
-        is_completed=True
+        is_completed=True,
     )
     if 'grammar_error' in factors:
         grammar_errors=str(factors['grammar_error'])

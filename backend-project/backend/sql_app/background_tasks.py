@@ -71,7 +71,8 @@ def check_factors_done(
     en_nlp,
     perplexity_model,
     tokenizer,
-    generation: schemas.GenerationCompleteCreate
+    generation: schemas.GenerationCompleteCreate,
+    descriptions: list
 ):
     db_generation = crud.get_generation(db, generation_id=generation.id)
 
@@ -81,7 +82,7 @@ def check_factors_done(
         # if (not db_generation.f_word) or (not db_generation.f_bigram):
         #     update_frequency_word(db=db, en_nlp=en_nlp, generation=generation)
         if not db_generation.perplexity:
-            update_perplexity(db=db, en_nlp=en_nlp, perplexity_model=perplexity_model, tokenizer=tokenizer, generation=generation)
+            update_perplexity(db=db, en_nlp=en_nlp, perplexity_model=perplexity_model, tokenizer=tokenizer, generation=generation, descriptions=descriptions)
         if not db_generation.content_score:
             update_content_score(db=db, generation=generation)
         
@@ -94,22 +95,12 @@ def calculate_score(
     perplexity_model,
     tokenizer,
     generation: schemas.GenerationCompleteCreate,
-    is_completed: bool=False
+    is_completed: bool=False, 
 ):
     
     db_generation = crud.get_generation(db, generation_id=generation.id)
     if db_generation is None:
         raise HTTPException(status_code=404, detail="Generation not found")
-    
-    check_factors_done(
-        db=db,
-        en_nlp=en_nlp,
-        perplexity_model=perplexity_model,
-        tokenizer=tokenizer,
-        generation=generation
-    )
-
-    db_generation = crud.get_generation(db, generation_id=generation.id)
     db_round = crud.get_round(db, round_id=db_generation.round_id)
     ai_play = crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
 
@@ -124,8 +115,16 @@ def calculate_score(
             story=story, 
             model_name="gpt-4o-mini"
         )
-
-
+    
+    check_factors_done(
+        db=db,
+        en_nlp=en_nlp,
+        perplexity_model=perplexity_model,
+        tokenizer=tokenizer,
+        generation=generation, 
+        descriptions=ai_play
+    )
+    
     if is_completed:
         generation_aware = generation.at.replace(tzinfo=timezone.utc)
         db_generation_aware = db_generation.created_at.replace(tzinfo=timezone.utc)
@@ -293,6 +292,7 @@ def update_perplexity(
         perplexity_model,
         tokenizer,
         generation: schemas.GenerationCompleteCreate,
+        descriptions: list
 ):
     t = computing_time_tracker("Update perplexity")
     db_generation = crud.get_generation(db, generation_id=generation.id)
@@ -305,7 +305,8 @@ def update_perplexity(
         perplexity_model=perplexity_model,
         tokenizer=tokenizer,
         sentence=db_generation.sentence,
-        cut_points=cut_points
+        cut_points=cut_points,
+        descriptions=descriptions
     )
 
     db_generation = crud.update_generation3(

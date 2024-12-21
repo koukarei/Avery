@@ -19,9 +19,28 @@ import time
 
 import numpy as np
 
-def get_loss_pretrained(perplexity_model, tokenizer,text, cuda=False):
-    qusestion = "Describe a scene in a story in around 150 words."
-    text_to_encode = f"{qusestion} {text}"
+def get_loss_pretrained(perplexity_model, tokenizer,text, descriptions: list, cuda=False):
+    descriptions = [d.content for d in descriptions]
+    question = "Conclude the following sentence: "
+    d = '\n* '.join(descriptions)
+    question_d = f"Question: {question} {d}"
+
+    # if description is too long, cut it in half
+    if len(question_d) > 512:
+      descriptions = descriptions[:len(descriptions)//2]
+      d = '\n* '.join(descriptions)
+      question_d = f"Question: {question} {d}"
+
+    # if description is still too long, cut it to the first element
+    if len(question_d) > 512:
+       descriptions = descriptions[0]
+       question_d = f"Question: {question} {descriptions}"
+
+    # if description is still too long, just use a generic question
+    if len(question_d) > 512:
+       question_d = f"Question: Describe an image from a story"
+    
+    text_to_encode = f"{question_d}\n Answer:{text}"
     input_ids = torch.tensor(tokenizer.encode(text_to_encode)).unsqueeze(0)  # Batch size 1
     if cuda:
         input_ids = input_ids.to('cuda')
@@ -135,14 +154,14 @@ def frequency_score(words):
          "f_bigram":f_bigram
    }
 
-def perplexity(perplexity_model, tokenizer,sentence, cut_points):
+def perplexity(perplexity_model, tokenizer,sentence, cut_points, descriptions):
   log_probs=[]
   for i,p in enumerate(cut_points):
     if i+1 == len(cut_points):
       t=sentence
     else:
       t=sentence[:p]
-    log_probs.append(get_loss_pretrained(perplexity_model, tokenizer,t))
+    log_probs.append(get_loss_pretrained(perplexity_model, tokenizer,t, descriptions))
     perplexity_value = np.exp(-np.mean(log_probs))
   return {
      'perplexity':perplexity_value
@@ -220,7 +239,8 @@ def calculate_score_init(
       perplexity_model,
       tokenizer,
       image_path: str, 
-      sentence: str
+      sentence: str,
+      descriptions: list
 ):
    doc = en_nlp(sentence)
    words=[w for s in doc.sentences for w in s.words]
@@ -236,7 +256,8 @@ def calculate_score_init(
         perplexity_model=perplexity_model,
         tokenizer=tokenizer,
       sentence=sentence,
-      cut_points=cut_points
+      cut_points=cut_points,
+      descriptions=descriptions
    ))
 
    factors.update(frequency_score(words=words))
