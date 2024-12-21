@@ -221,33 +221,7 @@ async def refresh_token(current_user: schemas.User = Security(get_current_user, 
             headers={"WWW-Authenticate": "Bearer",
                     "Current User":current_user.username},
         )
-
-@app.post("/content_score/")
-def content_score_test_endpoint(
-    image: Annotated[UploadFile, File()],
-    sentence: Annotated[str, Form()],
-):
-    temp_image_path = media_dir / "temp.jpg"
-    try:
-        image.file.seek(0)
-        image_content = Image.open(image.file)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Please upload a valid image file")
     
-    try:
-        image_content.save(temp_image_path)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error uploading file: {str(e)}")
-    finally:
-        image.file.close()
-    output = score.calculate_content_score(
-        image_path=temp_image_path,
-        sentence=sentence
-    )
-    if os.path.isfile(temp_image_path):
-        os.remove(temp_image_path)
-    return output
-
 @app.post("/users/", tags=["User"], response_model=schemas.User)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = crud.get_user_by_email(db, email=user.email)
@@ -827,10 +801,10 @@ def complete_generation(
         文法得点: {grammar_score} (満点5)
         スペリング得点: {spelling_score} (満点5)
         鮮明さ: {vividness_score} (満点5)
-        自然さ: {convention} (満点5)
+        自然さ: {convention} (満点1)
         構造性: {structure_score} (満点3)
         内容得点: {content_score} (満点100)
-        合計点: {total_score} (満点2300)
+        合計点: {total_score} (満点1900)
         ランク: {rank}　(A-最高, B-上手, C-良い, D-普通, E-悪い, F-最悪)
         """.format(
             user_sentence=db_generation.sentence,

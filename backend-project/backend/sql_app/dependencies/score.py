@@ -20,7 +20,9 @@ import time
 import numpy as np
 
 def get_loss_pretrained(perplexity_model, tokenizer,text, cuda=False):
-    input_ids = torch.tensor(tokenizer.encode(text)).unsqueeze(0)  # Batch size 1
+    qusestion = "Describe a scene in a story in around 150 words."
+    text_to_encode = f"{qusestion} {text}"
+    input_ids = torch.tensor(tokenizer.encode(text_to_encode)).unsqueeze(0)  # Batch size 1
     if cuda:
         input_ids = input_ids.to('cuda')
     with torch.no_grad():
@@ -188,8 +190,6 @@ def calculate_score(
       n_prepositions: int,
       n_clauses: int,
       perplexity: float,
-      f_word: float,
-      f_bigram: float,
       content_score: int,
       **kwargs
 ):
@@ -198,25 +198,11 @@ def calculate_score(
        'spelling_score':((n_words-n_spelling_errors)/n_words)*5
     }
 
-    output['vividness_score']=0
-    output['vividness_score']+= 1 if n_adj else 0
-    output['vividness_score']+= 1 if n_adv else 0
-    output['vividness_score']+= 1 if n_pronouns else 0
-    output['vividness_score']+= 1 if n_prepositions else 0
-    output['vividness_score']+= 1 if n_conjunctions else 0
-    
-    descriptive_words = (n_adj + n_adv + n_pronouns + n_prepositions + n_conjunctions)/n_words
-    if descriptive_words > 0.5:
-        output['vividness_score']+= 2
-    else:
-       output['vividness_score']+= descriptive_words*4
-    output['vividness_score'] += f_word
-    output['vividness_score'] = output['vividness_score'] if output['vividness_score'] < 8 else 8
-    output['vividness_score'] = output['vividness_score'] / 8 * 5
 
-    perplexity_score = perplexity
-    f_bigram = f_bigram if f_bigram < 5 else 5
-    convention = f_bigram-perplexity_score
+    vividness = n_adj + n_adv + n_pronouns + n_prepositions + n_conjunctions
+    output['vividness_score']=vividness if vividness < 5 else 5
+
+    convention = perplexity > 0.01
     output['convention']= convention
     
     output['structure_score']= n_clauses if n_clauses < 3 else 3
@@ -305,15 +291,16 @@ def image_similarity(image1_path, image2_path):
     }
 
 def rank(total_score):
-    if total_score>2100:
+    max_score = 1900
+    if total_score>(max_score*0.8):
         return "A"
-    elif total_score>1800:
+    elif total_score>(max_score*0.7):
         return "B"
-    elif total_score>1600:
+    elif total_score>(max_score*0.6):
         return "C"
-    elif total_score>1000:
+    elif total_score>(max_score*0.5):
         return "D"
-    elif total_score>500:
+    elif total_score>(max_score*0.4):
         return "E"
     else:
         return "F"
