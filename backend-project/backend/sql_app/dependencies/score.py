@@ -2,18 +2,14 @@ from typing import List,Literal,Union
 from fastapi import HTTPException
 from enum import Enum
 
-import PIL.Image
-import io
+import PIL.Image, cv2
+import io, os
 import requests
+from . import util
 
 import torch
-
-import os
-
-import cv2
 from skimage.metrics import structural_similarity as ssim
 
-import stanza
 import language_tool_python
 import time
 
@@ -49,10 +45,6 @@ def get_loss_pretrained(perplexity_model, tokenizer,text, descriptions: list, cu
     loss, logits = outputs[:2]
     sentence_prob = loss.item()
     return sentence_prob
-
-def encode_image(image_path):
-    pilImage = PIL.Image.open(io.BytesIO(requests.get(image_path).content))
-    return pilImage
 
 def analysis_word(words):
   output = {
@@ -98,16 +90,18 @@ def n_wordsNclauses(doc, words):
     output["n_clauses"]=n_clause
     return output
 
-def grammar_spelling_errors(sentence: str):
+def grammar_spelling_errors(sentence: str, en_nlp):
+    doc = en_nlp(sentence)
     tool = language_tool_python.LanguageTool('en-US')
-    matches = tool.check(sentence)
     spellings=[]
     grammars=[]
-    for m in matches:
-       if m.ruleId == 'MORFOLOGIK_RULE_EN_US':
-          spellings.append(m)
-       else:
-          grammars.append(m)
+    for s in doc.sentences:
+      matches = tool.check(s.text)
+      for m in matches:
+          if m.ruleId == 'MORFOLOGIK_RULE_EN_US':
+              spellings.append(m)
+          else:
+              grammars.append(m)
 
     return {
        'grammar_error':grammars,
@@ -168,31 +162,24 @@ def perplexity(perplexity_model, tokenizer,sentence, cut_points, descriptions):
   }
 
 def calculate_content_score(
-      image_path: str, 
+      image: str, 
       sentence: str
       ):
     
     BLIP2_URL = os.getenv("BLIP2_URL")
     # BLIP2_URL = "http://blip2:7874/fake_content_score"
-    if isinstance(image_path, str):
-      image_filename = image_path.split("/")[-1]
-    elif isinstance(image_path, os.PathLike):
-      image_filename = image_path.name
-    else:
-       raise ValueError("image_path must be a string or a PathLike object")
 
     try:
-      with open(image_path, "rb") as f:
-        status_code = 503
-        counter = 0
-        while status_code == 503:
-          if counter >0:
-            time.sleep(2)
-          response = requests.post(
-              url=BLIP2_URL, data={"sentence":sentence}, files={"image": (image_filename, f, "image/jpeg")}, timeout=30
-          )
-          status_code = response.status_code
-          counter += 1
+      status_code = 503
+      counter = 0
+      while status_code == 503:
+        if counter >0:
+          time.sleep(2)
+        response = requests.post(
+            url=BLIP2_URL, data={"sentence":sentence, "image": image}, timeout=30
+        )
+        status_code = response.status_code
+        counter += 1
       response.raise_for_status()
       return response.json()
     except requests.exceptions.RequestException as e:
@@ -217,17 +204,17 @@ def calculate_score(
        'spelling_score':((n_words-n_spelling_errors)/n_words)*5
     }
 
-
     vividness = n_adj + n_adv + n_pronouns + n_prepositions + n_conjunctions
     output['vividness_score']=vividness if vividness < 5 else 5
 
     convention = perplexity > 0.01
-    output['convention']= convention
+    output['convention']= int(convention)
     
     output['structure_score']= n_clauses if n_clauses < 3 else 3
 
     lang_quality = sum(output.values())
-    output['total_score'] = int(round(lang_quality*content_score))
+    total_score = int(round(lang_quality*content_score)/19)
+    output['total_score'] = total_score
 
     output['lang_quality']=lang_quality
     output['content_score']=content_score
@@ -238,7 +225,7 @@ def calculate_score_init(
       en_nlp,
       perplexity_model,
       tokenizer,
-      image_path: str, 
+      image: str, 
       sentence: str,
       descriptions: list
 ):
@@ -249,7 +236,7 @@ def calculate_score_init(
       words=words
    )
 
-   factors.update(grammar_spelling_errors(sentence))
+   factors.update(grammar_spelling_errors(sentence, en_nlp))
 
    cut_points=[w.end_char+1 for w in words if w.start_char != 0]
    factors.update(perplexity(
@@ -260,10 +247,10 @@ def calculate_score_init(
       descriptions=descriptions
    ))
 
-   factors.update(frequency_score(words=words))
+   # factors.update(frequency_score(words=words))
 
    factors.update(calculate_content_score(
-      image_path=image_path,
+      image=image,
       sentence=sentence
    ))
    
@@ -271,10 +258,10 @@ def calculate_score_init(
 
    return factors, output
 
-def image_similarity(image1_path, image2_path):
+def image_similarity(image1, image2):
     # Read images using OpenCV
-    img1 = cv2.imread(image1_path)
-    img2 = cv2.imread(image2_path)
+    img1 = util.base64_to_cv(image1)
+    img2 = util.base64_to_cv(image2)
 
     # Check if images were read successfully
     if img1 is None or img2 is None:
@@ -312,7 +299,7 @@ def image_similarity(image1_path, image2_path):
     }
 
 def rank(total_score):
-    max_score = 1900
+    max_score = 100
     if total_score>(max_score*0.8):
         return "A"
     elif total_score>(max_score*0.7):

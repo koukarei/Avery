@@ -156,6 +156,14 @@ async def redirect_page(request: Request):
 @app.get("/retry")
 async def retry(request: Request):
     request.app.state.generation=None
+    the_round=await read_my_rounds(
+        request=request,
+        is_completed=False,
+        leaderboard_id=request.app.state.selected_leaderboard.id,
+    )
+    if not the_round:
+        return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
+    request.app.state.round=the_round[0]
     return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)    
 
 @app.get("/resume_game")

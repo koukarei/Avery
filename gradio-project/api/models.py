@@ -42,7 +42,7 @@ class User(BaseModel):
 
 class Image(BaseModel):
     id: int
-    image_path: str
+    image: str
 
 class Vocabulary(BaseModel):
     id: int
@@ -156,10 +156,28 @@ class GenerationComplete(BaseModel):
     duration: int
     is_completed: bool
 
+class ScoreCreate(BaseModel):
+    generation_id: int
+    grammar_score: float
+    spelling_score: float
+    vividness_score: float
+    convention: bool
+    structure_score: int
+    content_score: int
+
+class ScoreUpdate(BaseModel):
+    id: int
+    image_similarity: float
+
+class Score(ScoreCreate):
+    id: int
+    image_similarity: Optional[float]=None
+
 class GenerationOut(GenerationComplete):
     sentence: Optional[str]=None
     correct_sentence: Optional[str]=None
     interpreted_image: Optional[Image]=None
+    score: Optional[Score]=None
 
 class GenerationRound(BaseModel):
     generation: GenerationOut
@@ -171,3 +189,4 @@ class ImageSimilarity(BaseModel):
     blip2_score: float
     ssim: float
     similarity: float
+    

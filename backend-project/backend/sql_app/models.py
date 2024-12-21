@@ -1,6 +1,6 @@
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, TEXT, Float
 from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.mysql import MEDIUMTEXT
+from sqlalchemy.dialects.mysql import MEDIUMTEXT, LONGTEXT
 
 import datetime
 
@@ -55,7 +55,7 @@ class Story(Base):
 
     id = Column(Integer, primary_key=True)
     title = Column(String(255), index=True)
-    textfile_path = Column(String(255), index=True)
+    content = Column(LONGTEXT)
     scene_id=Column(Integer,ForeignKey("scenes.id"))
     
     scene = relationship("Scene", back_populates="stories")
@@ -166,9 +166,25 @@ class Generation(Base):
     
     interpreted_image_id=Column(Integer,ForeignKey("interpreted_images.id"),nullable=True)
     round_id=Column(Integer,ForeignKey("rounds.id"))
+    score_id=Column(Integer,ForeignKey("scores.id"),nullable=True)
 
     interpreted_image = relationship("InterpretedImage", back_populates="generation",foreign_keys=[interpreted_image_id])
     round = relationship("Round", back_populates="generations",foreign_keys=[round_id])
+    score = relationship("Score",foreign_keys=[score_id])
+
+class Score(Base):
+    __tablename__ = "scores"
+
+    id = Column(Integer, primary_key=True)
+    grammar_score = Column(Float(precision=10), default=0)
+    spelling_score = Column(Float(precision=10), default=0)
+    vividness_score = Column(Float(precision=10), default=0)
+    convention = Column(Boolean, default=False)
+    structure_score = Column(Integer, default=0)
+    content_score = Column(Integer, default=0)
+    image_similarity = Column(Float(precision=10), default=0, nullable=True)
+
+    generation_id = Column(Integer, ForeignKey("generations.id"))
 
 class Chat(Base):
     __tablename__ = "chats"
@@ -181,7 +197,7 @@ class Message(Base):
 
     id = Column(Integer, primary_key=True)
     chat_id = Column(Integer, ForeignKey("chats.id"))
-    content = Column(MEDIUMTEXT, index=True)
+    content = Column(MEDIUMTEXT)
     sender = Column(String(50), index=True)
     created_at = Column(DateTime, default=datetime.datetime.now())
 
@@ -232,7 +248,7 @@ class OriginalImage(Base):
     __tablename__ = "original_images"
 
     id = Column(Integer, primary_key=True)
-    image_path = Column(String(255), index=True)
+    image = Column(MEDIUMTEXT)
 
     leaderboard = relationship("Leaderboard", back_populates="original_image")
     
@@ -240,7 +256,7 @@ class InterpretedImage(Base):
     __tablename__ = "interpreted_images"
 
     id = Column(Integer, primary_key=True)
-    image_path = Column(String(255), index=True)
+    image = Column(MEDIUMTEXT)
 
     generation = relationship("Generation", back_populates="interpreted_image")
 

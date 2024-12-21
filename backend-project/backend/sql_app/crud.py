@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 
 from . import models, schemas
 
-from typing import Union
+from typing import Union, Optional
 import datetime
 
 from .authentication import get_password_hash
@@ -343,6 +343,35 @@ def update_generation3(db: Session, generation: schemas.GenerationComplete):
     db.commit()
     db_generation = db.query(models.Generation).filter(models.Generation.id == generation.id).first()
     return db_generation
+
+def create_score(db: Session, score: schemas.ScoreCreate, generation_id: int):
+    db_score = models.Score(
+        **score.model_dump()
+    )
+    db.add(db_score)
+    db.commit()
+    db.refresh(db_score)
+
+    db_generation = db.query(models.Generation).filter(models.Generation.id == generation_id).first()
+    db_generation.score_id = db_score.id
+    db.commit()
+
+    return db_score
+
+def update_score(db: Session, score: schemas.ScoreUpdate):
+    db_score = db.query(models.Score).filter(models.Score.id == score.id).first()
+    db_score.image_similarity = score.image_similarity
+    db.commit()
+    db.refresh(db_score)
+    return db_score
+
+def get_score(db: Session, score_id: Optional[int] = None, generation_id: Optional[int] = None):
+    if score_id:
+        return db.query(models.Score).filter(models.Score.id == score_id).first()
+    elif generation_id:
+        return db.query(models.Score).filter(models.Score.generation_id == generation_id).first()
+    else:
+        return None
 
 def complete_round(db: Session, round_id: int, round: schemas.RoundComplete):
     db.bulk_update_mappings(models.Round, [round.model_dump()])

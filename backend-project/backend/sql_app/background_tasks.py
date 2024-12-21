@@ -1,39 +1,10 @@
 from sqlalchemy.orm import Session
 from .dependencies import sentence, score, dictionary
 from . import crud, schemas
-from pathlib import Path
 from typing import Union, List, Annotated, Optional
 from fastapi import HTTPException
 from datetime import timezone
-
-import logging, time
-
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-
-logger = logging.getLogger(__name__)
-
-class computing_time_tracker:
-    def __init__(self, message=None):
-        self.filehandler = logging.FileHandler("logs/computing_time.log", mode="a", encoding=None, delay=False)
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.INFO)
-        self.logger.addHandler(self.filehandler)
-        self.filehandler.setFormatter(formatter)
-        self.message = message
-        self.start_time = time.time()
-
-    def stop_timer(self):
-        duration = time.time() - self.start_time
-        if self.message:
-            message = f"{self.message} - Duration: {duration} - Start time: {self.start_time}"
-        else:
-            message = f"Duration: {duration} - Start time: {self.start_time}"
-        self.logger.info(message)
+from .dependencies.util import computing_time_tracker
 
 def generateDescription(db: Session, leaderboard_id: int, image: str, story: Optional[str], model_name: str="gpt-4o-mini"):
     
@@ -105,13 +76,12 @@ def calculate_score(
     ai_play = crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
 
     if not ai_play:
-        story_path=db_round.leaderboard.story.textfile_path
-        story=Path(story_path).read_text()
+        story=db_round.leaderboard.story.content
         
         ai_play = generateDescription(
             db=db,
             leaderboard_id=db_round.leaderboard_id, 
-            image=str(db_round.leaderboard.original_image.image_path), 
+            image=str(db_round.leaderboard.original_image.image), 
             story=story, 
             model_name="gpt-4o-mini"
         )
@@ -124,7 +94,7 @@ def calculate_score(
         generation=generation, 
         descriptions=ai_play
     )
-    
+
     if is_completed:
         generation_aware = generation.at.replace(tzinfo=timezone.utc)
         db_generation_aware = db_generation.created_at.replace(tzinfo=timezone.utc)
@@ -132,7 +102,7 @@ def calculate_score(
     else: 
         duration = 0
 
-    grammar_spelling = score.grammar_spelling_errors(db_generation.sentence)
+    grammar_spelling = score.grammar_spelling_errors(db_generation.sentence, en_nlp=en_nlp)
 
     factors = {
         'n_words': db_generation.n_words,
@@ -145,7 +115,7 @@ def calculate_score(
         'grammar_errors': grammar_spelling['grammar_error'],
         'n_spelling_errors': grammar_spelling['n_spelling_errors'],
         'spelling_errors': grammar_spelling['spelling_error'],
-        'perplexity': db_generation.perplexity,
+        'perplexity': int(db_generation.perplexity),
         'f_word': db_generation.f_word,
         'f_bigram': db_generation.f_bigram,
         'n_clauses': db_generation.n_clauses,
@@ -243,11 +213,12 @@ def update_n_words(
 def update_grammar_spelling(
         db: Session,
         generation: schemas.GenerationCompleteCreate,
+        en_nlp
 ):
     t = computing_time_tracker("Update grammar spelling")
     db_generation = crud.get_generation(db, generation_id=generation.id)
 
-    factors = score.grammar_spelling_errors(db_generation.sentence)
+    factors = score.grammar_spelling_errors(db_generation.sentence, en_nlp=en_nlp)
 
     db_generation = crud.update_generation3(
         db=db,
@@ -331,10 +302,8 @@ def update_content_score(
 
     db_round = crud.get_round(db, round_id=db_generation.round_id)
 
-    image_path = db_round.leaderboard.original_image.image_path
-
     factors = score.calculate_content_score(
-        image_path=image_path,
+        image=db_round.leaderboard.original_image.image,
         sentence=db_generation.sentence
     )
 

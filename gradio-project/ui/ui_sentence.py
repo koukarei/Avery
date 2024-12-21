@@ -81,6 +81,12 @@ with gr.Blocks() as avery_gradio:
         generated_time = app.state.generated_time
 
         if generated_time:
+            if isinstance(app.state.round, models.RoundStartOut):
+                app.state.round = await read_my_rounds(
+                    request=request,
+                    is_completed=False,
+                    leaderboard_id=app.state.selected_leaderboard.id,
+                )
             generations = app.state.round.generations
             if generations:
                 generations = [i.id for i in generations]
@@ -176,9 +182,13 @@ with gr.Blocks() as avery_gradio:
                         generation_id=output.id,
                         request=request
                     )
+                    submit_show = gr.update(visible=False)
+                    sentence_interactive = gr.update(interactive=False)
                 else:
                     show = gr.update(visible=False)
                     ai_image = None
+                    submit_show = gr.update(visible=True)
+                    sentence_interactive = gr.update(interactive=True)
 
                 chat = await get_chat(
                     round_id=app.state.round.id,
@@ -186,13 +196,13 @@ with gr.Blocks() as avery_gradio:
                 )
                 if chat:
                     chat_history = convert_history(chat)
-                return chat_history,show, show, ai_image
+                return chat_history,show, show, ai_image, submit_show, sentence_interactive
 
             gr.on(
                 triggers=[sentence.submit_btn.click, sentence.sentence.submit],
                 fn=submit_answer,
                 inputs=[guidance.chat, sentence.sentence],
-                outputs=[guidance.chat, sentence.ai_image, sentence.next_btn, sentence.ai_image],
+                outputs=[guidance.chat, sentence.ai_image, sentence.next_btn, sentence.ai_image, sentence.submit_btn,sentence.sentence],
                 queue=False
             )
 

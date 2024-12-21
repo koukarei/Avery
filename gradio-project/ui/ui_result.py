@@ -126,8 +126,8 @@ with gr.Blocks() as avery_gradio:
                 else:
                     show_end = gr.update(visible=True, link="/avery/new_game")
                     restart_value = "もう一回！"
-
-                yield convert_history(chat), show_restart, show_end, restart_value
+                send_msg = gr.update(visible=False)
+                yield convert_history(chat), show_restart, show_end, restart_value,send_msg,send_msg
                 return
             else:
                 yield None
@@ -153,6 +153,7 @@ with gr.Blocks() as avery_gradio:
 
         guidance=Guidance()
         guidance.create_guidance()
+        gr.update()
 
         gr.on(triggers=[guidance.msg.submit,guidance.submit.click],
                 fn=ask_hint,
@@ -166,7 +167,7 @@ with gr.Blocks() as avery_gradio:
 
 
     avery_gradio.load(obtain_image, inputs=[], outputs=[result.image, result.ai_image, result.similarity])
-    avery_gradio.load(load_chat_content, inputs=[], outputs=[guidance.chat, result.restart_btn, result.end_btn, result.restart_btn])
+    avery_gradio.load(load_chat_content, inputs=[], outputs=[guidance.chat, result.restart_btn, result.end_btn, result.restart_btn,guidance.msg,guidance.submit])
     avery_gradio.queue(max_size=128, default_concurrency_limit=50)
 
 

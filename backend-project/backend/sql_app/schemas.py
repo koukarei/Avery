@@ -4,7 +4,7 @@ import datetime
 from typing import Optional, List, Tuple
 
 class ImageBase(BaseModel):
-    image_path: str
+    image: str
 
 class OriginalImage(ImageBase):
     id: int
@@ -187,6 +187,26 @@ class GenerationCompleteCreate(BaseModel):
     id: int
     at: datetime.datetime
 
+class ScoreCreate(BaseModel):
+    generation_id: int
+    grammar_score: float
+    spelling_score: float
+    vividness_score: float
+    convention: bool
+    structure_score: int
+    content_score: int
+
+class ScoreUpdate(BaseModel):
+    id: int
+    image_similarity: float
+
+class Score(ScoreCreate):
+    id: int
+    image_similarity: Optional[float]=None
+
+    class Config:
+        orm_mode = True
+
 class GenerationComplete(BaseModel):
     id: int
     n_words: Optional[int] = None
@@ -217,6 +237,7 @@ class GenerationOut(GenerationComplete):
     sentence: Optional[str] = None
     correct_sentence: Optional[str] = None
     interpreted_image: Optional[InterpretedImage]=None
+    score: Optional[Score]=None
 
     class Config:
         orm_mode = True
@@ -279,11 +300,11 @@ class StoryBase(BaseModel):
     scene_id: int
 
 class StoryCreate(StoryBase):
-    textfile_path: str
+    content: str
 
 class Story(StoryBase):
     id: int
-    textfile_path: str
+    content: str
 
     class Config:
         orm_mode = True
@@ -292,7 +313,7 @@ class StoryOut(BaseModel):
     id: int
     title: str
     scene: Scene
-    textfile_path: str
+    content: str
 
     class Config:
         orm_mode = True

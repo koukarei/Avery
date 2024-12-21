@@ -1,12 +1,5 @@
 from openai import OpenAI
 from pydantic import BaseModel
-import base64
-import io
-from typing import Optional
-
-def encode_image(image_path):
-  with open(image_path, "rb") as image_file:
-    return base64.b64encode(image_file.read()).decode('utf-8')
 
 class Description(BaseModel):
    details: list[str]
@@ -17,7 +10,7 @@ class Passage(BaseModel):
 
 
 def generateSentence(image,story, model_name="gpt-4o-2024-08-06"):
-  #base64_image = encode_image(image)
+  
   client=OpenAI()
   completion = client.beta.chat.completions.parse(
     model=model_name,
@@ -47,12 +40,12 @@ def generateSentence(image,story, model_name="gpt-4o-2024-08-06"):
 def genSentences(image,story,amt=3):
     
     if "http" not in image:
-       image="data:image/jpeg;base64,{}".format(encode_image(image))
+       image="data:image/jpeg;base64,{}".format(image)
     for i in range(amt):
         gen_Sentences=generateSentence(image,story)
     return gen_Sentences
 
-def checkSentence(sentence,temp=0.3):
+def checkSentence(passage,temp=0.3):
   client=OpenAI()
   completion = client.beta.chat.completions.parse(
     model="gpt-4o",
@@ -93,7 +86,7 @@ Output: `{"status": 1, "message": "ブー！英語で答えてください。"}`
 Input: "Fuck You!"
 Output: `{"status": 2, "message": "ブー！不適切な言葉が含まれています。"}`
 """},
-      {"role": "user", "content": f"{sentence}"}
+      {"role": "user", "content": f"{passage}"}
     ],
     temperature=temp,
     response_format=Passage,

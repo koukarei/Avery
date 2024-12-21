@@ -9,7 +9,7 @@ from PIL import Image
 from . import crud, models, schemas
 from .database import SessionLocal, engine
 
-from .dependencies import sentence, gen_image, score, dictionary, openai_chatbot
+from .dependencies import sentence, gen_image, score, dictionary, openai_chatbot, util
 from .authentication import authenticate_user, authenticate_user_2, create_access_token, oauth2_scheme, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, REFRESH_TOKEN_EXPIRE_MINUTES, JWTError, jwt
 import tracemalloc
 tracemalloc.start()
@@ -20,46 +20,6 @@ import torch, stanza
 from contextlib import asynccontextmanager
 import logging
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-
-logger = logging.getLogger(__name__)
-
-class memory_tracker:
-    def __init__(self, message=None):
-        self.filehandler = logging.FileHandler("logs/memory_tracker.log", mode="a", encoding=None, delay=False)
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.WARNING)
-        self.logger.addHandler(self.filehandler)
-        self.filehandler.setFormatter(formatter)
-        self.logger.warning(f"{message} - Memory tracker started")
-        self.snapshot1 = tracemalloc.take_snapshot()
-
-    def get_top_stats(self, message=None):
-        snapshot2 = tracemalloc.take_snapshot()
-        top_stats = snapshot2.compare_to(self.snapshot1, 'lineno')
-        if message:
-            self.logger.warning(message)
-        self.logger.warning("[ Top 10 ]")
-        for stat in top_stats[:10]:
-            self.logger.warning(stat)
-        return top_stats
-
-log_filename = "logs/backend.log"
-
-os.makedirs(os.path.dirname(log_filename), exist_ok=True)
-file_handler = logging.FileHandler(log_filename, mode="a", encoding=None, delay=False)
-file_handler.setFormatter(formatter)
-
-logger1 = logging.getLogger(
-    "info_logger"
-)
-logger1.setLevel(logging.INFO)
-logger1.addHandler(file_handler)
 
 from .background_tasks import *
 
@@ -67,7 +27,7 @@ models.Base.metadata.create_all(bind=engine)
 nlp_models = {}
 
 def model_load():
-    logger1.info("Loading models: stanza, GPT-2")
+    util.logger1.info("Loading models: stanza, GPT-2")
     en_nlp = stanza.Pipeline('en', processors='tokenize,pos,constituency', package='default_accurate')
     from transformers import GPT2Tokenizer, GPT2LMHeadModel
     tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
@@ -93,18 +53,18 @@ def get_db():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await logger1.info("Starting up")
+    await util.logger1.info("Starting up")
     try:
         # Download the English model for stanza
         stanza.download('en')
         nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = await model_load()
-        logger1.info("Models loaded successfully")
+        util.logger1.info("Models loaded successfully")
         yield
     except Exception as e:
         print(f"Error in lifespan startup: {e}")
         raise
     finally:
-        await logger1.info("Shutting down")
+        await util.logger1.info("Shutting down")
         await nlp_models.clear()
 
 app = FastAPI(
@@ -231,6 +191,7 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
     user.is_admin=False
+    user.user_type="student"
     if user.username=="admin":
         user.is_admin=True
         user.user_type="instructor"
@@ -343,36 +304,24 @@ def create_story(
         raise HTTPException(status_code=401, detail="Login to create story")
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
-    os.makedirs(media_dir / "stories", exist_ok=True)
-    if not os.path.exists(media_dir / "stories"):
-        raise HTTPException(status_code=400, detail="The directory for stories does not exist")
+    
     if not story_content_file.filename.endswith(".txt"):
         raise HTTPException(status_code=400, detail="Please upload a text file")
     
-    timestamp = str(int(time.time()))
-    shortenfilename=".".join(story_content_file.filename.split(".")[:-1])[:20]
-    fileattr = story_content_file.filename.split(".")[-1:][0]
-    filename = f"s_{timestamp}_{shortenfilename}.{fileattr}"
-
-    textfile_path = media_dir / "stories" / filename
     
     try:
         story_content = story_content_file.file.read()
-        if not os.path.isfile(textfile_path):
-            with open(textfile_path, "wb") as f:
-                f.write(story_content)
+        storyCreate = schemas.StoryCreate(
+            title=title,
+            scene_id=scene_id,
+            content=story_content
+        )
                 
     except Exception:
-        logger1.error(f"Error uploading file: {Exception}")
+        util.logger1.error(f"Error uploading file: {Exception}")
         raise HTTPException(status_code=400, detail="Error uploading file")
     finally:
         story_content_file.file.close()
-
-    storyCreate = schemas.StoryCreate(
-        title=title,
-        scene_id=scene_id,
-        textfile_path=str(textfile_path)
-    )
 
     return crud.create_story(db=db, story=storyCreate)
 
@@ -414,16 +363,15 @@ def create_leaderboard(
     if db_story is None:
         story=None
     else:
-        story=Path(db_story.textfile_path).read_text()
+        story=db_story.content
 
     db_original_image = crud.get_original_image(db, image_id=leaderboard.original_image_id)
-    image_path = db_original_image.image_path
 
     background_tasks.add_task(
         generateDescription,
         db=db,
         leaderboard_id=result.id, 
-        image=str(image_path), 
+        image=db_original_image.image, 
         story=story, 
         model_name="gpt-4o-mini"
     )
@@ -440,38 +388,19 @@ def create_leaderboard_image(
         raise HTTPException(status_code=401, detail="Login to upload image")
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
-    
-    timestamp = str(int(time.time()))
-    shortenfilename=".".join(original_image.filename.split(".")[:-1])[:20]
-    fileattr = original_image.filename.split(".")[-1:][0]
-    filename = f"o_{timestamp}_{shortenfilename}.{fileattr}"
-    image_path = media_dir / "original_images" / filename
-
-    os.makedirs(media_dir / "original_images", exist_ok=True)
 
     try:
         original_image.file.seek(0)
-        image_content = Image.open(original_image.file)
+        img = util.encode_image(image_file=original_image.file)
     except Exception:
         raise HTTPException(status_code=400, detail="Please upload a valid image file")
-
-    counter = 0
-    while os.path.isfile(image_path):
-        counter += 1
-        image_path=media_dir / "original_images" / f"o_{timestamp}_{shortenfilename}_{counter}.{fileattr}"
-    
-    try:
-        image_content.save(image_path)
-    except Exception as e:
-        logger1.error(f"Error uploading file: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Error uploading file: {str(e)}")
     finally:
         original_image.file.close()
         
     db_original_image = crud.create_original_image(
         db=db,
         image=schemas.ImageBase(
-            image_path=str(image_path),
+            image=img
         )
     )
 
@@ -483,7 +412,7 @@ def read_leaderboard(current_user: Annotated[schemas.User, Depends(get_current_u
         raise HTTPException(status_code=401, detail="Login to view leaderboards")
     db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
     if db_leaderboard is None:
-        logger1.error(f"Leaderboard not found: {leaderboard_id}")
+        util.logger1.error(f"Leaderboard not found: {leaderboard_id}")
         raise HTTPException(status_code=404, detail="Leaderboard not found")
     return db_leaderboard
 
@@ -566,10 +495,10 @@ def get_user_answer(
     )
  
     try:
-        status, correct_sentence=sentence.checkSentence(sentence=db_generation.sentence)
+        status, correct_sentence=sentence.checkSentence(passage=db_generation.sentence)
 
     except Exception as e:
-        logger1.error(f"Error in get_user_answer: {str(e)}")
+        util.logger1.error(f"Error in get_user_answer: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     
     db_round = crud.get_round(db, round_id)
@@ -627,38 +556,24 @@ async def get_interpretation(
     
     try:
         # Image generation
+        gen_img_tracker = util.computing_time_tracker(message="Image generation started - DALLE 3")
         interpreted_image_url = gen_image.generate_interpretion(
             sentence=generation.correct_sentence
         )
-        image_filename = f"i_{round_id}_{generation.id}"
-        interpreted_image_path = media_dir / "interpreted_images" / f"{image_filename}.jpg"
+        gen_img_tracker.stop_timer()
 
         # Download and save image
         try:
             b_interpreted_image = io.BytesIO(requests.get(interpreted_image_url).content)
-            interpreted_image = Image.open(b_interpreted_image)
+            image = util.encode_image(image_file=b_interpreted_image)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid image file: {str(e)}")
-        
-        try:
-            counter = 0
-            while True:
-                if not os.path.isfile(interpreted_image_path):
-                    with open(interpreted_image_path, "wb") as buffer:
-                        interpreted_image.save(buffer)
-                    break
-                counter += 1
-                interpreted_image_path = media_dir / "interpreted_images" / f"{image_filename}_{counter}.jpg"
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Error uploading file: {str(e)}")
-        finally:
-            interpreted_image.close()
         
         # Database operations
         db_interpreted_image = crud.create_interpreted_image(
             db=db,
             image=schemas.ImageBase(
-                image_path=str(interpreted_image_path),
+                image=image,
             )
         )
 
@@ -716,7 +631,7 @@ async def get_interpretation(
             )
         except Exception as e:
             # Log the background task error without raising
-            logger1.error(f"Error in background task addition: {str(e)}")
+            util.logger1.error(f"Error in background task addition: {str(e)}")
 
         # Get round and create message
         db_round = crud.get_round(db, round_id)
@@ -741,7 +656,7 @@ async def get_interpretation(
         raise HTTPException(status_code=400, detail="Invalid image file")
     except Exception as e:
         # Catch and log any unexpected errors
-        logger1.error(f"Unexpected error in get_interpretation: {str(e)}")
+        util.logger1.error(f"Unexpected error in get_interpretation: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.put("/round/{round_id}/complete", tags=["Round"], response_model=schemas.GenerationComplete)
@@ -763,8 +678,6 @@ def complete_generation(
     if current_user.id != db_round.player_id:
         raise HTTPException(status_code=401, detail="You are not authorized to complete generation")
     
-    tracker_complete_generation = memory_tracker(message=f"Generation id: {generation.id} - Complete a generation")
-
     db_chat = crud.get_chat(db=db,chat_id=db_round.chat_history)
     cb=openai_chatbot.Hint_Chatbot()
 
@@ -783,7 +696,7 @@ def complete_generation(
         grammar_errors=str(factors['grammar_error'])
         spelling_errors=str(factors['spelling_error'])
     elif factors['n_grammar_errors'] > 0:
-        errors = score.grammar_spelling_errors(db_generation.sentence)
+        errors = score.grammar_spelling_errors(db_generation.sentence, en_nlp=nlp_models['en_nlp'])
         grammar_errors=str(errors['grammar_error'])
         spelling_errors=str(errors['spelling_error'])
     else:
@@ -794,7 +707,7 @@ def complete_generation(
         sentence=db_generation.sentence,
         scoring=scores_dict,
         rank=db_generation.rank,
-        original_image=db_round.leaderboard.original_image.image_path,
+        base64_image=db_round.leaderboard.original_image.image,
         chat_history=db_chat.messages,
         grammar_errors=grammar_errors,
         spelling_errors=spelling_errors
@@ -808,14 +721,14 @@ def complete_generation(
         自然さ: {convention} (満点1)
         構造性: {structure_score} (満点3)
         内容得点: {content_score} (満点100)
-        合計点: {total_score} (満点1900)
+        合計点: {total_score} (満点100)
         ランク: {rank}　(A-最高, B-上手, C-良い, D-普通, E-悪い, F-最悪)
         """.format(
             user_sentence=db_generation.sentence,
             grammar_score=round(scores_dict['grammar_score'],2),
             spelling_score=round(scores_dict['spelling_score'],2),
             vividness_score=round(scores_dict['vividness_score'],2),
-            convention=round(scores_dict['convention'],2),
+            convention=scores_dict['convention'],
             structure_score=scores_dict['structure_score'],
             content_score=scores_dict['content_score'],
             total_score=scores_dict['total_score'],
@@ -873,10 +786,20 @@ def complete_generation(
             chat_id=db_round.chat_history
         )
 
-    tracker_complete_generation.get_top_stats(
-        message=f"Generation id: {generation.id} - Complete a generation"
-    )
-    del tracker_complete_generation
+        crud.create_score(
+            db=db,
+            score=schemas.ScoreCreate(
+                generation_id=generation.id,
+                grammar_score=scores_dict['grammar_score'],
+                spelling_score=scores_dict['spelling_score'],
+                vividness_score=scores_dict['vividness_score'],
+                convention=scores_dict['convention'],
+                structure_score=scores_dict['structure_score'],
+                content_score=scores_dict['content_score'],
+            ),
+            generation_id=generation.id
+        )
+
     return crud.get_generation(db, generation_id=generation.id)
 
 @app.post("/round/{round_id}/end",tags=["Round"], response_model=schemas.RoundOut)
@@ -1054,7 +977,7 @@ def update_chat(
     model_response = cb.nextResponse(
         ask_for_hint=message.content,
         chat_history=db_chat.messages,
-        original_image=db_round.leaderboard.original_image.image_path,
+        base64_image=db_round.leaderboard.original_image.image,
     )
     if model_response:
         result = crud.create_message(
@@ -1071,7 +994,7 @@ def update_chat(
     else:
         raise HTTPException(status_code=400, detail="Error in chatbot response")
 
-@app.get("/original_image/{leaderboard_id}", tags=["Image"], response_class=responses.FileResponse)
+@app.get("/original_image/{leaderboard_id}", tags=["Image"])
 async def get_original_image(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: int, 
@@ -1083,18 +1006,18 @@ async def get_original_image(
         db=db,
         leaderboard_id=leaderboard_id
     )
-    image_name = db_leaderboard.original_image.image_path.split('/')[-1]
-    # Construct the image path
-    image_path = os.path.join('/static','original_images', image_name)
+
+    #decode base64 image
+    if db_leaderboard.original_image is None:
+        raise HTTPException(status_code=404, detail="Original image not found")
     
-    # Check if the file exists
-    if os.path.isfile(image_path):
-        # Return the image as a file response
-        return image_path
-    else:
-        raise HTTPException(status_code=404, detail="Image not found")
+    imgdata = util.decode_image(db_leaderboard.original_image.image)
+    return responses.Response(
+        content=imgdata,
+        media_type="image/jpeg"  # Adjust this based on your image type (jpeg, png, etc.)
+    )
     
-@app.get("/interpreted_image/{generation_id}", tags=["Image"], response_class=responses.FileResponse)
+@app.get("/interpreted_image/{generation_id}", tags=["Image"])
 async def get_interpreted_image(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     generation_id: int, 
@@ -1118,16 +1041,11 @@ async def get_interpreted_image(
     if db_generation.interpreted_image is None:
         raise HTTPException(status_code=404, detail="Interpreted image not found")
     
-    image_name = db_generation.interpreted_image.image_path.split('/')[-1]
-    # Construct the image path
-    image_path = os.path.join('/static','interpreted_images', image_name)
-    
-    # Check if the file exists
-    if os.path.isfile(image_path):
-        # Return the image as a file response
-        return image_path
-    else:
-        raise HTTPException(status_code=404, detail="Image not found")
+    imgdata = util.decode_image(db_generation.interpreted_image.image)
+    return responses.Response(
+        content=imgdata,
+        media_type="image/jpeg"  # Adjust this based on your image type (jpeg, png, etc.)
+    )
     
 @app.get("/image_similarity/{generation_id}", tags=["Image"], response_model=schemas.ImageSimilarity)
 def get_image_similarity(
@@ -1157,12 +1075,12 @@ def get_image_similarity(
     )
 
     semantic1 = score.calculate_content_score(
-        image_path=db_leaderboard.original_image.image_path,
+        image=db_leaderboard.original_image.image,
         sentence=db_generation.sentence
     )
 
     semantic2 = score.calculate_content_score(
-        image_path=db_generation.interpreted_image.image_path,
+        image=db_generation.interpreted_image.image,
         sentence=db_generation.sentence
     )
 
@@ -1174,8 +1092,8 @@ def get_image_similarity(
         blip2_score = 1 - blip2_score
 
     ssim = score.image_similarity(
-        image1_path=db_leaderboard.original_image.image_path,
-        image2_path=db_generation.interpreted_image.image_path
+        image1=db_leaderboard.original_image.image,
+        image2=db_generation.interpreted_image.image
     )["ssim_score"]
 
     similarity = blip2_score*0.8 + ssim*0.2
@@ -1188,6 +1106,16 @@ def get_image_similarity(
         similarity=similarity
 
     )
+
+    score_id = db_generation.score_id
+    if score_id is not None:
+        crud.update_score(
+            db=db,
+            score=schemas.ScoreUpdate(
+                id=score_id,
+                image_similarity=similarity
+            )
+        )
 
     return image_similarity
 
@@ -1233,7 +1161,7 @@ def read_generations(
     
     return generations
 
-@app.get("/generation/{generation_id}/score", tags=["Generation"], response_model=schemas.GenerationScore)
+@app.get("/generation/{generation_id}/score", tags=["Generation"], response_model=schemas.Score)
 def get_generation_score(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     generation_id: int, 
@@ -1247,14 +1175,12 @@ def get_generation_score(
     )
     if db_generation is None:
         raise HTTPException(status_code=404, detail="Generation not found")
-    scores = score.calculate_score(
-        **schemas.GenerationComplete(
-            db_generation
-        ).model_dump()
+    
+    score = crud.get_score(
+        db=db,
+        generation_id=generation_id
     )
-    scores['id'] = generation_id
-    scores['sentence'] = db_generation.sentence
-    return scores
+    return score
 
 @app.get("/leaderboards/{leaderboard_id}/playable", tags=["Leaderboard"], response_model=schemas.LeaderboardPlayable)
 def check_leaderboard_playable(
