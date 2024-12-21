@@ -242,7 +242,7 @@ async def redirect_to_answer(request: Request):
 
 @app.get("/go_to_result")
 async def redirect_to_result(request: Request):
-    if (not hasattr(request.app.state, 'generation') or not request.app.state.generation) and request.app.state.generated_time < 3:
+    if (not hasattr(request.app.state, 'generation') or not request.app.state.generation) and request.app.state.generated_time < MAX_GENERATION:
         return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
     
     output = await complete_generation(
