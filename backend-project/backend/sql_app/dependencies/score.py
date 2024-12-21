@@ -300,11 +300,11 @@ def image_similarity(image1, image2):
 
 def rank(total_score):
     max_score = 100
-    if total_score>(max_score*0.8):
+    if total_score>(max_score*0.9):
         return "A"
-    elif total_score>(max_score*0.7):
+    elif total_score>(max_score*0.8):
         return "B"
-    elif total_score>(max_score*0.6):
+    elif total_score>(max_score*0.7):
         return "C"
     elif total_score>(max_score*0.5):
         return "D"
