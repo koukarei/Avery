@@ -8,7 +8,7 @@ import datetime
 
 from starlette.applications import Starlette
 from starlette.middleware.sessions import SessionMiddleware
-from api.connection import get_original_images, create_generation, get_chat, send_message, get_interpretation, get_interpreted_image
+from api.connection import get_original_images, create_generation, get_chat, send_message, get_interpretation, get_interpreted_image, read_my_rounds, get_generation
 from api.connection import models
 
 from app import app as fastapi_app
@@ -75,8 +75,23 @@ with gr.Blocks() as avery_gradio:
 
     async def obtain_original_image(request: gr.Request):
         if not hasattr(app.state, 'selected_leaderboard'):
-            return None
-        return await get_original_images(int(app.state.selected_leaderboard.id), request)
+            return None, None
+        
+        original_img = await get_original_images(int(app.state.selected_leaderboard.id), request)
+        generated_time = app.state.generated_time
+
+        if generated_time:
+            generations = app.state.round.generations
+            if generations:
+                generations = [i.id for i in generations]
+                prev_generation_id = max(generations)
+                prev_generation = await get_generation(prev_generation_id, request)
+                prev_ans = prev_generation.sentence
+            else:
+                prev_ans = None
+        else:
+            prev_ans = None
+        return original_img, prev_ans
     
     async def load_chat_content(request: gr.Request):
         if not hasattr(app.state, 'round'):
@@ -191,7 +206,7 @@ with gr.Blocks() as avery_gradio:
                 inputs=[sentence.sentence]
             )
 
-    avery_gradio.load(obtain_original_image, inputs=[], outputs=[sentence.image])
+    avery_gradio.load(obtain_original_image, inputs=[], outputs=[sentence.image, sentence.sentence])
     avery_gradio.load(load_chat_content, inputs=[], outputs=[guidance.chat])
     avery_gradio.queue(max_size=128, default_concurrency_limit=50)
 
