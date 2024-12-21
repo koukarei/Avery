@@ -39,6 +39,7 @@ app.add_middleware(SessionMiddleware, secret_key=os.environ.get('SECRET_KEY'))
 
 templates = Jinja2Templates(directory="templates")
 
+MAX_GENERATION = os.getenv("MAX_GENERATION")
 
 @app.route("/login", methods=["GET", "POST"])
 async def login_form(request: Request):
@@ -183,7 +184,7 @@ async def resume_game(request: Request):
         request.app.state.generation=last_gen
         if last_gen.is_completed:
             request.app.state.generated_time = len(last_round.generations)
-            if request.app.state.generated_time > 4:
+            if request.app.state.generated_time > (MAX_GENERATION-1):
                 output = await end_round(
                     round_id=last_round.id,
                     request=request,
@@ -255,7 +256,7 @@ async def redirect_to_result(request: Request):
     if not output:
         raise HTTPException(status_code=500, detail="Generation not completed")
 
-    if request.app.state.generated_time > 4:
+    if request.app.state.generated_time > (MAX_GENERATION-1):
         output = await end_round(
             round_id=request.app.state.round.id, 
             request=request

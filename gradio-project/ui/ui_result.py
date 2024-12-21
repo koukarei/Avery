@@ -69,10 +69,16 @@ with gr.Blocks() as avery_gradio:
         similarity = await get_image_similarity(int(app.state.generation.id), request)
         
         if similarity:
-            print(similarity)
             similarity = float(similarity.similarity)*100
+            if similarity > 70:
+                css = "color: green;"
+            elif similarity > 50:
+                css = "color: orange;"
+            else:
+                css = "color: red;"
+        md_color = gr.update(css=css)
         similarity_md = "# 類似度: {:^10.2f} ".format(similarity)
-        return original_img, ai_img, similarity_md
+        return original_img, ai_img, similarity_md, md_color
     
     async def load_chat_content(request: gr.Request):
         # complete the generation and get the chat
@@ -130,7 +136,7 @@ with gr.Blocks() as avery_gradio:
         result.create_result()
 
 
-    avery_gradio.load(obtain_image, inputs=[], outputs=[result.image, result.ai_image, result.similarity])
+    avery_gradio.load(obtain_image, inputs=[], outputs=[result.image, result.ai_image, result.similarity, result.similarity])
     avery_gradio.load(load_chat_content, inputs=[], outputs=[guidance.chat, result.restart_btn, result.end_btn])
     avery_gradio.queue(max_size=128, default_concurrency_limit=50)
 
