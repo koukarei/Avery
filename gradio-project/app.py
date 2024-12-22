@@ -134,6 +134,8 @@ async def logout(request: Request):
         return RedirectResponse(url='https://sk.let.media.kyoto-u.ac.jp')
     elif school == "hikone":
         return RedirectResponse(url='https://leaf02.uchida.co.jp/moodle/')
+    elif school == "lms":
+        return RedirectResponse(url='https://lms.let.media.kyoto-u.ac.jp/moodle/')
     else:
         return RedirectResponse(url='/login')
 
