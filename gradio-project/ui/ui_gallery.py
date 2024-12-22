@@ -147,13 +147,24 @@ with gr.Blocks() as avery_gradio:
         selected_interpreted = generations[evt.index]
         selected = await get_generation(selected_interpreted.id, request)
         if selected:
-            md = f"""## {select_leaderboard.title}
-            
-            英作文：{selected.sentence}
+            if hasattr(selected, 'score'):
+                score = selected.score
+                md = f"""## {select_leaderboard.title}
+                
+                英作文：{selected.sentence}
+                
+                文法得点：{score.grammar_score}　スペル得点：{score.spelling_score}
 
-            合計点：{selected.total_score}
-            
-            ランク：{selected.rank}"""
+                鮮明さ：{score.vividness_score}　自然さ：{int(score.convention)}　構造性：{score.structure_score}
+
+                内容得点：{score.content_score}　合計点：{selected.total_score}
+                
+                ランク：{selected.rank}　時間：{selected.duration}秒　類似度： {round(score.image_similarity*100, 2)}%"""
+            else:
+                md = f"""## {select_leaderboard.title}
+                
+                英作文：{selected.sentence}
+                """
         else:
             md = f"## {select_leaderboard.title}"
         return md
