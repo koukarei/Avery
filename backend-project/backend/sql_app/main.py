@@ -139,17 +139,11 @@ async def login_for_access_token(
 
 @app.post("/lti/token",response_model=schemas.Token)
 async def login_for_access_token_lti(
-    user: schemas.UserCreateLti,
+    user: schemas.UserLti,
     db: Session = Depends(get_db),
 ):
-    user = authenticate_user_2(db, user_id=user.user_id, school=user.school)
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No such user found",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    
+    user = authenticate_user_2(db, lti_user_id=user.user_id, school=user.school)
     
     if not user.lti:
         raise HTTPException(
@@ -197,9 +191,9 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         user.user_type="instructor"
     return crud.create_user(db=db, user=user)
 
-@app.post("/users/lti/", tags=["User"], response_model=schemas.User)
-def create_user_lti(user: schemas.UserCreateLti, db: Session = Depends(get_db)):
-    db_user = crud.get_user_by_lti(db, user_id=user.user_id, school=user.school)
+@app.post("/users/lti", tags=["User"], response_model=schemas.User)
+def create_user_lti(user: schemas.UserLti, db: Session = Depends(get_db)):
+    db_user = crud.get_user_by_lti(db, lti_user_id=user.user_id, school=user.school)
     if db_user:
         raise HTTPException(status_code=400, detail="This account already exists")
     return crud.create_user_lti(db=db, user=user)

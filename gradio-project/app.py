@@ -66,12 +66,10 @@ async def login_form(request: Request):
 
 @app.route('/lti/login',methods=["POST"])
 async def lti_login(request: Request):
-    print(f"Validating LTI request. Request headers: {dict(request.headers)}")
     valid = await validate_lti_request(request)
     if not valid:
         return {'error': 'Invalid LTI request'} 
-    print(f"Valid LTI request: {valid}")
-    print(request.form())
+    
     # Extracting additional fields from the form data
     form_data = await request.form()
 
@@ -92,32 +90,32 @@ async def lti_login(request: Request):
         else:
             role = "student"
 
+        username = form_data.get('ext_user_username')
         user_login = models.UserLti(
             user_id=form_data.get('user_id'),
-            username=form_data.get('ext_user_username'),
+            username=username,
             display_name=form_data.get('lis_person_name_full', 'Unknown User'),
             roles=role,
             email=form_data.get('lis_person_contact_email_primary', ''),
             school=school,
         )
 
-        response = await get_access_token_from_backend_lti(form_data=user_login)
+        response = await get_access_token_from_backend_lti(user=user_login)
         
-        if response.status_code ==401:
+        if not hasattr(response, 'status_code'):
+            token = response
+        elif response.status_code == 400:
             # Create user
-            response = await create_user_lti(form_data=user_login)
-
-        response = await get_access_token_from_backend_lti(form_data=user_login)
-
-        if response.status_code != 200:
-            raise HTTPException(status_code=500, detail="Failed to login")
+            response = await create_user_lti(newuser=user_login)
+            token = await get_access_token_from_backend_lti(user=user_login)
+        else:
+            response.raise_for_status()
         
-        token = models.Token(**json.loads(response.json()))
-
         request.session["school"] = school
         request.session["token"] = token.model_dump()
-        request.session["username"] = form_data["username"]
+        request.session["username"] = username
         request.session["roles"] = role
+        return RedirectResponse(url='/avery/', status_code=status.HTTP_303_SEE_OTHER)
 
     raise HTTPException(status_code=500, detail="Failed to login")
 

@@ -54,7 +54,7 @@ def create_user(db: Session, user: schemas.UserCreate):
 
     return db_user
 
-def create_user_lti(db: Session, user: schemas.UserCreateLti):
+def create_user_lti(db: Session, user: schemas.UserLti):
     random_password = str(datetime.datetime.now())
     hashed_password = get_password_hash(random_password)
     db_userprofile = models.UserProfile(

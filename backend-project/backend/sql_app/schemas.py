@@ -69,7 +69,7 @@ class UserCreate(UserBase):
     class Config:
         orm_mode = True
 
-class UserCreateLti(UserBase):
+class UserLti(BaseModel):
     user_id: int
     username: str
     display_name: str
@@ -236,7 +236,7 @@ class GenerationComplete(BaseModel):
 class GenerationOut(GenerationComplete):
     sentence: Optional[str] = None
     correct_sentence: Optional[str] = None
-    interpreted_image: Optional[InterpretedImage]=None
+    interpreted_image: Optional[IdOnly]=None
     score: Optional[Score]=None
 
     class Config:

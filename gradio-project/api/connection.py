@@ -75,6 +75,7 @@ async def create_user_lti(newuser: models.UserLti):
         json=newuser.model_dump(),
         headers={"Content-Type": "application/json"}
     )
+    
     return response
 
 async def get_access_token_from_backend(
@@ -100,15 +101,17 @@ async def get_access_token_from_backend_lti(
         user: models.UserLti,
 ):
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{BACKEND_URL}lti/token", 
-                data=user.model_dump(), 
-                follow_redirects=True
-            )
-            response.raise_for_status()
-            token = models.Token(**response.json())  
-            return token
+        response = await http_client.post(
+            f"{BACKEND_URL}lti/token", 
+            json=user.model_dump(), 
+            headers={"Content-Type": "application/json"},
+            follow_redirects=True
+        )
+        if response.status_code == 400:
+            return response
+        response.raise_for_status()
+        token = models.Token(**response.json())  
+        return token
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code)
 

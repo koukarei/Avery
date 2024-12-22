@@ -176,7 +176,7 @@ class Score(ScoreCreate):
 class GenerationOut(GenerationComplete):
     sentence: Optional[str]=None
     correct_sentence: Optional[str]=None
-    interpreted_image: Optional[Image]=None
+    interpreted_image: Optional[IdOnly]=None
     score: Optional[Score]=None
 
 class GenerationRound(BaseModel):
