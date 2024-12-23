@@ -85,7 +85,7 @@ async def lti_login(request: Request):
         elif oauth_consumer_key == "lms_consumer_key":
             school = "lms"
 
-        if "instructor" in form_data.get('roles', ''):
+        if "instructor" in form_data.get('roles', '').lower():
             role = "instructor"
         else:
             role = "student"

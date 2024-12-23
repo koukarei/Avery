@@ -115,7 +115,7 @@ def calculate_score(
         'grammar_errors': grammar_spelling['grammar_error'],
         'n_spelling_errors': grammar_spelling['n_spelling_errors'],
         'spelling_errors': grammar_spelling['spelling_error'],
-        'perplexity': int(db_generation.perplexity),
+        'perplexity': db_generation.perplexity,
         'f_word': db_generation.f_word,
         'f_bigram': db_generation.f_bigram,
         'n_clauses': db_generation.n_clauses,
