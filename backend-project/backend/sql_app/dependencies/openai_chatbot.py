@@ -126,6 +126,7 @@ Avery、ロボット（ディズニーのベイマックスのように話すキ
                 model=self.model_name,
                 messages=self.messages,
                 response_format=Hint,
+                temperature=0.5,
             )
 
             hint = completion.choices[0].message.parsed
@@ -259,6 +260,7 @@ cat is pray arund in the katcen.
                 model=self.model_name,
                 messages=self.messages,
                 response_format=Final_Evaluation,
+                temperature=0.7,
             )
 
             evaluation = completion.choices[0].message.parsed
