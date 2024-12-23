@@ -43,7 +43,7 @@ class BearerAuth(httpx.Auth):
                 self.refresh_url,
                 data={"refresh_token": self.refresh_token}
             )
-            return response
+        return response
     
     def update_tokens(self, response):
         data = response.json()
