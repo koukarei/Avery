@@ -45,7 +45,7 @@ def genSentences(image,story,amt=3):
         gen_Sentences=generateSentence(image,story)
     return gen_Sentences
 
-def checkSentence(passage,temp=0.3):
+def checkSentence(passage,temp=1):
   client=OpenAI()
   completion = client.beta.chat.completions.parse(
     model="gpt-4o",
