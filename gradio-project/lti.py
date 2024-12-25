@@ -25,7 +25,6 @@ async def validate_lti_request(request: Request):
     common_request_verification = False
 
     LTI_URL = os.getenv("LTI_URL")
-    LTI_URL = str(request.url)
     LTI_CONSUMERS = load_lti_credentials()
     
     try: 
