@@ -729,24 +729,22 @@ def complete_generation(
             rank=db_generation.rank,
         )
 
-        evaluation_message = """文法について
+        evaluation_message = """**文法**
         {grammar_feedback}
-        スペルについて
+        **スペル**
         {spelling_feedback}
-        スタオルについて
+        **スタオル**
         {style_feedback}
-        内容について
+        **内容**
         {content_feedback}
+
+        **整体的なコメント**
+        {overall_feedback}
         """.format(
             grammar_feedback=evaluation.grammar_evaluation,
             spelling_feedback=evaluation.spelling_evaluation,
             style_feedback=evaluation.style_evaluation,
-            content_feedback=evaluation.content_evaluation
-        )
-
-        overall_evaluation_message = """整体的なコメント
-        {overall_feedback}
-        """.format(
+            content_feedback=evaluation.content_evaluation,
             overall_feedback=evaluation.overall_evaluation
         )
 
@@ -764,16 +762,6 @@ def complete_generation(
             db=db,
             message=schemas.MessageBase(
                 content=evaluation_message,
-                sender="assistant",
-                created_at=datetime.datetime.now(tz=timezone.utc)
-            ),
-            chat_id=db_round.chat_history
-        )
-
-        crud.create_message(
-            db=db,
-            message=schemas.MessageBase(
-                content=overall_evaluation_message,
                 sender="assistant",
                 created_at=datetime.datetime.now(tz=timezone.utc)
             ),
