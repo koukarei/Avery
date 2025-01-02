@@ -407,6 +407,9 @@ def get_vocabulary(db: Session, vocabulary: str, part_of_speech: str=None):
         return db.query(models.Vocabulary).filter(models.Vocabulary.word == vocabulary).all()
     return db.query(models.Vocabulary).filter(models.Vocabulary.word == vocabulary).filter(models.Vocabulary.pos == part_of_speech).first()
 
+def get_vocabularies(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Vocabulary).offset(skip).limit(limit).all()
+
 def create_vocabulary(db: Session, vocabulary: schemas.VocabularyBase):
     db_vocabulary = models.Vocabulary(**vocabulary.model_dump())
     db.add(db_vocabulary)

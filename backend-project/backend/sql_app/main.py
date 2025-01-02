@@ -369,6 +369,22 @@ def create_leaderboard(
 
     db_original_image = crud.get_original_image(db, image_id=leaderboard.original_image_id)
 
+    # add leaderboard vocabularies
+    if leaderboard.story_extract:
+        words = dictionary.get_sentence_nlp(leaderboard.story_extract)
+        for word in words:
+            vocab = crud.get_vocabulary(
+                db=db,
+                vocabulary=word.lemma,
+                part_of_speech=word.pos
+            )
+            if vocab:
+                crud.create_leaderboard_vocabulary(
+                    db=db,
+                    leaderboard_id=result.id,
+                    vocabulary_id=vocab.id
+                )
+
     background_tasks.add_task(
         generateDescription,
         db=db,
@@ -397,7 +413,7 @@ def create_leaderboards(
         raise HTTPException(status_code=400, detail="Please upload a CSV file")
     
     # Get the scene
-    scene = crud.get_scene(db=db, scene_name="Simpsons")
+    scene = crud.get_scene(db=db, scene_name="anime")
 
     leaderboards = pd.read_csv(csv_file.file)
     if int(len(leaderboards)) != int(len(images_files)):
@@ -444,22 +460,16 @@ def create_leaderboards(
         # Create leaderboards
         leaderboard_list = []
         for index, row in leaderboards.iterrows():
-            story_extract = row['story_extract']
+            
             published_at = row.get('published_at', datetime.datetime.now(tz=timezone.utc))
 
             # Get vocabularies if exist
             vocabularies = []
-            if 'vocabularies' in leaderboards.columns:
-                words = row['vocabularies'].split(",")
-                words = dictionary.get_pos_bulk(words, story_extract)
-                for word in words:
-                    vocab = crud.get_vocabulary(
-                        db=db,
-                        vocabulary=word.get('lemma'),
-                        pos=word.get('pos')
-                    )
-                    if vocab:
-                        vocabularies.append(vocab)
+
+            if 'story_extract' in leaderboards.columns:
+                story_extract = row['story_extract']
+            else:
+                story_extract = ''
 
             img = images.get(util.remove_special_chars(index), None)
 
@@ -480,12 +490,21 @@ def create_leaderboards(
             )
 
             # Add vocabularies
-            for vocab in vocabularies:
-                crud.create_leaderboard_vocabulary(
-                    db=db,
-                    leaderboard_id=db_leaderboard.id,
-                    vocabulary_id=vocab.id
-                )
+            if story_extract:
+                words = dictionary.get_sentence_nlp(story_extract)
+                for word in words:
+                    print(word.lemma, word.pos)
+                    vocab = crud.get_vocabulary(
+                        db=db,
+                        vocabulary=word.lemma,
+                        part_of_speech=word.pos
+                    )
+                    if vocab:
+                        crud.create_leaderboard_vocabulary(
+                            db=db,
+                            leaderboard_id=db_leaderboard.id,
+                            vocabulary_id=vocab.id
+                        )
 
             leaderboard_list.append(db_leaderboard)
 
@@ -718,6 +737,7 @@ async def get_interpretation(
 
         # Get descriptions
         descriptions =  crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
+        descriptions = [des.content for des in descriptions]
 
         # Safe background task addition with error handling
         try:
@@ -1144,8 +1164,9 @@ def update_chat(
         chat_id=db_chat.id
     )
 
+    vocabularies = db_round.leaderboard.vocabularies
     # get hint from AI
-    cb = openai_chatbot.Hint_Chatbot()
+    cb = openai_chatbot.Hint_Chatbot(vocabularies=vocabularies)
 
     model_response = cb.nextResponse(
         ask_for_hint=message.content,

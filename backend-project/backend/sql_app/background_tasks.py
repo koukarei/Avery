@@ -86,13 +86,15 @@ def calculate_score(
             model_name="gpt-4o-mini"
         )
     
+    descriptions = [d.content for d in ai_play]
+
     check_factors_done(
         db=db,
         en_nlp=en_nlp,
         perplexity_model=perplexity_model,
         tokenizer=tokenizer,
         generation=generation, 
-        descriptions=ai_play
+        descriptions=descriptions
     )
 
     if is_completed:

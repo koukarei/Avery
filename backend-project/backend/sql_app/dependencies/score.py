@@ -16,7 +16,7 @@ import time
 import numpy as np
 
 def get_loss_pretrained(perplexity_model, tokenizer,text, descriptions: list, cuda=False):
-    descriptions = [d.content for d in descriptions]
+    
     question = "Conclude the following sentence: "
     d = '\n* '.join(descriptions)
     question_d = f"Question: {question} {d}"

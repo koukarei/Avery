@@ -29,7 +29,7 @@ def convert_image(img):
     return None 
 
 class Hint_Chatbot:
-    def __init__(self, model_name="gpt-4o-2024-08-06"):
+    def __init__(self, model_name="gpt-4o-2024-08-06", vocabularies=None):
         self.client=OpenAI()
         
         self.system_prompt = f"""
@@ -56,6 +56,7 @@ Avery、ロボット（ディズニーのベイマックスのように話すキ
 - ヒントは短く、的確にする
 - フィードバックは親切で丁寧
 - 不適切な言葉遣いには注意を促す
+- おすすめ関連単語があれば、優先的に提案する
 
 ## Example
 1. ユーザー：丸のものは何ですか？
@@ -85,6 +86,11 @@ Avery、ロボット（ディズニーのベイマックスのように話すキ
 13. ユーザー：The apple is under the table.
    hints: 画像のリンゴはテーブルの上にありますから、The apple is on the table.と言うべきです。
         """
+
+        if vocabularies:
+            self.system_prompt+="\n\n## おすすめ関連単語\n"
+            for vocabulary in vocabularies:
+                self.system_prompt+=f"- {vocabulary.word} ({vocabulary.pos}): {vocabulary.meaning}\n"
 
         self.messages=[
             {"role": "system", "content": self.system_prompt},
