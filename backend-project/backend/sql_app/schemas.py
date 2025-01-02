@@ -374,7 +374,7 @@ class GoodRound(BaseModel):
 
 class LeaderboardOut(LeaderboardBase):
     id: int
-    original_image: OriginalImage
+    original_image: IdOnly
     scene: Scene
     story: Optional[Story]=None
     created_by: UserOut

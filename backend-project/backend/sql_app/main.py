@@ -397,7 +397,7 @@ def create_leaderboards(
         raise HTTPException(status_code=400, detail="Please upload a CSV file")
     
     # Get the scene
-    scene = crud.get_scene(db=db, scene_name="anime")
+    scene = crud.get_scene(db=db, scene_name="Simpsons")
 
     leaderboards = pd.read_csv(csv_file.file)
     if int(len(leaderboards)) != int(len(images_files)):

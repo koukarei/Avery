@@ -143,15 +143,15 @@ with gr.Blocks() as avery_gradio:
                   queue=False
             )
 
-            gr.Examples(
-                examples=[
-                    ["この部屋の英語は何？"],
-                    ["この生物の色は何？"],
-                    ["関連動詞を提示してください"],
-                    ["The mouse is cutting a ham with a fork and knife."],
-                ],
-                inputs=[guidance.msg]
-            )
+            # gr.Examples(
+            #     examples=[
+            #         ["この部屋の英語は何？"],
+            #         ["この生物の色は何？"],
+            #         ["関連動詞を提示してください"],
+            #         ["The mouse is cutting a ham with a fork and knife."],
+            #     ],
+            #     inputs=[guidance.msg]
+            # )
 
         with gr.Column(min_width=300,elem_classes='interactive'):
             sentence=Sentence()
@@ -206,15 +206,15 @@ with gr.Blocks() as avery_gradio:
                 queue=False
             )
 
-            gr.Examples(
-                examples=[
-                    ["ネズミはハムをフォークとナイフで切っている。"],
-                    ["Shit"],
-                    ["The mouse is cutting a ham with a fork and knife."],
-                    ["A rabbit ran with a turtle confidently."]
-                ],
-                inputs=[sentence.sentence]
-            )
+            # gr.Examples(
+            #     examples=[
+            #         ["ネズミはハムをフォークとナイフで切っている。"],
+            #         ["Shit"],
+            #         ["The mouse is cutting a ham with a fork and knife."],
+            #         ["A rabbit ran with a turtle confidently."]
+            #     ],
+            #     inputs=[sentence.sentence]
+            # )
 
     avery_gradio.load(obtain_original_image, inputs=[], outputs=[sentence.image, sentence.sentence])
     avery_gradio.load(load_chat_content, inputs=[], outputs=[guidance.chat])

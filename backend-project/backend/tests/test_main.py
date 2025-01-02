@@ -130,6 +130,8 @@ class TestAdmin:
             {"name": "anime", "prompt": "in the style of anime"},
             {"name": "manga", "prompt": "in the style of manga"},
             {"name": "cartoon", "prompt": "in the style of cartoon"},
+            {"name": "Simpsons", "prompt": "in the style of cartoon, the Simpsons"},
+            {"name": "Disney", "prompt": "in the style of Disney"},
         ]
 
         for scene in scenes:
