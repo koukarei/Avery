@@ -3,6 +3,7 @@ from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, Bac
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 import time, os, datetime, io, requests
+import pandas as pd
 from pathlib import Path
 from PIL import Image
 
@@ -169,6 +170,9 @@ async def refresh_token(current_user: schemas.User = Security(get_current_user, 
             )
             return {"access_token": access_token}
     else:
+        util.logger1.error(
+            msg=f"Invalid token: {current_user}",
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",
@@ -324,8 +328,12 @@ def create_story(
 def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_current_user)],skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view leaderboards")
-    
-    leaderboards = crud.get_leaderboards(db, skip=skip, limit=limit)
+    # Check if the user is a student
+    if current_user.user_type == "student":
+        leaderboards = crud.get_leaderboards(db, skip=skip, limit=limit)
+    else:
+        published_at = datetime.datetime.now(tz=timezone.utc) + timedelta(days=365)
+        leaderboards = crud.get_leaderboards(db, skip=skip, limit=limit, published_at=published_at)
     return leaderboards
 
 @app.post("/leaderboards/", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
@@ -371,6 +379,130 @@ def create_leaderboard(
     )
 
     return result
+
+@app.post("/leaderboards/bulk_create", tags=["Leaderboard"], response_model=list[schemas.LeaderboardOut])
+def create_leaderboards(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    images_files: List[Annotated[UploadFile, File()]],
+    csv_file: Annotated[UploadFile, File()],
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to create leaderboards")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    
+    if not csv_file.filename.endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Please upload a CSV file")
+    
+    # Get the scene
+    scene = crud.get_scene(db=db, scene_name="anime")
+
+    leaderboards = pd.read_csv(csv_file.file)
+    if int(len(leaderboards)) != int(len(images_files)):
+        raise HTTPException(status_code=400, detail=f"Number of images ({len(images_files)}) and leaderboards ({len(leaderboards)}) do not match")
+
+    # Check if the CSV file has the required columns
+    col_names = ['title', 'story_extract']
+    if not all(col in leaderboards.columns for col in col_names):
+        raise HTTPException(status_code=400, detail="CSV file must have 'title' and 'story_extract' columns")
+    
+    if 'published_at' in leaderboards.columns:
+        leaderboards['published_at'] = pd.to_datetime(leaderboards['published_at'], format='%d/%m/%Y')
+
+    # Create images
+    try:
+        images = {}
+        for image_file in images_files:
+            try:
+                image_file.file.seek(0)
+                img = util.encode_image(image_file=image_file.file)
+            except Exception:
+                raise HTTPException(status_code=400, detail="Please upload a valid image file")
+            finally:
+                image_file.file.close()
+
+            db_original_image = crud.create_original_image(
+                db=db,
+                image=schemas.ImageBase(
+                    image=img
+                )
+            )
+            title = image_file.filename.split(".")[0]
+            images[title] = db_original_image
+
+    except Exception as e:
+        util.logger1.error(f"Error creating images: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Read the CSV file
+    try:
+        
+        leaderboards.set_index('title', inplace=True)
+
+        # Create leaderboards
+        leaderboard_list = []
+        for index, row in leaderboards.iterrows():
+            story_extract = row['story_extract']
+            published_at = row.get('published_at', datetime.datetime.now(tz=timezone.utc))
+
+            # Get vocabularies if exist
+            vocabularies = []
+            if 'vocabularies' in leaderboards.columns:
+                words = row['vocabularies'].split(",")
+                words = dictionary.get_pos_bulk(words, story_extract)
+                for word in words:
+                    vocab = crud.get_vocabulary(
+                        db=db,
+                        vocabulary=word.get('lemma'),
+                        pos=word.get('pos')
+                    )
+                    if vocab:
+                        vocabularies.append(vocab)
+
+            img = images.get(util.remove_special_chars(index), None)
+
+            # Create leaderboard
+            leaderboard = schemas.LeaderboardCreate(
+                title=index,
+                story_extract=story_extract,
+                published_at=published_at,
+                is_public=True,
+                scene_id=scene.id,
+                original_image_id=img.id,
+                created_by_id=current_user.id,
+            )
+
+            db_leaderboard = crud.create_leaderboard(
+                db=db,
+                leaderboard=leaderboard,
+            )
+
+            # Add vocabularies
+            for vocab in vocabularies:
+                crud.create_leaderboard_vocabulary(
+                    db=db,
+                    leaderboard_id=db_leaderboard.id,
+                    vocabulary_id=vocab.id
+                )
+
+            leaderboard_list.append(db_leaderboard)
+
+            # Generate descriptions
+            background_tasks.add_task(
+                generateDescription,
+                db=db,
+                leaderboard_id=db_leaderboard.id, 
+                image=img.image, 
+                story=story_extract, 
+                model_name="gpt-4o-mini"
+            )
+
+        return leaderboard_list
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error reading CSV file: {str(e)}")
 
 @app.post("/leaderboards/image", tags=["Leaderboard"], response_model=schemas.IdOnly)
 def create_leaderboard_image(
@@ -826,6 +958,65 @@ def end_round(
     if db_round is None:
         raise HTTPException(status_code=404, detail="Round not found")
     return db_round
+
+@app.get("/vocabulary/{vocabulary}", tags=["Vocabulary"], response_model=list[schemas.Vocabulary])
+def read_vocabulary(current_user: Annotated[schemas.User, Depends(get_current_user)], vocabulary: str, pos: str=None, db: Session = Depends(get_db)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view vocabulary")
+    vocabularies = crud.get_vocabulary(db, vocabulary=vocabulary, pos=pos)
+    return vocabularies
+
+@app.post("/vocabularies", tags=["Vocabulary"], response_model=List[schemas.Vocabulary])
+def create_vocabularies(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    vocabularies_csv: Annotated[UploadFile, File()],
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to create vocabulary")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    
+    if not vocabularies_csv.filename.endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Please upload a CSV file")
+    
+    output = []
+    try:
+        vocabularies = pd.read_csv(vocabularies_csv.file)
+        col_names = ['word','pos']
+        if not all(col in vocabularies.columns for col in col_names):
+            raise HTTPException(status_code=400, detail="CSV file must have 'word' and 'pos' columns")
+        
+        for index, row in vocabularies.iterrows():
+            pos = row['pos'].split(",")
+            for p in pos:
+                p = p.strip()
+
+                meaning = dictionary.get_meaning(
+                    lemma=row['word'],
+                    pos=p
+                )
+
+                if isinstance(meaning, list):
+                    meaning = '; '.join(meaning)
+                elif meaning is None:
+                    continue
+                elif meaning == "Word not found in the dictionary":
+                    continue
+                
+                v = crud.create_vocabulary(
+                    db=db,
+                    vocabulary=schemas.VocabularyBase(
+                        word=row['word'],
+                        pos=p,
+                        meaning=meaning
+                    )
+                )
+                output.append(v)
+        return output
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 @app.get("/personal_dictionaries/", tags=["Personal Dictionary"], response_model=list[schemas.PersonalDictionary])
 def read_personal_dictionaries(current_user: Annotated[schemas.User, Depends(get_current_user)], db: Session = Depends(get_db)):

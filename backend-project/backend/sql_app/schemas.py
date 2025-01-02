@@ -96,27 +96,28 @@ class UserOut(BaseModel):
     level: int
 
 class UserUpdateIn(BaseModel):
-    username: Optional[str]
-    email: Optional[str]
-    id: Optional[int]
-    is_admin: Optional[bool]
-    is_active: Optional[bool]
-    user_type: Optional[str]
+    username: Optional[str]=None
+    email: Optional[str]=None
+    id: Optional[int]=None
+    is_admin: Optional[bool]=None
+    is_active: Optional[bool]=None
+    user_type: Optional[str]=None
 
 class UserUpdate(BaseModel):
     id: int
-    is_admin: Optional[bool]
-    is_active: Optional[bool]
-    user_type: Optional[str]
+    is_admin: Optional[bool]=None
+    is_active: Optional[bool]=None
+    user_type: Optional[str]=None
 
 class LeaderboardBase(BaseModel):
     title: str
     story_extract: str
     is_public: bool
+    published_at: Optional[datetime.datetime]=datetime.datetime.now()
 
 class LeaderboardCreateIn(LeaderboardBase):
     scene_id: int
-    story_id: Optional[int]
+    story_id: Optional[int]=None
     original_image_id: int
 
 class LeaderboardCreate(LeaderboardCreateIn):
@@ -348,11 +349,11 @@ class PersonalDictionary(PersonalDictionaryBase):
         orm_mode = True
         
 class PersonalDictionaryUpdate(PersonalDictionaryId):
-    position_top: Optional[int]
-    position_left: Optional[int]
-    size_width: Optional[int]
-    size_height: Optional[int]
-    note: Optional[str]
+    position_top: Optional[int]=0
+    position_left: Optional[int]=0
+    size_width: Optional[int]=0
+    size_height: Optional[int]=0
+    note: Optional[str]=""
 
 class GoodImage(BaseModel):
     player_id: int
@@ -375,7 +376,7 @@ class LeaderboardOut(LeaderboardBase):
     id: int
     original_image: OriginalImage
     scene: Scene
-    story: Optional[Story]
+    story: Optional[Story]=None
     created_by: UserOut
     vocabularies: list[Vocabulary]=[]
 

@@ -108,8 +108,10 @@ def delete_user(db: Session, user_id: int):
         db.commit()
     return db_user
 
-def get_leaderboards(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.Leaderboard).offset(skip).limit(limit).all()
+def get_leaderboards(db: Session, skip: int = 0, limit: int = 100, published_at: datetime.datetime = None):
+    if published_at is None:
+        published_at = datetime.datetime.now()
+    return db.query(models.Leaderboard).filter(models.Leaderboard.published_at <= published_at).offset(skip).limit(limit).all()
 
 def get_leaderboard(db: Session, leaderboard_id: int):
     return db.query(models.Leaderboard).filter(models.Leaderboard.id == leaderboard_id).first()
@@ -176,8 +178,11 @@ def create_story(db: Session, story: schemas.StoryCreate):
 def get_scenes(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Scene).offset(skip).limit(limit).all()
 
-def get_scene(db: Session, scene_id: int):
-    return db.query(models.Scene).filter(models.Scene.id == scene_id).first()
+def get_scene(db: Session, scene_id: int = None, scene_name: str = None):
+    if scene_name:
+        return db.query(models.Scene).filter(models.Scene.name == scene_name).first()
+    else:
+        return db.query(models.Scene).filter(models.Scene.id == scene_id).first()
 
 def create_scene(db: Session, scene: schemas.SceneBase):
     db_scene = models.Scene(**scene.model_dump())
@@ -397,7 +402,9 @@ def create_message(db: Session, message: schemas.MessageBase, chat_id: int):
     db.refresh(db_chat)
     return {"message": db_message, "chat": db_chat}
 
-def get_vocabulary(db: Session, vocabulary: str, part_of_speech: str):
+def get_vocabulary(db: Session, vocabulary: str, part_of_speech: str=None):
+    if part_of_speech is None:
+        return db.query(models.Vocabulary).filter(models.Vocabulary.word == vocabulary).all()
     return db.query(models.Vocabulary).filter(models.Vocabulary.word == vocabulary).filter(models.Vocabulary.pos == part_of_speech).first()
 
 def create_vocabulary(db: Session, vocabulary: schemas.VocabularyBase):

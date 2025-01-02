@@ -124,6 +124,19 @@ class TestAdmin:
         scene_id = response.json()['id']
         assert scene_id > 0
 
+    def test_add_scenes(self):
+        scenes = [
+            {"name": "One Piece", "prompt": "in the style of One Piece"},
+            {"name": "anime", "prompt": "in the style of anime"},
+            {"name": "manga", "prompt": "in the style of manga"},
+            {"name": "cartoon", "prompt": "in the style of cartoon"},
+        ]
+
+        for scene in scenes:
+            response = client.post("/sqlapp/scene/", json=scene.copy(),headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"})
+            assert response.status_code == 200, response.json()
+
+
     def test_read_stories(self):
 
         # Test read all stories

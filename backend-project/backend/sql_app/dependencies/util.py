@@ -1,4 +1,4 @@
-import base64, cv2, PIL, io
+import base64, cv2, PIL, io, re
 import numpy as np
 import logging, time, os, tracemalloc
 
@@ -80,3 +80,7 @@ logger1 = logging.getLogger(
 )
 logger1.setLevel(logging.INFO)
 logger1.addHandler(file_handler)
+
+def remove_special_chars(text):
+    cleaned_text = re.sub(r'[^\w\s]', '', text)
+    return cleaned_text
