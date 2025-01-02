@@ -137,7 +137,7 @@ async def logout(request: Request):
     elif school == "lms":
         return RedirectResponse(url='https://lms.let.media.kyoto-u.ac.jp/moodle/')
     else:
-        return RedirectResponse(url='/login')
+        return RedirectResponse(url='/avery/login')
 
 @app.post("/token")
 def token(request: Request):

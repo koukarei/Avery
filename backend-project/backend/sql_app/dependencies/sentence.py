@@ -74,7 +74,7 @@ Analyze a passage to determine:
 - Must detect non-English text accurately.
 - Must detect offensive or inappropriate content with high precision.
 - Correct spelling and grammar only for English text.
-- Message should not exceed 1000 characters if providing reasons for statuses 1 or 2.
+- Message should not exceed 1000 characters.
 
 ## Example
 Input: "This is an exmple of bad grammar!"
