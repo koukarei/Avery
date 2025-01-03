@@ -886,6 +886,7 @@ def complete_generation(
         ランク: {rank}　(A-最高, B-上手, C-良い, D-普通, E-悪い, F-最悪)
         """.format(
             user_sentence=db_generation.sentence,
+            correct_sentence=db_generation.correct_sentence,
             grammar_score=round(scores_dict['grammar_score'],2),
             spelling_score=round(scores_dict['spelling_score'],2),
             vividness_score=round(scores_dict['vividness_score'],2),
