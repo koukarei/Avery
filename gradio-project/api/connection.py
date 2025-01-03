@@ -354,20 +354,35 @@ async def get_generations(
     request: Request,
     leaderboard_id: Optional[int] = None, 
     player_id: Optional[int] = None, 
+    school_name: Optional[str] = None
 ):
-    if leaderboard_id and player_id:
-        url = f"{BACKEND_URL}generations/?leaderboard_id={leaderboard_id}&player_id={player_id}"
-    elif leaderboard_id:
-        url = f"{BACKEND_URL}generations/?leaderboard_id={leaderboard_id}"
-    elif player_id:
-        url = f"{BACKEND_URL}generations/?player_id={player_id}"
+    if school_name:
+        if leaderboard_id and player_id:
+            url = f"{BACKEND_URL}generations/?leaderboard_id={leaderboard_id}&player_id={player_id}&school_name={school_name}"
+        elif leaderboard_id:
+            url = f"{BACKEND_URL}generations/?leaderboard_id={leaderboard_id}&school_name={school_name}"
+        elif player_id:
+            url = f"{BACKEND_URL}generations/?player_id={player_id}&school_name={school_name}"
+        else:
+            url = f"{BACKEND_URL}generations/?school_name={school_name}"
     else:
-        url = f"{BACKEND_URL}generations"
+        if leaderboard_id and player_id:
+            url = f"{BACKEND_URL}generations/?leaderboard_id={leaderboard_id}&player_id={player_id}"
+        elif leaderboard_id:
+            url = f"{BACKEND_URL}generations/?leaderboard_id={leaderboard_id}"
+        elif player_id:
+            url = f"{BACKEND_URL}generations/?player_id={player_id}"
+        else:
+            url = f"{BACKEND_URL}generations"
+
     response = await http_client.get(
         url,
         auth=get_auth(request),
     )
     if response.status_code != 200:
         return None
-    output = [models.GenerationRound(**generation) for generation in response.json()]
+    output = [models.GenerationRound(
+        generation=generation[0],
+        round=generation[1]
+    ) for generation in response.json()]
     return output

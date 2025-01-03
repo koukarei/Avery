@@ -7,7 +7,7 @@ import datetime
 from starlette.applications import Starlette
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import RedirectResponse, Response
-from api.connection import read_leaderboard, get_original_images, get_interpreted_image, get_rounds, get_generation, check_playable, read_my_rounds
+from api.connection import read_leaderboard, get_original_images, get_interpreted_image, get_rounds, get_generation, check_playable, read_my_rounds, get_generations
 from api.connection import models
 
 from app import app as fastapi_app
@@ -143,22 +143,25 @@ with gr.Blocks() as avery_gradio:
             leaderboard_vocabularies=""
         
         info = f"## {select_leaderboard.title}{leaderboard_vocabularies}"
-        rounds = await get_rounds(select_leaderboard.id, request=request)
-        if rounds:
-            generations = [generation for round in rounds for generation in round.generations]
+        if hasattr(app.state, "school"):
+            school_name = app.state.get("school")
+        else:
+            school_name = None
+        round_generations = await get_generations(leaderboard_id=select_leaderboard.id,school_name=school_name, request=request)
+        if round_generations:
             interpreted_images = []
             not_working = []
-            for generation in generations:
-                interpreted_img = await get_interpreted_image(generation_id=generation.id, request=request)
+            for round_generation in round_generations:
+                interpreted_img = await get_interpreted_image(generation_id=round_generation.generation.id, request=request)
                 if interpreted_img:
                     interpreted_images.append(interpreted_img)
                 else:
-                    not_working.append(generation)
+                    not_working.append(round_generation)
             if not_working:
-                generations = [generation for generation in generations if generation not in not_working]
+                round_generations = [generation for generation in round_generations if generation not in not_working]
         else:
             interpreted_images = None
-            generations = None
+            round_generations = None
         
         # Check if the player played the game before
         playable = await check_playable(select_leaderboard.id, request=request)
@@ -168,11 +171,11 @@ with gr.Blocks() as avery_gradio:
         if unfinished_rounds:
             start_btn = gr.update(value="再開", link="/avery/resume_game",interactive=True)
             
-        return select_leaderboard, start_btn, info, interpreted_images, generations, unfinished_rounds
+        return select_leaderboard, start_btn, info, interpreted_images, round_generations, unfinished_rounds
 
     async def select_interpreted_image(evt: gr.SelectData, generations, select_leaderboard, request: gr.Request):
         selected_interpreted = generations[evt.index]
-        selected = await get_generation(selected_interpreted.id, request)
+        selected = selected_interpreted.generation
 
         leaderboard_vocabularies=[v.word for v in select_leaderboard.vocabularies]
         leaderboard_vocabularies="/ ".join(leaderboard_vocabularies)
@@ -203,8 +206,7 @@ with gr.Blocks() as avery_gradio:
 
 ---
 
-英作文：{selected.correct_sentence}
-                """
+英作文：{selected.correct_sentence}"""
         else:
             md = f"## {select_leaderboard.title}{leaderboard_vocabularies}"
         return md

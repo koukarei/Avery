@@ -1351,6 +1351,7 @@ def read_generations(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     player_id: Optional[int] = None,
     leaderboard_id: Optional[int] = None,
+    school_name: Optional[str] = None,
     order_by: Optional[str] = "total_score",
     skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
 ):
@@ -1370,6 +1371,9 @@ def read_generations(
         order_by=order_by
     )
     
+    if school_name:
+        generations = [gen for gen in generations if gen[1].player.school_name == school_name]
+
     return generations
 
 @app.get("/generation/{generation_id}/score", tags=["Generation"], response_model=schemas.Score)
