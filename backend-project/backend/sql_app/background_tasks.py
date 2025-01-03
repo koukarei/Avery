@@ -104,7 +104,7 @@ def calculate_score(
 
     if is_completed:
         generation_aware = generation.at.replace(tzinfo=timezone.utc)
-        db_generation_aware = db_generation.created_at.replace(tzinfo=timezone.utc)
+        db_generation_aware = db_round.created_at.replace(tzinfo=timezone.utc)
         duration = (generation_aware - db_generation_aware).seconds
     else: 
         duration = 0

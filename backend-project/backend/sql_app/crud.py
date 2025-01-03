@@ -110,18 +110,56 @@ def delete_user(db: Session, user_id: int):
 
 def get_leaderboards(
         db: Session, 
+        school_name: str = None,
         skip: int = 0, 
         limit: int = 100, 
         published_at_start: datetime.datetime = None,
         published_at_end: datetime.datetime = None,
 ):
+    if school_name:
+        school_leaderboards = db.query(
+            models.Leaderboard,
+            models.School_Leaderboard
+        ).\
+        filter(models.School_Leaderboard.school_name == school_name).\
+        join(
+            models.Leaderboard,
+            models.Leaderboard.id == models.School_Leaderboard.leaderboard_id
+        )
+    else:
+        school_leaderboards = db.query(
+            models.Leaderboard
+        )
+
     if published_at_start is None and published_at_end is None:
-        return db.query(models.Leaderboard).filter(models.Leaderboard.published_at <= datetime.datetime.now()).offset(skip).limit(limit).all()
+        return school_leaderboards.\
+            filter(models.Leaderboard.published_at <= datetime.datetime.now()).\
+                offset(skip).limit(limit).all()
     elif published_at_start is None:
-        return db.query(models.Leaderboard).filter(models.Leaderboard.published_at <= published_at_end).offset(skip).limit(limit).all()
+        return school_leaderboards.\
+            filter(models.Leaderboard.published_at <= published_at_end).\
+                offset(skip).limit(limit).all()
     elif published_at_end is None:
         published_at_end = datetime.datetime.now()
-    return db.query(models.Leaderboard).filter(models.Leaderboard.published_at >= published_at_start).filter(models.Leaderboard.published_at <= published_at_end).offset(skip).limit(limit).all()
+    return school_leaderboards.\
+        filter(models.Leaderboard.published_at >= published_at_start).\
+            filter(models.Leaderboard.published_at <= published_at_end).\
+                offset(skip).limit(limit).all()
+
+    # if published_at_start is None and published_at_end is None:
+    #     return db.query(models.Leaderboard).\
+    #         filter(models.Leaderboard.published_at <= datetime.datetime.now()).\
+    #             offset(skip).limit(limit).all()
+    # elif published_at_start is None:
+    #     return db.query(models.Leaderboard).\
+    #         filter(models.Leaderboard.published_at <= published_at_end).\
+    #             offset(skip).limit(limit).all()
+    # elif published_at_end is None:
+    #     published_at_end = datetime.datetime.now()
+    # return db.query(models.Leaderboard).\
+    #     filter(models.Leaderboard.published_at >= published_at_start).\
+    #         filter(models.Leaderboard.published_at <= published_at_end).\
+    #             offset(skip).limit(limit).all()
 
 def get_leaderboard(db: Session, leaderboard_id: int):
     return db.query(models.Leaderboard).filter(models.Leaderboard.id == leaderboard_id).first()

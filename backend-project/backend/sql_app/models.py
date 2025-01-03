@@ -278,3 +278,10 @@ class GoodRound(Base):
 
     player = Column(Integer, ForeignKey("users.id"),primary_key=True)
     round = Column(Integer, ForeignKey("rounds.id"),primary_key=True)
+
+class School_Leaderboard(Base):
+    __tablename__ = "school_leaderboards"
+
+    id = Column(Integer, primary_key=True)
+    school = Column(String(100))
+    leaderboard_id = Column(Integer, ForeignKey("leaderboards.id"))
