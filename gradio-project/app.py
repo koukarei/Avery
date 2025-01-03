@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Depends, status, HTTPException
+from fastapi import FastAPI, Request, Depends, status, HTTPException, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,6 +12,67 @@ import datetime
 
 from api import models
 from api.connection import *
+
+from functools import wraps
+from typing import Dict, Optional
+import asyncio
+import time
+
+class EndpointConcurrencyControl:
+    def __init__(self):
+        # Store semaphores for each endpoint
+        self.endpoint_semaphores: Dict[str, asyncio.Semaphore] = {}
+        # Store active requests for each endpoint-client combination
+        self.active_requests: Dict[str, Dict[str, float]] = {}
+    
+    def limit_concurrency(self, max_concurrent: int = 1, per_client: bool = True):
+        def decorator(func):
+            # Create a unique key for this endpoint
+            endpoint_key = f"{func.__module__}.{func.__name__}"
+            
+            # Initialize semaphore and active requests tracking for this endpoint
+            self.endpoint_semaphores[endpoint_key] = asyncio.Semaphore(max_concurrent)
+            self.active_requests[endpoint_key] = {}
+            
+            @wraps(func)
+            async def wrapper(*args, **kwargs):
+                # Extract request object from args or kwargs
+                request = next((arg for arg in args if isinstance(arg, Request)), 
+                             kwargs.get('request'))
+                
+                if not request:
+                    raise HTTPException(
+                        status_code=500,
+                        detail="Request object not found in endpoint arguments"
+                    )
+                
+                client_id = request.client.host if per_client else "global"
+                request_key = f"{endpoint_key}:{client_id}"
+                
+                # Check if client already has an active request for this endpoint
+                if per_client and client_id in self.active_requests[endpoint_key]:
+                    last_request_time = self.active_requests[endpoint_key][client_id]
+                    if time.time() - last_request_time < 1:  # 1 second cooldown
+                        raise HTTPException(
+                            status_code=429,
+                            detail="Too many requests. Please wait before making another request."
+                        )
+                
+                try:
+                    async with self.endpoint_semaphores[endpoint_key]:
+                        if per_client:
+                            self.active_requests[endpoint_key][client_id] = time.time()
+                        response = await func(*args, **kwargs)
+                        return response
+                finally:
+                    if per_client and client_id in self.active_requests[endpoint_key]:
+                        del self.active_requests[endpoint_key][client_id]
+            
+            return wrapper
+        return decorator
+
+# Initialize the concurrency control
+concurrency_control = EndpointConcurrencyControl()
 
 app = FastAPI(
     root_path="/avery",
@@ -42,6 +103,7 @@ templates = Jinja2Templates(directory="templates")
 MAX_GENERATION = int(os.getenv("MAX_GENERATION", 5))
 
 @app.route("/login", methods=["GET", "POST"])
+@concurrency_control.limit_concurrency(max_concurrent=1, per_client=True)
 async def login_form(request: Request):
     if request.method == "POST":
 
@@ -65,6 +127,7 @@ async def login_form(request: Request):
     return templates.TemplateResponse("login_form.html", {"request": request})
 
 @app.route('/lti/login',methods=["POST"])
+@concurrency_control.limit_concurrency(max_concurrent=1, per_client=True)
 async def lti_login(request: Request):
     valid = await validate_lti_request(request)
     if not valid:
@@ -120,6 +183,7 @@ async def lti_login(request: Request):
     raise HTTPException(status_code=500, detail="Failed to login")
 
 @app.route('/logout')
+@concurrency_control.limit_concurrency(max_concurrent=1, per_client=True)
 async def logout(request: Request):
 
     school = request.session.pop('school', None)
@@ -252,6 +316,7 @@ async def redirect_to_answer(request: Request):
     return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
 
 @app.get("/go_to_result")
+@concurrency_control.limit_concurrency(max_concurrent=1, per_client=True)
 async def redirect_to_result(request: Request):
     if (not hasattr(request.app.state, 'generation') or not request.app.state.generation) and request.app.state.generated_time < MAX_GENERATION:
         return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
