@@ -134,7 +134,7 @@ with gr.Blocks() as avery_gradio:
 
         app.state.selected_leaderboard = select_leaderboard
         leaderboard_vocabularies = [v.word for v in select_leaderboard.vocabularies]
-        leaderboard_vocabularies = "/".join(leaderboard_vocabularies)
+        leaderboard_vocabularies = "/ ".join(leaderboard_vocabularies)
         info = f"## {select_leaderboard.title}\n\n関連単語：{leaderboard_vocabularies}"
         rounds = await get_rounds(select_leaderboard.id, request=request)
         if rounds:
@@ -171,7 +171,7 @@ with gr.Blocks() as avery_gradio:
                 score = selected.score
 
                 leaderboard_vocabularies=[v.word for v in select_leaderboard.vocabularies]
-                leaderboard_vocabularies="/".join(leaderboard_vocabularies)
+                leaderboard_vocabularies="/ ".join(leaderboard_vocabularies)
 
                 md = f"""## {select_leaderboard.title}
 
