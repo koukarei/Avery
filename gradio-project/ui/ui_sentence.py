@@ -34,7 +34,9 @@ class Sentence:
         )
         self.sentence=gr.Textbox(label='英作文',interactive=True, max_length=1000)
 
-        self.submit_btn=gr.Button("送信",scale=0)
+        with gr.Row():
+            self.submit_btn=gr.Button("送信",scale=0)
+            self.back_btn=gr.Button("戻る",scale=0, link="/avery/")
 
         self.ai_image=gr.Image(
             None,
@@ -127,7 +129,7 @@ with gr.Blocks() as avery_gradio:
 
     gr.Markdown(
     """
-    # 各写真を注意深く観察し、写真に写っている人々、動物、または物について英語で150字以内で記述してください。回答は次の質問に焦点を当ててください：「写真には何が写っているのか」「それらは何をしているのか」「それらはどのように見えるのか（数や色など）」「それらはどこにいるのか」。写真に人が写っている場合は、その外見についても説明する必要があります。
+    各写真を注意深く観察し、写真に写っている人々、動物、または物について英語で150字以内で記述してください。回答は次の質問に焦点を当ててください：「写真には何が写っているのか」「それらは何をしているのか」「それらはどのように見えるのか（数や色など）」「それらはどこにいるのか」。写真に人が写っている場合は、その外見についても説明する必要があります。
     """
     )
 

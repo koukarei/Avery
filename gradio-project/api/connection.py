@@ -5,7 +5,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import FastAPI, Request, Depends, status, HTTPException
 from typing import Annotated, Optional
 from PIL import Image as PILImage
-import io
+import io, datetime
 
 from api import models
 
@@ -123,9 +123,26 @@ def get_auth(request: Request):
     )
     return bearer
 
-async def read_leaderboard(request: Request):
+async def read_leaderboard(
+        request: Request, 
+        published_at_start: Optional[datetime.datetime] = None,
+        published_at_end: Optional[datetime.datetime] = datetime.datetime.now()
+):
     auth = get_auth(request)
     url = f"{BACKEND_URL}leaderboards"
+    if published_at_start:
+        # convert to utczone
+        published_at_start = published_at_start.astimezone(datetime.timezone.utc)
+        url += f"?published_at_start={published_at_start.strftime('%d%m%Y')}"
+
+    if published_at_end:
+        # convert to utczone
+        published_at_end = published_at_end.astimezone(datetime.timezone.utc)
+        if published_at_start:
+            url += f"&published_at_end={published_at_end.strftime('%d%m%Y')}"
+        else:
+            url += f"?published_at_end={published_at_end.strftime('%d%m%Y')}"
+
     try:
         response = await http_client.get(
             url,

@@ -49,8 +49,20 @@ with gr.Blocks() as avery_gradio:
 
     unfinished = gr.State()
     
-    async def initialize_game(request: gr.Request):
-        leaderboards = await read_leaderboard(request)
+    async def initialize_game(request: gr.Request, published_at_start: Optional[datetime.datetime]=None, published_at_end: Optional[datetime.datetime]=None):
+        if published_at_start and published_at_end:
+            published_at_start = datetime.datetime.fromtimestamp(published_at_start)
+            published_at_end = datetime.datetime.fromtimestamp(published_at_end)
+            
+            leaderboards = await read_leaderboard(request, published_at_start, published_at_end)
+        elif published_at_start:
+            published_at_start = datetime.datetime.fromtimestamp(published_at_start)
+            leaderboards = await read_leaderboard(request, published_at_start)
+        elif published_at_end:
+            published_at_end = datetime.datetime.fromtimestamp(published_at_end)
+            leaderboards = await read_leaderboard(request, published_at_end=published_at_end)
+        else:
+            leaderboards = await read_leaderboard(request)
         return [
             await get_original_images(leaderboard.id, request) 
             for leaderboard in leaderboards
@@ -66,26 +78,32 @@ with gr.Blocks() as avery_gradio:
         return rounds
 
     with gr.Row():
-        gr.Markdown(
-        """
-        # AVERYにようこそ！
-        このゲームは、Averyと一緒に画像を解釈するゲームです。
+        with gr.Column():
+            gr.Markdown(
+            """
+            # AVERYにようこそ！
+            このゲームは、Averyと一緒に画像を解釈するゲームです。
 
-        まずは、ギャラリーから画像を選択してください。
-        """
-        )
+            まずは、ギャラリーから画像を選択してください。
+            """
+            )
 
-        gr.Button(
-            "ダッシュボード",
-            scale=0,
-            link="/avery/dashboard",
-        )
+        with gr.Column():
+            with gr.Row():
+                gr.Button(
+                    "ダッシュボード",
+                    scale=0,
+                    link="/avery/dashboard",
+                )
 
-        gr.Button(
-            "ログアウト",
-            scale=0,
-            link="/avery/logout",
-        )
+                gr.Button(
+                    "ログアウト",
+                    scale=0,
+                    link="/avery/logout",
+                )
+            with gr.Row():
+                published_at_start_dropdown = gr.DateTime(include_time=False, label="公開日")
+                published_at_end_dropdown = gr.DateTime(include_time=False, label="〜")
 
     leaderboards = gr.State()
     selected_leaderboard = gr.State()
@@ -94,7 +112,7 @@ with gr.Blocks() as avery_gradio:
     gallery.create_gallery()
 
     try: 
-        avery_gradio.load(initialize_game, inputs=[], outputs=[gallery.gallery,leaderboards])
+        avery_gradio.load(initialize_game, inputs=[published_at_start_dropdown, published_at_end_dropdown], outputs=[gallery.gallery,leaderboards])
     except Exception as e:
         RedirectResponse(url="/")
 
@@ -115,7 +133,9 @@ with gr.Blocks() as avery_gradio:
         select_leaderboard = leaderboards[evt.index]
 
         app.state.selected_leaderboard = select_leaderboard
-        info = f"## {select_leaderboard.title}"
+        leaderboard_vocabularies = [v.word for v in select_leaderboard.vocabularies]
+        leaderboard_vocabularies = "/".join(leaderboard_vocabularies)
+        info = f"## {select_leaderboard.title}\n\n関連単語：{leaderboard_vocabularies}"
         rounds = await get_rounds(select_leaderboard.id, request=request)
         if rounds:
             generations = [generation for round in rounds for generation in round.generations]
@@ -149,7 +169,13 @@ with gr.Blocks() as avery_gradio:
         if selected:
             if hasattr(selected, 'score'):
                 score = selected.score
+
+                leaderboard_vocabularies=[v.word for v in select_leaderboard.vocabularies]
+                leaderboard_vocabularies="/".join(leaderboard_vocabularies)
+
                 md = f"""## {select_leaderboard.title}
+
+                関連単語：{leaderboard_vocabularies}
                 
                 英作文：{selected.sentence}
                 
@@ -169,6 +195,14 @@ with gr.Blocks() as avery_gradio:
             md = f"## {select_leaderboard.title}"
         return md
             
+
+    # Load leaderboards
+    gr.on(
+        triggers=[published_at_start_dropdown.change, published_at_end_dropdown.change],
+        fn=initialize_game,
+        inputs=[published_at_start_dropdown, published_at_end_dropdown],
+        outputs=[gallery.gallery, leaderboards],
+    )
 
     # Set the selected leaderboard
     gr.on(

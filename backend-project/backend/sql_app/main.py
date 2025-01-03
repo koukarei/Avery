@@ -325,15 +325,27 @@ def create_story(
 
 
 @app.get("/leaderboards/", tags=["Leaderboard"], response_model=list[schemas.LeaderboardOut])
-def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_current_user)],skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_current_user)],skip: int = 0, limit: int = 100, published_at_start: str=None, published_at_end: str=None, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view leaderboards")
-    # Check if the user is a student
+    
+    if not published_at_start and not published_at_end and current_user.user_type == "student":
+        leaderboards = crud.get_leaderboards(db, skip=skip, limit=limit, published_at_end=datetime.datetime.now(tz=timezone.utc))
+        return leaderboards
+    
+    if published_at_start:
+        published_at_start = datetime.datetime.strptime(published_at_start, "%d%m%Y").replace(tzinfo=timezone.utc)
+    if published_at_end:
+        published_at_end = datetime.datetime.strptime(published_at_end, "%d%m%Y").replace(tzinfo=timezone.utc)
+        
     if current_user.user_type == "student":
-        leaderboards = crud.get_leaderboards(db, skip=skip, limit=limit)
-    else:
-        published_at = datetime.datetime.now(tz=timezone.utc) + timedelta(days=365)
-        leaderboards = crud.get_leaderboards(db, skip=skip, limit=limit, published_at=published_at)
+        if published_at_start and published_at_start > datetime.datetime.now(tz=timezone.utc):
+            published_at_start = datetime.datetime.now(tz=timezone.utc)
+        if published_at_end and published_at_end > datetime.datetime.now(tz=timezone.utc):
+            published_at_end = datetime.datetime.now(tz=timezone.utc)
+            
+        
+    leaderboards = crud.get_leaderboards(db, skip=skip, limit=limit, published_at_start=published_at_start, published_at_end=published_at_end)
     return leaderboards
 
 @app.post("/leaderboards/", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
