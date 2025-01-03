@@ -133,9 +133,16 @@ with gr.Blocks() as avery_gradio:
         select_leaderboard = leaderboards[evt.index]
 
         app.state.selected_leaderboard = select_leaderboard
+
+        # Get the related vocabularies
         leaderboard_vocabularies = [v.word for v in select_leaderboard.vocabularies]
         leaderboard_vocabularies = "/ ".join(leaderboard_vocabularies)
-        info = f"## {select_leaderboard.title}\n\n関連単語：{leaderboard_vocabularies}"
+        if leaderboard_vocabularies:
+            leaderboard_vocabularies=f"\n\n関連単語：*{leaderboard_vocabularies}*"
+        else:
+            leaderboard_vocabularies=""
+        
+        info = f"## {select_leaderboard.title}\n\n---\n\n{leaderboard_vocabularies}"
         rounds = await get_rounds(select_leaderboard.id, request=request)
         if rounds:
             generations = [generation for round in rounds for generation in round.generations]
@@ -166,18 +173,23 @@ with gr.Blocks() as avery_gradio:
     async def select_interpreted_image(evt: gr.SelectData, generations, select_leaderboard, request: gr.Request):
         selected_interpreted = generations[evt.index]
         selected = await get_generation(selected_interpreted.id, request)
+
+        leaderboard_vocabularies=[v.word for v in select_leaderboard.vocabularies]
+        leaderboard_vocabularies="/ ".join(leaderboard_vocabularies)
+        if leaderboard_vocabularies:
+            leaderboard_vocabularies=f"\n\n関連単語：*{leaderboard_vocabularies}*"
+        else:
+            leaderboard_vocabularies=""
+
         if selected:
             if hasattr(selected, 'score'):
                 score = selected.score
 
-                leaderboard_vocabularies=[v.word for v in select_leaderboard.vocabularies]
-                leaderboard_vocabularies="/ ".join(leaderboard_vocabularies)
-
                 md = f"""## {select_leaderboard.title}
 
-                関連単語：{leaderboard_vocabularies}
+                ---
                 
-                英作文：{selected.sentence}
+                英作文：{selected.correct_sentence}
                 
                 文法得点：{score.grammar_score}　スペル得点：{score.spelling_score}
 
@@ -185,11 +197,13 @@ with gr.Blocks() as avery_gradio:
 
                 内容得点：{score.content_score}　合計点：{selected.total_score}
                 
-                ランク：{selected.rank}　時間：{selected.duration}秒　類似度： {round(score.image_similarity*100, 2)}%"""
+                ランク：{selected.rank}　時間：{selected.duration}秒　類似度： {round(score.image_similarity*100, 2)}%{leaderboard_vocabularies}"""
             else:
                 md = f"""## {select_leaderboard.title}
+
+                ---
                 
-                英作文：{selected.sentence}
+                英作文：{selected.correct_sentence}{leaderboard_vocabularies}
                 """
         else:
             md = f"## {select_leaderboard.title}"

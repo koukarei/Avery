@@ -120,7 +120,7 @@ def get_leaderboards(
     elif published_at_start is None:
         return db.query(models.Leaderboard).filter(models.Leaderboard.published_at <= published_at_end).offset(skip).limit(limit).all()
     elif published_at_end is None:
-        return db.query(models.Leaderboard).filter(models.Leaderboard.published_at >= published_at_start).offset(skip).limit(limit).all()
+        published_at_end = datetime.datetime.now()
     return db.query(models.Leaderboard).filter(models.Leaderboard.published_at >= published_at_start).filter(models.Leaderboard.published_at <= published_at_end).offset(skip).limit(limit).all()
 
 def get_leaderboard(db: Session, leaderboard_id: int):
