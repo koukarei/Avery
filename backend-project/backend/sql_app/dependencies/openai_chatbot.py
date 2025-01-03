@@ -207,7 +207,7 @@ The muse is play on the table and drop the ham on the floor.
 内容評価:
 あなたの英作文は画像に合っているが、もう少し工夫が必要です。画像の中に花瓶(vase)がありますよね？🧐
 総合評価:
-あなたの英作文は良いですが、改善の余地があります。😇😇画像の背景は食堂(dining room)だと思います、文に追加してみればどうですか？
+あなたの英作文は良いですが、改善の余地があります。😇😇画像の背景は食堂(dining room)だと思います、文に追加してみればどうですか？関連単語の提案として、名詞は花瓶(vase)、サボテン(Cactus)、動詞は落とす(drop)、見る(see)、形容詞は明るい(gleaming)、堅固(solid)
 
 3. 
 ユーザーの英作文: 
@@ -222,7 +222,7 @@ cat is pray arund in the katcen.
 内容評価:
 想像力は豊かですが、あなたの英作文は画像に合っていません。😰
 総合評価:
-画像の主要題材はネズミ(mouse)だと思います、文に追加してみればどうですか？
+画像の主要題材はネズミ(mouse)だと思います、文に追加してみればどうですか？例えば、The mouse is playing in the kitchen.🤔
         """.format(
             user_sentence=sentence,
             grammar_score=scoring['grammar_score'],
