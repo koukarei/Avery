@@ -203,7 +203,7 @@ async def send_message(round_id: int, new_message:models.MessageSend, request: R
         headers={"Content-Type": "application/json",
         },
         auth=get_auth(request),
-        timeout=10
+        timeout=20
     )
     if response.status_code != 200:
         return None

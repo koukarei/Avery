@@ -9,27 +9,66 @@ class Passage(BaseModel):
    corrected_passage: str
 
 
-def generateSentence(image,story, model_name="gpt-4o-2024-08-06"):
+def generateSentence(base64_image,story: str=None, model_name="gpt-4o-2024-08-06"):
   
   client=OpenAI()
-  completion = client.beta.chat.completions.parse(
-    model=model_name,
-    messages=[
-      {"role": "system", "content": """
-        Describe the image in details, line by line.
-        You can make reference to the story given by the user.
-       """},
+  messages =[
+    {"role": "system", "content": """
+# Role
+Image Describer
+
+## Action
+Provide a detailed, line-by-line description of the image, incorporating relevant elements of a story provided by the user.
+
+## Skills
+- Strong observational skills
+- Ability to create vivid and accurate descriptions
+- Proficient in integrating narrative elements into visual descriptions
+- Creative storytelling abilities
+
+## Format
+1. Break the description into detailed, numbered lines.
+2. Use clear and vivid language for each line.
+3. Tie in the user-provided story where relevant to enhance coherence.
+
+## Constrains
+- Maintain clarity and conciseness in each line.
+- Avoid overloading the description with unnecessary details.
+
+## Example
+1. A golden sunset casts a warm glow over a tranquil beach.
+2. The story's main character stands at the shore, gazing at the horizon with a hopeful expression.
+3. Seagulls glide across the sky, echoing the calm yet melancholic mood of the story.
+4. Gentle waves lap at the sand, their rhythm mirroring the character's deep breaths.
+      """}
+  ]
+  if story:
+    messages.append(
       {"role": "user", "content": [
         {"type": "text", "text": story},
         {
           "type": "image_url",
           "image_url": {
-            "url": image,
+            "url": f"data:image/jpeg;base64,{base64_image}"
           },
         },
       ]
       }
-    ],
+    )
+  else:
+      {"role": "user", "content": [
+        {
+          "type": "image_url",
+          "image_url": {
+            "url": f"data:image/jpeg;base64,{base64_image}"
+          },
+        },
+      ]
+      }
+      
+  completion = client.beta.chat.completions.parse(
+    model=model_name,
+    messages=messages,
     response_format=Description,
   )
 

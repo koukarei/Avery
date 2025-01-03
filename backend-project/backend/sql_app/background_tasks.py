@@ -8,8 +8,8 @@ from .dependencies.util import computing_time_tracker
 
 def generateDescription(db: Session, leaderboard_id: int, image: str, story: Optional[str], model_name: str="gpt-4o-mini"):
     
-    contents = sentence.genSentences(
-        image=image,
+    contents = sentence.generateSentence(
+        base64_image=image,
         story=story
     )
 
@@ -76,7 +76,12 @@ def calculate_score(
     ai_play = crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
 
     if not ai_play:
-        story=db_round.leaderboard.story.content
+        if db_round.leaderboard.story:
+            story=db_round.leaderboard.story.content
+        elif db_round.leaderboard.story_extract:
+            story=db_round.leaderboard.story_extract
+        else:
+            story=None
         
         ai_play = generateDescription(
             db=db,
