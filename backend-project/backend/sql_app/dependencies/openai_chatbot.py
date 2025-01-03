@@ -143,7 +143,7 @@ Avery、ロボット（ディズニーのベイマックスのように話すキ
             print(f"Messages: {self.messages}")
             return {}
         
-    def get_result(self, sentence,scoring,rank,base64_image,chat_history,grammar_errors,spelling_errors):
+    def get_result(self, sentence, correct_sentence,scoring,rank,base64_image,chat_history,grammar_errors,spelling_errors):
         prompt = """
 # 役割
 あなたの名前は Avery、ロボットです。
@@ -166,16 +166,17 @@ Avery、ロボット（ディズニーのベイマックスのように話すキ
 
 ### 現状
 1. ユーザー：{user_sentence}
-2. 文法得点: {grammar_score}
+2. 修正された英作文: {correct_sentence}
+3. 文法得点: {grammar_score}
 検出された文法の誤り: {grammar_errors}
-3. スペリング得点: {spelling_score}
+4. スペリング得点: {spelling_score}
 検出されたスペルミス: {spelling_errors}
-4. 鮮明さ: {vividness_score}
-5. 自然さ: {convention}
-6. 構造性: {structure_score}
-7. 内容得点: {content_score}
-8. 合計点: {total_score}
-9. ランク: {rank}
+5. 鮮明さ: {vividness_score}
+6. 自然さ: {convention}
+7. 構造性: {structure_score}
+8. 内容得点: {content_score}
+9. 合計点: {total_score}
+10. ランク: {rank}
 
 ## 評価の例文
 あなたのミッションは、ユーザーにフィードバックを提供して、ユーザーの英作文が元の画像に合うようにすることです。
@@ -225,6 +226,7 @@ cat is pray arund in the katcen.
 画像の主要題材はネズミ(mouse)だと思います、文に追加してみればどうですか？例えば、The mouse is playing in the kitchen.🤔
         """.format(
             user_sentence=sentence,
+            correct_sentence=correct_sentence,
             grammar_score=scoring['grammar_score'],
             spelling_score=scoring['spelling_score'],
             vividness_score=scoring['vividness_score'],

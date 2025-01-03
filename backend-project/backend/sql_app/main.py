@@ -796,7 +796,7 @@ async def get_interpretation(
         db_round = crud.get_round(db, round_id)
 
         new_message = """回答をシステム入力しました。📝
-回答: {}""".format(generation.correct_sentence)
+回答: {}\n\n修正された回答：{}""".format(db_generation.sentence, db_generation.correct_sentence)
 
         crud.create_message(
             db=db,
@@ -864,6 +864,7 @@ def complete_generation(
 
     evaluation = cb.get_result(
         sentence=db_generation.sentence,
+        correct_sentence=db_generation.correct_sentence,
         scoring=scores_dict,
         rank=db_generation.rank,
         base64_image=db_round.leaderboard.original_image.image,
@@ -874,6 +875,7 @@ def complete_generation(
 
     if evaluation:
         score_message = """あなたの回答：{user_sentence}
+        修正された回答：{correct_sentence}
         文法得点: {grammar_score} (満点5)
         スペリング得点: {spelling_score} (満点5)
         鮮明さ: {vividness_score} (満点5)
