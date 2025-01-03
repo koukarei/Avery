@@ -30,7 +30,7 @@ class Gallery:
                 with gr.Column():
                     self.gallery = gr.Gallery(None, label="Original", interactive=False)
                 with gr.Column():
-                    self.info = gr.Markdown(None)
+                    self.info = gr.Markdown(None, line_breaks=True)
                     self.generated_img = gr.Gallery(None, label="record")
             with gr.Row():
                 self.submit_btn = gr.Button("始める", scale=0, interactive=False, link="/avery/go_to_answer")
@@ -142,7 +142,7 @@ with gr.Blocks() as avery_gradio:
         else:
             leaderboard_vocabularies=""
         
-        info = f"## {select_leaderboard.title}\n\n---\n\n{leaderboard_vocabularies}"
+        info = f"## {select_leaderboard.title}{leaderboard_vocabularies}"
         rounds = await get_rounds(select_leaderboard.id, request=request)
         if rounds:
             generations = [generation for round in rounds for generation in round.generations]
@@ -185,28 +185,28 @@ with gr.Blocks() as avery_gradio:
             if hasattr(selected, 'score'):
                 score = selected.score
 
-                md = f"""## {select_leaderboard.title}
+                md = f"""## {select_leaderboard.title}{leaderboard_vocabularies}
 
-                ---
-                
-                英作文：{selected.correct_sentence}
-                
-                文法得点：{score.grammar_score}　スペル得点：{score.spelling_score}
+---
 
-                鮮明さ：{score.vividness_score}　自然さ：{int(score.convention)}　構造性：{score.structure_score}
+英作文：{selected.correct_sentence}
 
-                内容得点：{score.content_score}　合計点：{selected.total_score}
-                
-                ランク：{selected.rank}　時間：{selected.duration}秒　類似度： {round(score.image_similarity*100, 2)}%{leaderboard_vocabularies}"""
+文法得点：{score.grammar_score}　スペル得点：{score.spelling_score}
+
+鮮明さ：{score.vividness_score}　自然さ：{int(score.convention)}　構造性：{score.structure_score}
+
+内容得点：{score.content_score}　合計点：{selected.total_score}
+
+ランク：{selected.rank}　時間：{selected.duration}秒　類似度： {round(score.image_similarity*100, 2)}%"""
             else:
-                md = f"""## {select_leaderboard.title}
+                md = f"""## {select_leaderboard.title}{leaderboard_vocabularies}
 
-                ---
-                
-                英作文：{selected.correct_sentence}{leaderboard_vocabularies}
+---
+
+英作文：{selected.correct_sentence}
                 """
         else:
-            md = f"## {select_leaderboard.title}"
+            md = f"## {select_leaderboard.title}{leaderboard_vocabularies}"
         return md
             
 
