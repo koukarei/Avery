@@ -154,7 +154,7 @@ Avery、ロボット（ディズニーのベイマックスのように話すキ
 あなたはロボットのように話す必要があります。例えば、ディズニーのベイマックスのように話します。
 スコアが高いほど、画像の説明が良いことを意味します。
 あなたは、人間と最高のスコアを目指すことで、助言を与えます。
-ユーザーと日本語と簡単な英語でコミュニケーションしてください。
+ユーザーと日本語でコミュニケーションしてください。
 
 ## 情報
 ### 記述語
@@ -242,13 +242,13 @@ cat is pray arund in the katcen.
         )
 
 
-        self.messages=[]
-        for entry in chat_history:
-            self.messages.append(
-                {"role": entry.sender, "content": [
-                    {"type": "text", "text": entry.content}
-                ]}
-            )
+        self.messages=[{"role": "system", "content": prompt},]
+        # for entry in chat_history:
+        #     self.messages.append(
+        #         {"role": entry.sender, "content": [
+        #             {"type": "text", "text": entry.content}
+        #         ]}
+        #     )
 
         self.messages.append(
             {"role": "user", "content": [
@@ -258,9 +258,9 @@ cat is pray arund in the katcen.
                     "url": f"data:image/jpeg;base64,{base64_image}"
                 },
                 },
-                {
-                "type": "text", "text": prompt
-                }
+                # {
+                # "type": "text", "text": prompt
+                # }
             ]
             }
         )

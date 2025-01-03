@@ -876,15 +876,15 @@ def complete_generation(
 
     if evaluation:
         score_message = """あなたの回答：{user_sentence}
-        修正された回答：{correct_sentence}
-        文法得点: {grammar_score} (満点5)
-        スペリング得点: {spelling_score} (満点5)
-        鮮明さ: {vividness_score} (満点5)
-        自然さ: {convention} (満点1)
-        構造性: {structure_score} (満点3)
-        内容得点: {content_score} (満点100)
-        合計点: {total_score} (満点100)
-        ランク: {rank}　(A-最高, B-上手, C-良い, D-普通, E-悪い, F-最悪)
+修正された回答：{correct_sentence}
+文法得点: {grammar_score} (満点5)
+スペリング得点: {spelling_score} (満点5)
+鮮明さ: {vividness_score} (満点5)
+自然さ: {convention} (満点1)
+構造性: {structure_score} (満点3)
+内容得点: {content_score} (満点100)
+合計点: {total_score} (満点100)
+ランク: {rank}　(A-最高, B-上手, C-良い, D-普通, E-悪い, F-最悪)
         """.format(
             user_sentence=db_generation.sentence,
             correct_sentence=db_generation.correct_sentence,
@@ -899,16 +899,16 @@ def complete_generation(
         )
 
         evaluation_message = """**文法**
-        {grammar_feedback}
-        **スペル**
-        {spelling_feedback}
-        **スタオル**
-        {style_feedback}
-        **内容**
-        {content_feedback}
+{grammar_feedback}
+**スペル**
+{spelling_feedback}
+**スタオル**
+{style_feedback}
+**内容**
+{content_feedback}
 
-        **整体的なコメント**
-        {overall_feedback}
+**整体的なコメント**
+{overall_feedback}
         """.format(
             grammar_feedback=evaluation.grammar_evaluation,
             spelling_feedback=evaluation.spelling_evaluation,

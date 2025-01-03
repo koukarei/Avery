@@ -27,7 +27,9 @@ class Result:
 
 
     def create_result(self):
-        self.similarity=gr.Markdown("Similarity")
+        with gr.Row():
+            self.similarity=gr.Markdown("Similarity")
+
         with gr.Row():
             self.image=gr.Image(None,label="Original",interactive=False)
             self.ai_image=gr.Image(None,label="Interpreted",interactive=False)
@@ -127,7 +129,11 @@ with gr.Blocks() as avery_gradio:
                     show_end = gr.update(visible=True, link="/avery/new_game")
                     restart_value = "もう一回！"
                 send_msg = gr.update(visible=False)
-                yield convert_history(chat), show_restart, show_end, restart_value,send_msg,send_msg
+                md = ""
+                md += chat.messages[-2].content.replace("\n", "\n\n")
+                md += "\n\n"
+                md += chat.messages[-1].content.replace("\n", "\n\n")
+                yield convert_history(chat), show_restart, show_end, restart_value,send_msg,send_msg,md
                 return
             else:
                 yield None
@@ -149,25 +155,30 @@ with gr.Blocks() as avery_gradio:
     """
     )
 
-    with gr.Column(show_progress=True,elem_classes='whole'):
+    with gr.Row():
+        with gr.Column(scale=1):
+            guidance=Guidance()
+            guidance.create_guidance()
+            gr.update()
 
-        guidance=Guidance()
-        guidance.create_guidance()
-        gr.update()
+            gr.on(triggers=[guidance.msg.submit,guidance.submit.click],
+                    fn=ask_hint,
+                    inputs=[guidance.msg, guidance.chat],
+                    outputs=[guidance.msg, guidance.chat],
+                    queue=False
+            )
 
-        gr.on(triggers=[guidance.msg.submit,guidance.submit.click],
-                fn=ask_hint,
-                inputs=[guidance.msg, guidance.chat],
-                outputs=[guidance.msg, guidance.chat],
-                queue=False
-        )
+        with gr.Column(scale=2):
+            md = gr.Markdown()
 
-        result=Result()
-        result.create_result()
+    with gr.Row():
+        with gr.Column(scale=1):
+            result=Result()
+            result.create_result()
 
 
     avery_gradio.load(obtain_image, inputs=[], outputs=[result.image, result.ai_image, result.similarity])
-    avery_gradio.load(load_chat_content, inputs=[], outputs=[guidance.chat, result.restart_btn, result.end_btn, result.restart_btn,guidance.msg,guidance.submit])
+    avery_gradio.load(load_chat_content, inputs=[], outputs=[guidance.chat, result.restart_btn, result.end_btn, result.restart_btn,guidance.msg,guidance.submit,md])
     avery_gradio.queue(max_size=128, default_concurrency_limit=50)
 
 
