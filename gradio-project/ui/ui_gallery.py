@@ -143,7 +143,7 @@ with gr.Blocks() as avery_gradio:
             leaderboard_vocabularies=""
         
         info = f"## {select_leaderboard.title}{leaderboard_vocabularies}"
-        if hasattr(app.state, "school"):
+        if hasattr(app, "school"):
             school_name = app.state.get("school")
         else:
             school_name = None
@@ -175,6 +175,7 @@ with gr.Blocks() as avery_gradio:
 
     async def select_interpreted_image(evt: gr.SelectData, generations, select_leaderboard, request: gr.Request):
         selected_interpreted = generations[evt.index]
+        selected_round = selected_interpreted.round
         selected = selected_interpreted.generation
 
         leaderboard_vocabularies=[v.word for v in select_leaderboard.vocabularies]
@@ -187,6 +188,12 @@ with gr.Blocks() as avery_gradio:
         if selected:
             if hasattr(selected, 'score'):
                 score = selected.score
+                duration = round(selected.duration/60,2)
+                
+                if hasattr(request.session, "roles") and request.session.get("roles")!= "student":
+                    player_name = "作成者：{}　".format(selected_round.player.display_name)
+                else:
+                    player_name = ""
 
                 md = f"""## {select_leaderboard.title}{leaderboard_vocabularies}
 
@@ -194,13 +201,15 @@ with gr.Blocks() as avery_gradio:
 
 英作文：{selected.correct_sentence}
 
+{player_name}作成時間：{selected_round.created_at}
+
 文法得点：{score.grammar_score}　スペル得点：{score.spelling_score}
 
 鮮明さ：{score.vividness_score}　自然さ：{int(score.convention)}　構造性：{score.structure_score}
 
 内容得点：{score.content_score}　合計点：{selected.total_score}
 
-ランク：{selected.rank}　時間：{selected.duration}秒　類似度： {round(score.image_similarity*100, 2)}%"""
+ランク：{selected.rank}　時間：{duration}秒　類似度： {round(score.image_similarity*100, 2)}%"""
             else:
                 md = f"""## {select_leaderboard.title}{leaderboard_vocabularies}
 

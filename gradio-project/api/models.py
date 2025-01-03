@@ -97,6 +97,7 @@ class IdOnly(BaseModel):
 class Round(BaseModel):
     id: int
     player: UserOut
+    created_at: Optional[datetime]=None
     last_generation_id: Optional[int]=None
     chat_history: int
     generations: list[IdOnly]=[]
