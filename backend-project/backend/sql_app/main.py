@@ -344,7 +344,7 @@ def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_current_
         if published_at_end and published_at_end > datetime.datetime.now(tz=timezone.utc):
             published_at_end = datetime.datetime.now(tz=timezone.utc)
             
-        leaderboards = crud.get_leaderboards(db, skip=skip, limit=limit, published_at_start=published_at_start, published_at_end=published_at_end)
+    leaderboards = crud.get_leaderboards(db, skip=skip, limit=limit, published_at_start=published_at_start, published_at_end=published_at_end)
     return leaderboards
 
 @app.post("/leaderboards/", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
