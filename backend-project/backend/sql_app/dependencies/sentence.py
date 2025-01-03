@@ -75,6 +75,7 @@ Analyze a passage to determine:
 - Must detect offensive or inappropriate content with high precision.
 - Correct spelling and grammar only for English text.
 - Message should not exceed 1000 characters.
+- Ensure the corrected passage is American English.
 
 ## Example
 Input: "This is an exmple of bad grammar!"
