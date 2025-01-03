@@ -710,11 +710,13 @@ async def get_interpretation(
     if current_user.id != db_round.player_id:
         raise HTTPException(status_code=401, detail="You are not authorized to get interpretation")
     
+    db_generation = crud.get_generation(db, generation_id=generation.id)
+
     try:
         # Image generation
         gen_img_tracker = util.computing_time_tracker(message="Image generation started - DALLE 3")
         interpreted_image_url = gen_image.generate_interpretion(
-            sentence=generation.correct_sentence
+            sentence=db_generation.sentence,
         )
         gen_img_tracker.stop_timer()
 
