@@ -127,6 +127,7 @@ with gr.Blocks() as avery_gradio:
                 multiselect = True,
                 label = "ユーザー",
                 visible = False,
+                interactive = True,
             )
 
             leaderboard_choices = gr.Dropdown(
@@ -135,13 +136,17 @@ with gr.Blocks() as avery_gradio:
                 type = "index",
                 label = "リーダーボード",
                 multiselect = True,
+                interactive = True,
             )
 
             score_choices = gr.Dropdown(
-                choices = ["字数", "接続詞", "形容詞", "副詞", "代名詞","前置詞","文法ミス数","スペルミス数","Perplexity","単語頻度","単語連続頻度","文節数","内容得点","全部"],
-                value = "全部",
+                ["字数", "接続詞", "形容詞", "副詞", "代名詞","前置詞","文法ミス数","スペルミス数","Perplexity","単語頻度","単語連続頻度","文節数","内容得点","全部"],
+                value = ["全部"],
+                multiselect = True,
                 type = "index",
                 label = "スコア",
+                interactive = True,
+                info="スコアの種類を選択してください。",
             )
 
         with gr.Column(show_progress=True,elem_classes='whole', scale=3):

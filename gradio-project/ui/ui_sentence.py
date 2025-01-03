@@ -116,7 +116,7 @@ with gr.Blocks() as avery_gradio:
             else:
                 yield None
 
-    async def ask_hint( message: str, request: gr.Request):
+    async def ask_hint( message: str, chathist , request: gr.Request):
         if message == "":
             message = "ヒントをちょうだい。"
         round_id = app.state.round.id
@@ -125,7 +125,12 @@ with gr.Blocks() as avery_gradio:
             created_at=datetime.datetime.now(datetime.timezone.utc),
         )
         chat_mdl = await send_message(round_id, new_message, request)
-        return None, convert_history(chat_mdl)
+        new_msg = convert_history(chat_mdl)
+        len_new_msg = len(new_msg)-len(chathist)
+
+        for i in range(len_new_msg):
+            chathist.append(new_msg[-len_new_msg+i])
+        return None, chathist
 
     gr.Markdown(
     """
@@ -140,7 +145,7 @@ with gr.Blocks() as avery_gradio:
 
             gr.on(triggers=[guidance.msg.submit,guidance.submit.click],
                   fn=ask_hint,
-                  inputs=[guidance.msg],
+                  inputs=[guidance.msg, guidance.chat],
                   outputs=[guidance.msg, guidance.chat],
                   queue=False
             )
