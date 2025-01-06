@@ -473,8 +473,6 @@ def create_leaderboards(
                     img = util.encode_image(image_file=f)
             except Exception:
                 raise HTTPException(status_code=400, detail="Please upload a valid image file")
-            finally:
-                image_file.file.close()
 
             db_original_image = crud.create_original_image(
                 db=db,
