@@ -528,7 +528,6 @@ def create_leaderboards(
             if story_extract:
                 words = dictionary.get_sentence_nlp(story_extract)
                 for word in words:
-                    print(word.lemma, word.pos)
                     vocab = crud.get_vocabulary(
                         db=db,
                         vocabulary=word.lemma,
