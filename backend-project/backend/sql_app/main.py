@@ -465,7 +465,7 @@ def create_leaderboards(
                 os.unlink(tmp.name)
     
 
-        images_files = [f for f in os.listdir('temp_dir') if os.path.isfile(os.path.join(temp_dir, f))]
+        images_files = [f for f in os.listdir(temp_dir) if os.path.isfile(os.path.join(temp_dir, f))]
         if int(len(leaderboards)) != int(len(images_files)):
             raise HTTPException(status_code=400, detail=f"Number of images ({len(images_files)}) and leaderboards ({len(leaderboards)}) do not match")
 
