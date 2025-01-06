@@ -419,7 +419,7 @@ def create_leaderboards(
     if not zipped_image_files.filename.endswith(".zip"):
         raise HTTPException(status_code=400, detail="Please upload a ZIP file")
     
-    shutil.unpack_archive(zipped_image_files.file, extract_dir='temp_dir')
+    shutil.unpack_archive(zipped_image_files, extract_dir='temp_dir')
     
     images_files = [f for f in os.listdir('temp_dir') if os.path.isfile(os.path.join('temp_dir', f))]
     
@@ -536,7 +536,7 @@ def create_leaderboards(
 
         # Remove the temporary directory
         shutil.rmtree('temp_dir')
-        
+
         return leaderboard_list
 
     except Exception as e:
