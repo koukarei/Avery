@@ -504,6 +504,9 @@ def create_leaderboards(
                 story_extract = ''
 
             img = images.get(util.remove_special_chars(index), None)
+            if img is None:
+                util.logger1.error(f"Image not found: {index}")
+                continue
 
             # Create leaderboard
             leaderboard = schemas.LeaderboardCreate(
