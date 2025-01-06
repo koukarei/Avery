@@ -563,17 +563,24 @@ def create_leaderboards(
                             db=db,
                             vocabulary=word
                         )
-                        vocab = vocab[0] if vocab else None
-                        if vocab and not crud.get_leaderboard_vocabulary(
+                        if not vocab:
+                            continue
+                        while vocab:
+                            v = vocab.pop()
+                            lv = crud.get_leaderboard_vocabulary(
                                 db=db,
                                 leaderboard_id=db_leaderboard.id,
-                                vocabulary_id=vocab.id
-                        ):
-                            crud.create_leaderboard_vocabulary(
-                                db=db,
-                                leaderboard_id=db_leaderboard.id,
-                                vocabulary_id=vocab.id
+                                vocabulary_id=v.id
                             )
+                            if lv:
+                                break
+                        if lv:
+                            continue
+                        crud.create_leaderboard_vocabulary(
+                            db=db,
+                            leaderboard_id=db_leaderboard.id,
+                            vocabulary_id=v.id
+                        )
 
 
             leaderboard_list.append(db_leaderboard)
@@ -1050,7 +1057,10 @@ def end_round(
 def read_vocabulary(current_user: Annotated[schemas.User, Depends(get_current_user)], vocabulary: str, pos: str=None, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view vocabulary")
-    vocabularies = crud.get_vocabulary(db, vocabulary=vocabulary, part_of_speech=pos)
+    if pos:
+        vocabularies = [crud.get_vocabulary(db, vocabulary=vocabulary, part_of_speech=pos)]
+    else:
+        vocabularies = crud.get_vocabulary(db, vocabulary=vocabulary)
     return vocabularies
 
 @app.get("/vocabularies/", tags=["Vocabulary"], response_model=list[schemas.Vocabulary])
