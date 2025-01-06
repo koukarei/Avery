@@ -420,7 +420,7 @@ def create_leaderboards(
         raise HTTPException(status_code=400, detail="Please upload a ZIP file")
     
     with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp:
-        tmp.write(zipped_image_files.file.seek(0))
+        tmp.write(zipped_image_files.file)
         tmp_path = tmp.name
 
     try:
