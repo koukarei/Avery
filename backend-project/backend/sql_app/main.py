@@ -416,30 +416,9 @@ def create_leaderboards(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
+    # Check arguments
     if not zipped_image_files.filename.endswith(".zip"):
         raise HTTPException(status_code=400, detail="Please upload a ZIP file")
-
-    try:
-        # Create a temporary file to store the uploaded content
-        with tempfile.NamedTemporaryFile(delete=False) as tmp:
-            # Copy the uploaded file's content to the temporary file
-            shutil.copyfileobj(zipped_image_files.file, tmp)
-            
-        with zipfile.ZipFile(tmp.name, 'r') as zip_ref:
-            zip_ref.extractall('temp_dir')
-            
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error processing uploaded file: {str(e)}"
-        )
-    finally:
-        # Clean up
-        import os
-        if 'tmp' in locals():
-            os.unlink(tmp.name)
-    
-    images_files = [f for f in os.listdir('temp_dir') if os.path.isfile(os.path.join('temp_dir', f))]
     
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to create leaderboards")
@@ -452,9 +431,8 @@ def create_leaderboards(
     # Get the scene
     scene = crud.get_scene(db=db, scene_name="anime")
 
+    # Check leaderboards
     leaderboards = pd.read_csv(csv_file.file)
-    if int(len(leaderboards)) != int(len(images_files)):
-        raise HTTPException(status_code=400, detail=f"Number of images ({len(images_files)}) and leaderboards ({len(leaderboards)}) do not match")
 
     # Check if the CSV file has the required columns
     col_names = ['title', 'story_extract']
@@ -464,28 +442,55 @@ def create_leaderboards(
     if 'published_at' in leaderboards.columns:
         leaderboards['published_at'] = pd.to_datetime(leaderboards['published_at'], format='%d/%m/%Y')
 
-    # Create images
-    try:
-        images = {}
-        for image_file in images_files:
-            try:
-                with open(f'temp_dir/{image_file}', 'rb') as f:
-                    img = util.encode_image(image_file=f)
-            except Exception:
-                raise HTTPException(status_code=400, detail="Please upload a valid image file")
+    with tempfile.TemporaryDirectory() as temp_dir:
 
-            db_original_image = crud.create_original_image(
-                db=db,
-                image=schemas.ImageBase(
-                    image=img
-                )
+        try:
+            # Create a temporary file to store the uploaded content
+            with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                # Copy the uploaded file's content to the temporary file
+                shutil.copyfileobj(zipped_image_files.file, tmp)
+                
+            with zipfile.ZipFile(tmp.name, 'r') as zip_ref:
+                zip_ref.extractall(temp_dir)
+            
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error processing uploaded file: {str(e)}"
             )
-            title = image_file.split(".")[0]
-            images[title] = db_original_image
+        finally:
+            # Clean up
+            import os
+            if 'tmp' in locals():
+                os.unlink(tmp.name)
+    
 
-    except Exception as e:
-        util.logger1.error(f"Error creating images: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+        images_files = [f for f in os.listdir('temp_dir') if os.path.isfile(os.path.join(temp_dir, f))]
+        if int(len(leaderboards)) != int(len(images_files)):
+            raise HTTPException(status_code=400, detail=f"Number of images ({len(images_files)}) and leaderboards ({len(leaderboards)}) do not match")
+
+        # Create images
+        try:
+            images = {}
+            for image_file in images_files:
+                try:
+                    with open(f'{temp_dir}/{image_file}', 'rb') as f:
+                        img = util.encode_image(image_file=f)
+                except Exception:
+                    raise HTTPException(status_code=400, detail="Please upload a valid image file")
+
+                db_original_image = crud.create_original_image(
+                    db=db,
+                    image=schemas.ImageBase(
+                        image=img
+                    )
+                )
+                title = image_file.split(".")[0]
+                images[title] = db_original_image
+
+        except Exception as e:
+            util.logger1.error(f"Error creating images: {str(e)}")
+            raise HTTPException(status_code=400, detail=str(e))
 
     # Read the CSV file
     try:
@@ -527,13 +532,18 @@ def create_leaderboards(
             # Add vocabularies
             if story_extract:
                 words = dictionary.get_sentence_nlp(story_extract)
+                
                 for word in words:
                     vocab = crud.get_vocabulary(
                         db=db,
                         vocabulary=word.lemma,
                         part_of_speech=word.pos
                     )
-                    if vocab:
+                    if vocab and not crud.get_leaderboard_vocabulary(
+                            db=db,
+                            leaderboard_id=db_leaderboard.id,
+                            vocabulary_id=vocab.id
+                    ):
                         crud.create_leaderboard_vocabulary(
                             db=db,
                             leaderboard_id=db_leaderboard.id,
@@ -553,7 +563,8 @@ def create_leaderboards(
             )
 
         # Remove the temporary directory
-        shutil.rmtree('temp_dir')
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
 
         return leaderboard_list
 

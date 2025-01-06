@@ -523,8 +523,8 @@ def delete_personal_dictionary(
         db.commit()
     return db_dictionary
 
-def get_leaderboard_vocabulary(db: Session, leaderboard_vocabulary_id: int):
-    return db.query(models.LeaderboardVocabulary).filter(models.LeaderboardVocabulary.id == leaderboard_vocabulary_id).first()
+def get_leaderboard_vocabulary(db: Session, leaderboard_id: int, vocabulary_id: int):
+    return db.query(models.LeaderboardVocabulary).filter(models.LeaderboardVocabulary.leaderboard_id == leaderboard_id).filter(models.LeaderboardVocabulary.vocabulary_id == vocabulary_id).first()
 
 def create_leaderboard_vocabulary(
         db: Session, 
