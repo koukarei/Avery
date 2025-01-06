@@ -1053,6 +1053,13 @@ def read_vocabulary(current_user: Annotated[schemas.User, Depends(get_current_us
     vocabularies = crud.get_vocabulary(db, vocabulary=vocabulary, pos=pos)
     return vocabularies
 
+@app.get("/vocabularies/", tags=["Vocabulary"], response_model=list[schemas.Vocabulary])
+def read_vocabularies(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view vocabularies")
+    vocabularies = crud.get_vocabularies(db, skip=skip, limit=limit)
+    return vocabularies
+
 @app.post("/vocabularies", tags=["Vocabulary"], response_model=List[schemas.Vocabulary])
 def create_vocabularies(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
