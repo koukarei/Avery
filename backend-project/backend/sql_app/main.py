@@ -1061,6 +1061,8 @@ def read_vocabulary(current_user: Annotated[schemas.User, Depends(get_current_us
         vocabularies = [crud.get_vocabulary(db, vocabulary=vocabulary, part_of_speech=pos)]
     else:
         vocabularies = crud.get_vocabulary(db, vocabulary=vocabulary)
+    if not vocabularies:
+        raise HTTPException(status_code=404, detail="Vocabulary not found")
     return vocabularies
 
 @app.get("/vocabularies/", tags=["Vocabulary"], response_model=list[schemas.Vocabulary])
