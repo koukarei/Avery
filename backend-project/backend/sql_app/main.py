@@ -2,7 +2,7 @@ import logging.config
 from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, BackgroundTasks, responses, Security, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-import time, os, datetime, io, requests, shutil
+import time, os, datetime, io, requests, shutil, tempfile
 import pandas as pd
 from pathlib import Path
 from PIL import Image
@@ -418,10 +418,15 @@ def create_leaderboards(
 ):
     if not zipped_image_files.filename.endswith(".zip"):
         raise HTTPException(status_code=400, detail="Please upload a ZIP file")
-    with open('temp.zip', 'wb') as f:
-        zipfile = zipped_image_files.file.read()
-        f.write(zipfile)
-        shutil.unpack_archive(zipfile, extract_dir='temp_dir')
+    
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp:
+        tmp.write(zipped_image_files.file.seek(0))
+        tmp_path = tmp.name
+
+    try:
+        shutil.unpack_archive(tmp_path, extract_dir='temp_dir')
+    finally:
+        os.unlink(tmp_path)
     
     images_files = [f for f in os.listdir('temp_dir') if os.path.isfile(os.path.join('temp_dir', f))]
     
@@ -539,9 +544,6 @@ def create_leaderboards(
         # Remove the temporary directory
         shutil.rmtree('temp_dir')
 
-        # Remove the temporary ZIP file
-        os.remove('temp.zip')
-        
         return leaderboard_list
 
     except Exception as e:
