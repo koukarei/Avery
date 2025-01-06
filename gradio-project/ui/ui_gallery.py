@@ -62,7 +62,9 @@ with gr.Blocks() as avery_gradio:
             published_at_end = datetime.datetime.fromtimestamp(published_at_end)
             leaderboards = await read_leaderboard(request, published_at_end=published_at_end)
         else:
-            leaderboards = await read_leaderboard(request)
+            published_at_start = datetime.datetime.now()
+            published_at_end = datetime.datetime.now()
+            leaderboards = await read_leaderboard(request, published_at_start, published_at_end)
         return [
             await get_original_images(leaderboard.id, request) 
             for leaderboard in leaderboards

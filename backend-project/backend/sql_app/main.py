@@ -550,6 +550,32 @@ def create_leaderboards(
                             vocabulary_id=vocab.id
                         )
 
+                words = [word.lemma for word in words]
+
+            # Add preset vocabularies
+            if 'vocabularies' in leaderboards.columns:
+                preset_vocabularies = row['vocabularies']
+                preset_vocabularies = preset_vocabularies.split(",")
+                for word in preset_vocabularies:
+                    word = word.strip()
+                    if word not in words:
+                        vocab = crud.get_vocabulary(
+                            db=db,
+                            vocabulary=word
+                        )
+                        vocab = vocab[0] if vocab else None
+                        if vocab and not crud.get_leaderboard_vocabulary(
+                                db=db,
+                                leaderboard_id=db_leaderboard.id,
+                                vocabulary_id=vocab.id
+                        ):
+                            crud.create_leaderboard_vocabulary(
+                                db=db,
+                                leaderboard_id=db_leaderboard.id,
+                                vocabulary_id=vocab.id
+                            )
+
+
             leaderboard_list.append(db_leaderboard)
 
             # Generate descriptions
