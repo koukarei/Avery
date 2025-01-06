@@ -1050,7 +1050,7 @@ def end_round(
 def read_vocabulary(current_user: Annotated[schemas.User, Depends(get_current_user)], vocabulary: str, pos: str=None, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view vocabulary")
-    vocabularies = crud.get_vocabulary(db, vocabulary=vocabulary, pos=pos)
+    vocabularies = crud.get_vocabulary(db, vocabulary=vocabulary, part_of_speech=pos)
     return vocabularies
 
 @app.get("/vocabularies/", tags=["Vocabulary"], response_model=list[schemas.Vocabulary])
