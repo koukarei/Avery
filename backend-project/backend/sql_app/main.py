@@ -480,7 +480,7 @@ def create_leaderboards(
                     image=img
                 )
             )
-            title = image_file.filename.split(".")[0]
+            title = image_file.split(".")[0]
             images[title] = db_original_image
 
     except Exception as e:
