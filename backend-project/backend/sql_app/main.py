@@ -2,7 +2,7 @@ import logging.config
 from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, BackgroundTasks, responses, Security, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-import time, os, datetime, io, requests
+import time, os, datetime, io, requests, shutil
 import pandas as pd
 from pathlib import Path
 from PIL import Image
@@ -411,11 +411,18 @@ def create_leaderboard(
 @app.post("/leaderboards/bulk_create", tags=["Leaderboard"], response_model=list[schemas.LeaderboardOut])
 def create_leaderboards(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
-    images_files: List[Annotated[UploadFile, File()]],
+    zipped_image_files: Annotated[UploadFile, File()],
     csv_file: Annotated[UploadFile, File()],
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
+    if not zipped_image_files.filename.endswith(".zip"):
+        raise HTTPException(status_code=400, detail="Please upload a ZIP file")
+    
+    shutil.unpack_archive(zipped_image_files.file, extract_dir='temp_dir')
+    
+    images_files = [f for f in os.listdir('temp_dir') if os.path.isfile(os.path.join('temp_dir', f))]
+    
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to create leaderboards")
     if not current_user.is_admin:
@@ -444,8 +451,8 @@ def create_leaderboards(
         images = {}
         for image_file in images_files:
             try:
-                image_file.file.seek(0)
-                img = util.encode_image(image_file=image_file.file)
+                with open(f'temp_dir/{image_file}', 'rb') as f:
+                    img = util.encode_image(image_file=f)
             except Exception:
                 raise HTTPException(status_code=400, detail="Please upload a valid image file")
             finally:
@@ -474,9 +481,6 @@ def create_leaderboards(
         for index, row in leaderboards.iterrows():
             
             published_at = row.get('published_at', datetime.datetime.now(tz=timezone.utc))
-
-            # Get vocabularies if exist
-            vocabularies = []
 
             if 'story_extract' in leaderboards.columns:
                 story_extract = row['story_extract']
@@ -530,6 +534,9 @@ def create_leaderboards(
                 model_name="gpt-4o-mini"
             )
 
+        # Remove the temporary directory
+        shutil.rmtree('temp_dir')
+        
         return leaderboard_list
 
     except Exception as e:
