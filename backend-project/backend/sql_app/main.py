@@ -529,6 +529,8 @@ def create_leaderboards(
                 leaderboard=leaderboard,
             )
 
+            added_vocabularies = []
+
             # Add vocabularies
             if story_extract:
                 words = dictionary.get_sentence_nlp(story_extract)
@@ -549,6 +551,7 @@ def create_leaderboards(
                             leaderboard_id=db_leaderboard.id,
                             vocabulary_id=vocab.id
                         )
+                        added_vocabularies.append(vocab.word)
 
                 words = [word.lemma for word in words]
 
@@ -556,33 +559,38 @@ def create_leaderboards(
             if 'vocabularies' in leaderboards.columns:
                 preset_vocabularies = row['vocabularies']
                 preset_vocabularies = preset_vocabularies.split(",")
+                preset_vocabularies = [word.strip() for word in preset_vocabularies]
                 for word in preset_vocabularies:
-                    word = word.strip()
-                    if word not in words:
-                        vocab = crud.get_vocabulary(
-                            db=db,
-                            vocabulary=word
-                        )
-                        if not vocab:
-                            continue
-                        while vocab:
-                            v = vocab.pop()
-                            lv = crud.get_leaderboard_vocabulary(
-                                db=db,
-                                leaderboard_id=db_leaderboard.id,
-                                vocabulary_id=v.id
-                            )
-                            if lv:
-                                break
-                        if lv:
-                            continue
-                        crud.create_leaderboard_vocabulary(
+                    if word in words:
+                        continue
+                    vocab = crud.get_vocabulary(
+                        db=db,
+                        vocabulary=word
+                    )
+                    if not vocab:
+                        continue
+                    while vocab:
+                        v = vocab.pop()
+                        lv = crud.get_leaderboard_vocabulary(
                             db=db,
                             leaderboard_id=db_leaderboard.id,
                             vocabulary_id=v.id
                         )
+                        if lv:
+                            break
+                    if lv:
+                        continue
+                    crud.create_leaderboard_vocabulary(
+                        db=db,
+                        leaderboard_id=db_leaderboard.id,
+                        vocabulary_id=v.id
+                    )
+                    added_vocabularies.append(v.word)
 
-
+                # Log the difference between the added and preset vocabularies
+                diff = set(added_vocabularies) - set(preset_vocabularies)
+                if diff:
+                    util.logger1.info(f"Leaderboard {index} Added vocabularies: {diff}")
             leaderboard_list.append(db_leaderboard)
 
             # Generate descriptions
