@@ -83,5 +83,4 @@ logger1.addHandler(file_handler)
 
 def remove_special_chars(text):
     cleaned_text = re.sub(r'[^\w\s]', '', text)
-    cleaned_text.replace('!', '')
     return cleaned_text
