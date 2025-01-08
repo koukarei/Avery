@@ -690,13 +690,24 @@ def read_programs(current_user: Annotated[schemas.User, Depends(get_current_user
 def get_rounds_by_leaderboard(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: int,
+    program: Optional[str] = "None",
     db: Session = Depends(get_db),
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view")
+    
+    if program == "None":
+        return []
+    elif program == "Overview":
+        return crud.get_rounds(
+            db=db,
+            leaderboard_id=leaderboard_id,
+        )
+    db_program = crud.get_program_by_name(db, program)
     return crud.get_rounds(
         db=db,
         leaderboard_id=leaderboard_id,
+        program_id=db_program.id
     )
 
 @app.get("/my_rounds/", tags=["Round"], response_model=list[schemas.RoundOut])
@@ -1477,6 +1488,7 @@ def read_generations(
     player_id: Optional[int] = None,
     leaderboard_id: Optional[int] = None,
     school_name: Optional[str] = None,
+    program: Optional[str] = None,
     order_by: Optional[str] = "total_score",
     skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
 ):
@@ -1487,19 +1499,22 @@ def read_generations(
     if player_id is None and current_user.user_type == "student":
         player_id = current_user.id
 
-    generations = crud.get_generations(
-        db=db,
-        skip=skip,
-        limit=limit,
-        player_id=player_id,
-        leaderboard_id=leaderboard_id,
-        order_by=order_by
-    )
-    
-    if school_name:
-        generations = [gen for gen in generations if gen[1].player.school_name == school_name]
+    if program == "None":
+        return []
+    elif program == "Overview":
+        generations = crud.get_generations(
+            db=db,
+            skip=skip,
+            limit=limit,
+            player_id=player_id,
+            leaderboard_id=leaderboard_id,
+            order_by=order_by
+        )
+        
+        if school_name:
+            generations = [gen for gen in generations if gen[1].player.school_name == school_name]
 
-    return generations
+        return generations
 
 @app.get("/generation/{generation_id}/score", tags=["Generation"], response_model=schemas.Score)
 def get_generation_score(

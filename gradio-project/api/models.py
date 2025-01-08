@@ -104,6 +104,7 @@ class Round(BaseModel):
 
 class RoundStart(BaseModel):
     model: Optional[str]="gpt-4o-mini"
+    program: Optional[str]="None"
     leaderboard_id: int
     created_at: datetime
 

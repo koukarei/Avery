@@ -118,6 +118,7 @@ async def login_form(request: Request):
         request.session["token"] = token.model_dump()
         request.session["username"] = form_data["username"]
         request.session["roles"] = "instructor" if form_data["username"] == "admin" else "student"
+        request.session["program"] = "overview"
 
         # app.state.token = token.model_dump()
         # app.state.username = form_data["username"]
@@ -178,6 +179,7 @@ async def lti_login(request: Request):
         request.session["token"] = token.model_dump()
         request.session["username"] = username
         request.session["roles"] = role
+        request.session["program"] = form_data.get('custom_program', 'none')
         return RedirectResponse(url='/avery/', status_code=status.HTTP_303_SEE_OTHER)
 
     raise HTTPException(status_code=500, detail="Failed to login")

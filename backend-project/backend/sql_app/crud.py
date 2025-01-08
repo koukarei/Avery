@@ -300,18 +300,31 @@ def create_program(db: Session, program: schemas.ProgramBase):
 def get_programs(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Program).offset(skip).limit(limit).all()
 
+def get_program_by_name(db: Session, program_name: str):
+    return db.query(models.Program).filter(models.Program.name == program_name).first()
+
 def get_round(db: Session, round_id: int):
     return db.query(models.Round).filter(models.Round.id == round_id).first()
 
-def get_rounds(db: Session, skip: int = 0, limit: int = 100, player_id: int = None,is_completed: bool = True, leaderboard_id: int = None):
-    if leaderboard_id and player_id:
-        return db.query(models.Round).filter(models.Round.is_completed == is_completed).filter(models.Round.leaderboard_id == leaderboard_id).filter(models.Round.player_id==player_id).order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
-    elif leaderboard_id:
-        return db.query(models.Round).filter(models.Round.is_completed == is_completed).filter(models.Round.leaderboard_id == leaderboard_id).order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
-    elif player_id:
-        return db.query(models.Round).filter(models.Round.is_completed == is_completed).filter(models.Round.player_id==player_id).order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
+def get_rounds(db: Session, skip: int = 0, limit: int = 100, player_id: int = None,is_completed: bool = True, leaderboard_id: int = None, program_id: int = None):
+    if program_id:
+        rounds = db.query(
+            models.Round,
+        ).\
+        filter(models.Round.program_id == program_id)
     else:
-        return db.query(models.Round).filter(models.Round.is_completed == is_completed).order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
+        rounds = db.query(
+            models.Round,
+        )
+
+    if leaderboard_id and player_id:
+        return rounds.filter(models.Round.is_completed == is_completed).filter(models.Round.leaderboard_id == leaderboard_id).filter(models.Round.player_id==player_id).order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
+    elif leaderboard_id:
+        return rounds.filter(models.Round.is_completed == is_completed).filter(models.Round.leaderboard_id == leaderboard_id).order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
+    elif player_id:
+        return rounds.filter(models.Round.is_completed == is_completed).filter(models.Round.player_id==player_id).order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
+    else:
+        return rounds.filter(models.Round.is_completed == is_completed).order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
 
 def create_round(db: Session, leaderboard_id:int, user_id: int, created_at: datetime.datetime, model_name: str="gpt-4o-mini"):
     db_chat=models.Chat()
@@ -335,7 +348,82 @@ def create_round(db: Session, leaderboard_id:int, user_id: int, created_at: date
 def get_generation(db: Session, generation_id: int):
     return db.query(models.Generation).filter(models.Generation.id == generation_id).first()
 
-def get_generations(db: Session, skip: int = 0, limit: int = 100, player_id: int = None, leaderboard_id: int = None, order_by: str = "id"):
+def get_generations(db: Session, program_id: int=None, skip: int = 0, limit: int = 100, player_id: int = None, leaderboard_id: int = None, order_by: str = "id"):
+    if program_id is not None:
+        if order_by == "id":
+            if leaderboard_id and player_id:
+                generations = db.query(
+                    models.Generation,
+                    models.Round
+                ).\
+                join(models.Round, models.Generation.round_id == models.Round.id).\
+                filter(models.Round.leaderboard_id == leaderboard_id).\
+                filter(models.Round.player_id == player_id).\
+                order_by(models.Generation.id.desc()).offset(skip).limit(limit).all()
+            elif leaderboard_id:
+                generations = db.query(
+                    models.Generation,
+                    models.Round
+                ).\
+                join(models.Round, models.Generation.round_id == models.Round.id).\
+                filter(models.Round.leaderboard_id == leaderboard_id).\
+                filter(models.Round.program_id == program_id).\
+                order_by(models.Generation.id.desc()).offset(skip).limit(limit).all()
+            elif player_id:
+                generations = db.query(
+                    models.Generation,
+                    models.Round
+                ).\
+                join(models.Round, models.Generation.round_id == models.Round.id).\
+                filter(models.Round.player_id == player_id).\
+                order_by(models.Generation.id.desc()).offset(skip).limit(limit).all()
+            else:
+                generations = db.query(
+                    models.Generation,
+                    models.Round
+                ).\
+                join(models.Round, models.Generation.round_id == models.Round.id).\
+                filter(models.Round.program_id == program_id).\
+                order_by(models.Generation.id.desc()).offset(skip).limit(limit).all()
+                
+        elif order_by == "total_score":
+            if leaderboard_id and player_id:
+                generations = db.query(
+                    models.Generation,
+                    models.Round
+                ).\
+                join(models.Round, models.Generation.round_id == models.Round.id).\
+                filter(models.Round.leaderboard_id == leaderboard_id).\
+                filter(models.Round.player_id == player_id).\
+                order_by(models.Generation.total_score.desc()).offset(skip).limit(limit).all()
+            elif leaderboard_id:
+                generations = db.query(
+                    models.Generation,
+                    models.Round
+                ).\
+                join(models.Round, models.Generation.round_id == models.Round.id).\
+                filter(models.Round.leaderboard_id == leaderboard_id).\
+                filter(models.Round.program_id == program_id).\
+                order_by(models.Generation.total_score.desc()).offset(skip).limit(limit).all()
+            elif player_id:
+                generations = db.query(
+                    models.Generation,
+                    models.Round
+                ).\
+                join(models.Round, models.Generation.round_id == models.Round.id).\
+                filter(models.Round.player_id == player_id).\
+                order_by(models.Generation.total_score.desc()).offset(skip).limit(limit).all()
+            else:
+                generations = db.query(
+                    models.Generation,
+                    models.Round
+                ).\
+                join(models.Round, models.Generation.round_id == models.Round.id).\
+                filter(models.Round.program_id == program_id).\
+                order_by(models.Generation.total_score.desc()).offset(skip).limit(limit).all()
+        else:
+            raise ValueError("Invalid order_by value")
+        return generations
     if order_by == "id":
         if leaderboard_id and player_id:
             generations = db.query(
