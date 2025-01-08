@@ -127,7 +127,7 @@ with gr.Blocks() as avery_gradio:
         path="/",
         root_path="/avery/leaderboards",
     )
-    print(f"Gradio root path: {avery_gradio.root_path}")
+    
     app.add_middleware(
         SessionMiddleware,
         secret_key=os.getenv("SECRET_KEY"),
@@ -185,6 +185,20 @@ with gr.Blocks() as avery_gradio:
 
     async def delete_selected_leaderboard(request: gr.Request, selected_leaderboard, published_at_start: Optional[datetime.datetime]=None, published_at_end: Optional[datetime.datetime]=None):
         leaderboard = await delete_leaderboard(selected_leaderboard.id, request=request)
+        if published_at_start and published_at_end:
+            published_at_start = datetime.datetime.fromtimestamp(published_at_start)
+            published_at_end = datetime.datetime.fromtimestamp(published_at_end)
+            
+            leaderboards = await read_leaderboard(request, published_at_start, published_at_end)
+        elif published_at_start:
+            published_at_start = datetime.datetime.fromtimestamp(published_at_start)
+            leaderboards = await read_leaderboard(request, published_at_start)
+        elif published_at_end:
+            published_at_end = datetime.datetime.fromtimestamp(published_at_end)
+            leaderboards = await read_leaderboard(request, published_at_end=published_at_end)
+        else:
+            published_at_start = datetime.datetime.now()
+            published_at_end = datetime.datetime.now()
         leaderboards = await read_leaderboard(request, published_at_start, published_at_end)
         return [
             await get_original_images(leaderboard.id, request) 
