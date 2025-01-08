@@ -125,9 +125,8 @@ with gr.Blocks() as avery_gradio:
         fastapi_app, 
         avery_gradio, 
         path="/leaderboards",
-        root_path="/avery"
     )
-
+    print(f"Gradio root path: {avery_gradio.root_path}")
     app.add_middleware(
         SessionMiddleware,
         secret_key=os.getenv("SECRET_KEY"),
