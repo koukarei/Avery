@@ -68,7 +68,6 @@ with gr.Blocks() as avery_gradio:
         fastapi_app, 
         avery_gradio, 
         path="/answer",
-        root_path="https://dev.let.media.kyoto-u.ac.jp/avery/"
     )
 
     app.add_middleware(
