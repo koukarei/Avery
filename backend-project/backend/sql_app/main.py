@@ -650,6 +650,21 @@ def read_leaderboard(current_user: Annotated[schemas.User, Depends(get_current_u
         raise HTTPException(status_code=404, detail="Leaderboard not found")
     return db_leaderboard
 
+@app.delete("/leaderboards/{leaderboard_id}", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
+def delete_leaderboard(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    leaderboard_id: int,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to delete leaderboard")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
+    if db_leaderboard is None:
+        raise HTTPException(status_code=404, detail="Leaderboard not found")
+    return crud.delete_leaderboard(db=db, leaderboard_id=leaderboard_id)
+
 @app.get("/leaderboards/{leaderboard_id}/rounds/", tags=["Leaderboard", "Round"], response_model=list[schemas.RoundOut])
 def get_rounds_by_leaderboard(
     current_user: Annotated[schemas.User, Depends(get_current_user)],

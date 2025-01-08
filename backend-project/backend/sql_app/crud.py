@@ -192,6 +192,40 @@ def update_leaderboard_difficulty(
     db.refresh(db_leaderboard)
     return db_leaderboard
 
+def delete_leaderboard(db: Session, leaderboard_id: int):
+    db_leaderboard = db.query(models.Leaderboard).filter(models.Leaderboard.id == leaderboard_id).first()
+    db_original_images = db.query(models.OriginalImage).filter(models.OriginalImage.id == db_leaderboard.original_image_id).all()
+
+    db_rounds = db.query(models.Round).filter(models.Round.leaderboard_id == leaderboard_id).all()
+
+    db_leaderboard_vocab = db.query(
+        models.LeaderboardVocabulary
+    ).filter(
+        models.LeaderboardVocabulary.leaderboard_id == leaderboard_id
+    ).all()
+
+    db_description = db.query(models.Description).filter(models.Description.leaderboard_id == leaderboard_id).all()
+
+    if db_original_images:
+        for image in db_original_images:
+            db.delete(image)
+        db.commit()
+
+    if db_rounds:
+        for round in db_rounds:
+            db.delete(round)
+        db.commit()
+
+    if db_leaderboard_vocab:
+        for vocab in db_leaderboard_vocab:
+            db.delete(vocab)
+        db.commit()
+
+    if db_leaderboard:
+        db.delete(db_leaderboard)
+        db.commit()
+    return db_leaderboard
+
 def get_original_image(db: Session, image_id: int):
     return db.query(models.OriginalImage).filter(models.OriginalImage.id == image_id).first()
 
