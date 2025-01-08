@@ -650,17 +650,64 @@ def read_leaderboard(current_user: Annotated[schemas.User, Depends(get_current_u
         raise HTTPException(status_code=404, detail="Leaderboard not found")
     return db_leaderboard
 
-@app.get("/leaderboards/{leaderboard_id}/rounds/", tags=["Leaderboard", "Round"], response_model=list[schemas.RoundOut])
-def get_rounds_by_leaderboard(
+@app.delete("/leaderboards/{leaderboard_id}", tags=["Leaderboard"], response_model=schemas.IdOnly)
+def delete_leaderboard(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: int,
     db: Session = Depends(get_db),
 ):
     if not current_user:
+        raise HTTPException(status_code=401, detail="Login to delete leaderboard")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
+    if db_leaderboard is None:
+        raise HTTPException(status_code=404, detail="Leaderboard not found")
+    return crud.delete_leaderboard(db=db, leaderboard_id=leaderboard_id)
+
+@app.post("/program", tags=["Program"], response_model=schemas.Program)
+def create_program(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    program: schemas.ProgramBase,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to create program")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    return crud.create_program(db=db, program=program)
+
+@app.get("/programs/", tags=["Program"], response_model=list[schemas.Program])
+def read_programs(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to read programs")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    programs = crud.get_programs(db, skip=skip, limit=limit)
+    return programs
+
+@app.get("/leaderboards/{leaderboard_id}/rounds/", tags=["Leaderboard", "Round"], response_model=list[schemas.RoundOut])
+def get_rounds_by_leaderboard(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    leaderboard_id: int,
+    program: Optional[str] = "none",
+    db: Session = Depends(get_db),
+):
+    if not current_user:
         raise HTTPException(status_code=401, detail="Login to view")
+    
+    if program == "none":
+        return []
+    elif program == "overview":
+        return crud.get_rounds(
+            db=db,
+            leaderboard_id=leaderboard_id,
+        )
+    db_program = crud.get_program_by_name(db, program)
     return crud.get_rounds(
         db=db,
         leaderboard_id=leaderboard_id,
+        program_id=db_program.id
     )
 
 @app.get("/my_rounds/", tags=["Round"], response_model=list[schemas.RoundOut])
@@ -1441,6 +1488,7 @@ def read_generations(
     player_id: Optional[int] = None,
     leaderboard_id: Optional[int] = None,
     school_name: Optional[str] = None,
+    program: Optional[str] = None,
     order_by: Optional[str] = "total_score",
     skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
 ):
@@ -1451,18 +1499,34 @@ def read_generations(
     if player_id is None and current_user.user_type == "student":
         player_id = current_user.id
 
+    if program == "none":
+        return []
+    elif program == "overview":
+        generations = crud.get_generations(
+            db=db,
+            skip=skip,
+            limit=limit,
+            player_id=player_id,
+            leaderboard_id=leaderboard_id,
+            order_by=order_by
+        )
+        
+        if school_name:
+            generations = [gen for gen in generations if gen[1].player.school_name == school_name]
+
+        return generations
+    db_program = crud.get_program_by_name(db, program)
+    if db_program is None:
+        raise HTTPException(status_code=404, detail="Program not found")
     generations = crud.get_generations(
         db=db,
+        program_id=db_program.id,
         skip=skip,
         limit=limit,
         player_id=player_id,
         leaderboard_id=leaderboard_id,
         order_by=order_by
     )
-    
-    if school_name:
-        generations = [gen for gen in generations if gen[1].player.school_name == school_name]
-
     return generations
 
 @app.get("/generation/{generation_id}/score", tags=["Generation"], response_model=schemas.Score)

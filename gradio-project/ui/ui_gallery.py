@@ -7,7 +7,7 @@ import datetime
 from starlette.applications import Starlette
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import RedirectResponse, Response
-from api.connection import read_leaderboard, get_original_images, get_interpreted_image, get_rounds, get_generation, check_playable, read_my_rounds, get_generations
+from api.connection import read_leaderboard, get_original_images, get_interpreted_image, get_rounds, get_generation, check_playable, read_my_rounds, get_generations, delete_leaderboard
 from api.connection import models
 
 from app import app as fastapi_app
@@ -37,6 +37,7 @@ class Gallery:
                     self.generated_img = gr.Gallery(None, label="record")
             with gr.Row():
                 self.submit_btn = gr.Button("始める", scale=0, interactive=False, link="/avery/go_to_answer")
+                self.delete_btn = gr.Button("削除", scale=0, visible=False)
 
     def upload_picture(self, image):
         return image[0][0]
@@ -119,7 +120,7 @@ with gr.Blocks() as avery_gradio:
     try: 
         avery_gradio.load(initialize_game, inputs=[published_at_start_dropdown, published_at_end_dropdown], outputs=[gallery.gallery,leaderboards])
     except Exception as e:
-        RedirectResponse(url="/")
+        RedirectResponse(url="/avery/")
 
     avery_gradio.queue(max_size=128, default_concurrency_limit=50)
 
@@ -129,7 +130,7 @@ with gr.Blocks() as avery_gradio:
         path="/leaderboards",
     )
 
-    async def select_leaderboard(evt: gr.SelectData, leaderboards, request: gr.Request):
+    async def select_leaderboard_fn(evt: gr.SelectData, leaderboards, request: gr.Request):
         select_leaderboard = leaderboards[evt.index]
 
         app.state.selected_leaderboard = select_leaderboard
@@ -167,11 +168,39 @@ with gr.Blocks() as avery_gradio:
         playable = await check_playable(select_leaderboard.id, request=request)
         start_btn = gr.update(value="始める",interactive=playable, link="/avery/go_to_answer")
 
+        # Check if the player is an admin
+        delete_btn = gr.update(visible=False)
+        if hasattr(request.session, "roles") and request.session.get("roles") != "student":
+            if hasattr(request.session, "username") and request.session.get("username") == "admin":
+                delete_btn = gr.update(visible=True)
+                
         unfinished_rounds = await get_unfinished_rounds_from_backend(request, select_leaderboard.id)
         if unfinished_rounds:
             start_btn = gr.update(value="再開", link="/avery/resume_game",interactive=True)
             
-        return select_leaderboard, start_btn, info, interpreted_images, round_generations, unfinished_rounds
+        return select_leaderboard, start_btn, delete_btn, info, interpreted_images, round_generations, unfinished_rounds
+
+    async def delete_selected_leaderboard(request: gr.Request, selected_leaderboard, published_at_start: Optional[datetime.datetime]=None, published_at_end: Optional[datetime.datetime]=None):
+        leaderboard = await delete_leaderboard(selected_leaderboard.id, request=request)
+        if published_at_start and published_at_end:
+            published_at_start = datetime.datetime.fromtimestamp(published_at_start)
+            published_at_end = datetime.datetime.fromtimestamp(published_at_end)
+            
+            leaderboards = await read_leaderboard(request, published_at_start, published_at_end)
+        elif published_at_start:
+            published_at_start = datetime.datetime.fromtimestamp(published_at_start)
+            leaderboards = await read_leaderboard(request, published_at_start)
+        elif published_at_end:
+            published_at_end = datetime.datetime.fromtimestamp(published_at_end)
+            leaderboards = await read_leaderboard(request, published_at_end=published_at_end)
+        else:
+            published_at_start = datetime.datetime.now()
+            published_at_end = datetime.datetime.now()
+        leaderboards = await read_leaderboard(request, published_at_start, published_at_end)
+        return [
+            await get_original_images(leaderboard.id, request) 
+            for leaderboard in leaderboards
+        ], leaderboards
 
     async def select_interpreted_image(evt: gr.SelectData, generations, select_leaderboard, request: gr.Request):
         selected_interpreted = generations[evt.index]
@@ -232,9 +261,9 @@ with gr.Blocks() as avery_gradio:
     # Set the selected leaderboard
     gr.on(
         triggers=[gallery.gallery.select],
-        fn=select_leaderboard,
+        fn=select_leaderboard_fn,
         inputs=[leaderboards],
-        outputs=[selected_leaderboard, gallery.submit_btn, gallery.info, gallery.generated_img, related_generations, unfinished],
+        outputs=[selected_leaderboard, gallery.submit_btn, gallery.delete_btn, gallery.info, gallery.generated_img, related_generations, unfinished],
     )
 
     # Set the selected interpreted image
@@ -243,6 +272,14 @@ with gr.Blocks() as avery_gradio:
         fn=select_interpreted_image,
         inputs=[related_generations, selected_leaderboard],
         outputs=[gallery.info],
+    )
+
+    # Delete the selected leaderboard
+    gr.on(
+        triggers=[gallery.delete_btn.click],
+        fn=delete_selected_leaderboard,
+        inputs=[selected_leaderboard, published_at_start_dropdown, published_at_end_dropdown],
+        outputs=[gallery.gallery, leaderboards],
     )
 
 

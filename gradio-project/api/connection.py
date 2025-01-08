@@ -155,6 +155,15 @@ async def read_leaderboard(
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code, detail=e.response.json())
 
+async def delete_leaderboard(leaderboard_id: int, request: Request):
+    response = await http_client.delete(
+        f"{BACKEND_URL}leaderboards/{leaderboard_id}",
+        auth=get_auth(request),
+    )
+    response.raise_for_status()
+    output = models.IdOnly(**response.json())
+    return output
+
 async def get_original_images(leaderboard_id: int, request: Request):
     response = await http_client.get(
         f"{BACKEND_URL}original_image/{leaderboard_id}",

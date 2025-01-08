@@ -46,6 +46,16 @@ class Chat(ChatBase):
     class Config:
         orm_mode = True
 
+class ProgramBase(BaseModel):
+    name: str
+    description: str
+
+class Program(ProgramBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
 class SceneBase(BaseModel):
     name: str
     prompt: str
@@ -145,6 +155,7 @@ class Leaderboard(LeaderboardCreate):
 
 class RoundCreate(BaseModel):
     leaderboard_id: int
+    program: Optional[str]="none"
     model: str="gpt-4o-mini"
     created_at: datetime.datetime
 

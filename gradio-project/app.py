@@ -3,6 +3,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.routing import Mount
 from lti import validate_lti_request
 
 import os
@@ -118,6 +119,7 @@ async def login_form(request: Request):
         request.session["token"] = token.model_dump()
         request.session["username"] = form_data["username"]
         request.session["roles"] = "instructor" if form_data["username"] == "admin" else "student"
+        request.session["program"] = "overview"
 
         # app.state.token = token.model_dump()
         # app.state.username = form_data["username"]
@@ -178,6 +180,7 @@ async def lti_login(request: Request):
         request.session["token"] = token.model_dump()
         request.session["username"] = username
         request.session["roles"] = role
+        request.session["program"] = form_data.get('custom_program', 'none')
         return RedirectResponse(url='/avery/', status_code=status.HTTP_303_SEE_OTHER)
 
     raise HTTPException(status_code=500, detail="Failed to login")
@@ -191,6 +194,8 @@ async def logout(request: Request):
     token = request.session.pop('token', None)
 
     username = request.session.pop('username', None)
+
+    program = request.session.pop('program', None)
 
     role = request.session.pop('roles', None)
 
@@ -307,6 +312,7 @@ async def redirect_to_answer(request: Request):
     output = await create_round(
         new_round=models.RoundStart(
             leaderboard_id=selected_leaderboard_id,
+            program=request.session["program"],
             created_at=datetime.datetime.now(datetime.timezone.utc),
         ),
         request=request,
@@ -352,3 +358,15 @@ def get_root_url(
     print(f"route_path: {route_path}\nroot_path: {root_path}\nrequest: {request.url if hasattr(request, 'url') else None}")
     root_path = root_path or request.scope.get("root_path", "")
     return root_path
+
+@app.get('/routes')
+def get_mounted_apps():
+    routes = []
+    for route in app.routes:
+        methods = ', '.join(route.methods) if hasattr(route, 'methods') else 'No methods'
+        routes.append({"path": route.path, "name": getattr(route, 'name', 'No name'), "methods": methods})
+
+        if isinstance(route, Mount):
+                routes.append({"path": route.path, "name": route.name, "app": str(route.app), "root_path":route.root_path if hasattr(route, 'root_path') else 'No root path'})
+
+    return {"mounted_routes": routes}
