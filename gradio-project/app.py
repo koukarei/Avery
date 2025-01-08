@@ -194,6 +194,8 @@ async def logout(request: Request):
 
     username = request.session.pop('username', None)
 
+    program = request.session.pop('program', None)
+
     role = request.session.pop('roles', None)
 
     if school == "saikyo":
@@ -309,6 +311,7 @@ async def redirect_to_answer(request: Request):
     output = await create_round(
         new_round=models.RoundStart(
             leaderboard_id=selected_leaderboard_id,
+            program=request.session["program"],
             created_at=datetime.datetime.now(datetime.timezone.utc),
         ),
         request=request,

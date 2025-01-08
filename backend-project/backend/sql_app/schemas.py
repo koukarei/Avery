@@ -155,7 +155,7 @@ class Leaderboard(LeaderboardCreate):
 
 class RoundCreate(BaseModel):
     leaderboard_id: int
-    program: Optional[str]="None"
+    program: Optional[str]="none"
     model: str="gpt-4o-mini"
     created_at: datetime.datetime
 
