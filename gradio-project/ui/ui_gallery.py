@@ -122,12 +122,11 @@ with gr.Blocks() as avery_gradio:
     avery_gradio.queue(max_size=128, default_concurrency_limit=50)
 
     app = gr.mount_gradio_app(
-        Starlette(), 
+        fastapi_app, 
         avery_gradio, 
         path="/",
-        root_path="/avery/leaderboards"
+        root_path="/avery/leaderboards",
     )
-    
     print(f"Gradio root path: {avery_gradio.root_path}")
     app.add_middleware(
         SessionMiddleware,
