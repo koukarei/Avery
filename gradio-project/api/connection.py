@@ -157,7 +157,7 @@ async def read_leaderboard(
 
 async def delete_leaderboard(leaderboard_id: int, request: Request):
     response = await http_client.delete(
-        f"{BACKEND_URL}leaderboards/{leaderboard_id}/delete",
+        f"{BACKEND_URL}leaderboards/{leaderboard_id}",
         auth=get_auth(request),
     )
     response.raise_for_status()
