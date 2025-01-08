@@ -3,6 +3,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.routing import Mount
 from lti import validate_lti_request
 
 import os
@@ -76,7 +77,6 @@ concurrency_control = EndpointConcurrencyControl()
 
 app = FastAPI(
     root_path="/avery",
-    docs_url=None, redoc_url=None, openapi_url=None
 )
 
 @app.on_event("shutdown")
@@ -351,3 +351,15 @@ async def redirect_to_result(request: Request):
 @app.exception_handler(Exception)
 async def exception_handler(request: Request, exc: Exception):
     return RedirectResponse(url="/avery/login", status_code=status.HTTP_303_SEE_OTHER)
+
+@app.get('/routes')
+def get_mounted_apps():
+    routes = []
+    for route in app.routes:
+        methods = ', '.join(route.methods) if hasattr(route, 'methods') else 'No methods'
+        routes.append({"path": route.path, "name": getattr(route, 'name', 'No name'), "methods": methods})
+
+        if isinstance(route, Mount):
+                routes.append({"path": route.path, "name": route.name, "app": str(route.app)})
+
+    return {"mounted_routes": routes}
