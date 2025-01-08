@@ -360,6 +360,6 @@ def get_mounted_apps():
         routes.append({"path": route.path, "name": getattr(route, 'name', 'No name'), "methods": methods})
 
         if isinstance(route, Mount):
-                routes.append({"path": route.path, "name": route.name, "app": str(route.app)})
+                routes.append({"path": route.path, "name": route.name, "app": str(route.app), "vars":vars(route)})
 
     return {"mounted_routes": routes}
