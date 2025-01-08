@@ -75,7 +75,7 @@ with gr.Blocks() as avery_gradio:
         fastapi_app, 
         avery_gradio, 
         path="/result",
-        root_path="/"
+        root_path="/avery"
     )
 
     app.add_middleware(
