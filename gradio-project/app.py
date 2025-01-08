@@ -76,6 +76,7 @@ concurrency_control = EndpointConcurrencyControl()
 
 app = FastAPI(
     root_path="/avery",
+    docs_url=None, redoc_url=None, openapi_url=None
 )
 
 @app.on_event("shutdown")

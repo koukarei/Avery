@@ -124,8 +124,18 @@ with gr.Blocks() as avery_gradio:
     app = gr.mount_gradio_app(
         fastapi_app, 
         avery_gradio, 
-        path="/avery/leaderboards", 
-        root_path="/avery"
+        path="/", 
+        root_path="/avery/leaderboards",
+        allowed_paths=[
+            "/avery/leaderboards",
+            "/avery/go_to_answer",
+            "/avery/resume_game",
+            "/avery/go_to_result",
+            "/avery/new_game",
+            "/avery/logout",
+            "/avery/dashboard",
+            "/avery/answer",
+        ]
     )
 
     app.add_middleware(
