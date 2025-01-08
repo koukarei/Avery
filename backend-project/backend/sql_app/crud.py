@@ -115,6 +115,7 @@ def get_leaderboards(
         limit: int = 100, 
         published_at_start: datetime.datetime = None,
         published_at_end: datetime.datetime = None,
+        is_public: bool = True
 ):
     if school_name:
         school_leaderboards = db.query(
@@ -133,17 +134,20 @@ def get_leaderboards(
 
     if published_at_start is None and published_at_end is None:
         return school_leaderboards.\
+            filter(models.Leaderboard.is_public == is_public).\
             filter(models.Leaderboard.published_at <= datetime.datetime.now()).\
                 offset(skip).limit(limit).all()
     elif published_at_start is None:
         return school_leaderboards.\
+            filter(models.Leaderboard.is_public == is_public).\
             filter(models.Leaderboard.published_at <= published_at_end).\
                 offset(skip).limit(limit).all()
     elif published_at_end is None:
         published_at_end = datetime.datetime.now()
     return school_leaderboards.\
+        filter(models.Leaderboard.is_public == is_public).\
         filter(models.Leaderboard.published_at >= published_at_start).\
-            filter(models.Leaderboard.published_at <= published_at_end).\
+        filter(models.Leaderboard.published_at <= published_at_end).\
                 offset(skip).limit(limit).all()
 
     # if published_at_start is None and published_at_end is None:

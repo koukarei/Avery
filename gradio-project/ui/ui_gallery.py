@@ -116,7 +116,7 @@ with gr.Blocks() as avery_gradio:
     try: 
         avery_gradio.load(initialize_game, inputs=[published_at_start_dropdown, published_at_end_dropdown], outputs=[gallery.gallery,leaderboards])
     except Exception as e:
-        RedirectResponse(url="/")
+        RedirectResponse(url="/avery/")
 
     avery_gradio.queue(max_size=128, default_concurrency_limit=50)
 
