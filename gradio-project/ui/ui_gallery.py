@@ -125,7 +125,7 @@ with gr.Blocks() as avery_gradio:
         fastapi_app, 
         avery_gradio, 
         path="/avery/leaderboards/",
-        root_path="/avery/leaderboards",
+        root_path="/avery",
     )
     print(f"Gradio root path: {avery_gradio.root_path}")
     app.add_middleware(

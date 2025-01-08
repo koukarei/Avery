@@ -54,7 +54,6 @@ with gr.Blocks() as avery_gradio:
         fastapi_app, 
         avery_gradio, 
         path="/avery/dashboard/",
-        root_path="/avery/dashboard"
     )
 
     app.add_middleware(
