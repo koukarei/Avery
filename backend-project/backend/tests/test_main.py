@@ -138,6 +138,25 @@ class TestAdmin:
             response = client.post("/sqlapp/scene/", json=scene.copy(),headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"})
             assert response.status_code == 200, response.json()
 
+    def test_add_programs(self):
+        programs = [
+            {
+                "name": "inlab_test",
+                "description": "For in-lab experiment. Link disclosed to LMS",
+            },
+            {
+                "name": "haga_sensei_test",
+                "description": "For Haga sensei trial version",
+            },
+            {
+                "name": "student_january_experiment",
+                "description": "For January experiment in Saikyo High School year 1",
+            }
+        ]
+
+        for program in programs:
+            response = client.post("/sqlapp/scene/", json=program.copy(),headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"})
+            assert response.status_code == 200, response.json()
 
     def test_read_stories(self):
 
