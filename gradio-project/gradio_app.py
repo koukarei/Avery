@@ -60,11 +60,6 @@ with gr.Blocks() as avery_gradio:
         path="/dashboard", 
     )
 
-    app.add_middleware(
-        SessionMiddleware,
-        secret_key=os.getenv("SECRET_KEY"),
-    )
-
     leaderboards = gr.State()
     selected_player = gr.State()
     selected_leaderboard = gr.State()

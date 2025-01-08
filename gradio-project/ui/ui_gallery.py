@@ -11,6 +11,9 @@ from api.connection import read_leaderboard, get_original_images, get_interprete
 from api.connection import models
 
 from app import app as fastapi_app
+from app import get_root_url
+import gradio.route_utils 
+gradio.route_utils.get_root_url = get_root_url
 
 class Gallery:
     """Create a gallery object for the user interface."""
@@ -123,12 +126,7 @@ with gr.Blocks() as avery_gradio:
     app = gr.mount_gradio_app(
         fastapi_app, 
         avery_gradio, 
-        path="/leaderboards", 
-    )
-
-    app.add_middleware(
-        SessionMiddleware,
-        secret_key=os.getenv("SECRET_KEY"),
+        path="/leaderboards",
     )
 
     async def select_leaderboard(evt: gr.SelectData, leaderboards, request: gr.Request):

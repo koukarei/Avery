@@ -70,11 +70,6 @@ with gr.Blocks() as avery_gradio:
         path="/answer", 
     )
 
-    app.add_middleware(
-        SessionMiddleware,
-        secret_key=os.getenv("SECRET_KEY"),
-    )
-
     async def obtain_original_image(request: gr.Request):
         if not hasattr(app.state, 'selected_leaderboard'):
             return None, None

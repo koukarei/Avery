@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Depends, status, HTTPException, Request
+from fastapi import FastAPI, Request, Depends, status, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -345,3 +345,10 @@ async def redirect_to_result(request: Request):
 @app.exception_handler(Exception)
 async def exception_handler(request: Request, exc: Exception):
     return RedirectResponse(url="/avery/login", status_code=status.HTTP_303_SEE_OTHER)
+
+def get_root_url(
+    request: Request, route_path: str, root_path: Optional[str] = None
+):
+    print(f"route_path: {route_path}\nroot_path: {root_path}\nrequest: {request.url if hasattr(request, 'url') else None}")
+    root_path = root_path or request.scope.get("root_path", "")
+    return root_path
