@@ -1,6 +1,4 @@
-from ui import ui_gallery
-from ui import ui_sentence
-from ui import ui_result
+from ui.ui_result import app as fastapi_app
 
 from ui.ui_chatbot import Guidance
 from ui.ui_result import Result
@@ -15,8 +13,6 @@ from starlette.applications import Starlette
 from starlette.middleware.sessions import SessionMiddleware
 from api.connection import read_leaderboard, get_users, get_original_images, get_chat, get_generations, get_interpreted_image
 from api.connection import models
-
-from app import app as fastapi_app
 
 score_cat = [
     "n_words","n_conjunctions","n_adj","n_adv","n_pronouns","n_prepositions","n_grammar_errors","n_spelling_errors","perplexity","f_word","f_bigram","n_clauses","content_score"

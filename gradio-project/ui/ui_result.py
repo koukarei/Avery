@@ -10,7 +10,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from api.connection import get_original_images, get_image_similarity, get_chat, send_message, get_interpreted_image
 from api.connection import models
 
-from app import app as fastapi_app
+from ui.ui_sentence import app as fastapi_app
 
 MAX_GENERATION = int(os.getenv("MAX_GENERATION", 5))
 

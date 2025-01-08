@@ -11,7 +11,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from api.connection import get_original_images, create_generation, get_chat, send_message, get_interpretation, get_interpreted_image, read_my_rounds, get_generation
 from api.connection import models
 
-from app import app as fastapi_app
+from ui.ui_gallery import app as fastapi_app
 
 
 class Sentence:
