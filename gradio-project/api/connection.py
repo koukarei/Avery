@@ -161,7 +161,7 @@ async def delete_leaderboard(leaderboard_id: int, request: Request):
         auth=get_auth(request),
     )
     response.raise_for_status()
-    output = models.Leaderboard(**response.json())
+    output = models.IdOnly(**response.json())
     return output
 
 async def get_original_images(leaderboard_id: int, request: Request):

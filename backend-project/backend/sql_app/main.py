@@ -650,7 +650,7 @@ def read_leaderboard(current_user: Annotated[schemas.User, Depends(get_current_u
         raise HTTPException(status_code=404, detail="Leaderboard not found")
     return db_leaderboard
 
-@app.delete("/leaderboards/{leaderboard_id}", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
+@app.delete("/leaderboards/{leaderboard_id}", tags=["Leaderboard"], response_model=schemas.IdOnly)
 def delete_leaderboard(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: int,
