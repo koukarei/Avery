@@ -122,7 +122,7 @@ def get_leaderboards(
             models.Leaderboard,
             models.School_Leaderboard
         ).\
-        filter(models.School_Leaderboard.school_name == school_name).\
+        filter(models.School_Leaderboard.school == school_name).\
         join(
             models.Leaderboard,
             models.Leaderboard.id == models.School_Leaderboard.leaderboard_id
