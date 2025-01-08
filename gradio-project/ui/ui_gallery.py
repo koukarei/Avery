@@ -126,16 +126,6 @@ with gr.Blocks() as avery_gradio:
         avery_gradio, 
         path="/", 
         root_path="/avery/leaderboards",
-        allowed_paths=[
-            "/avery/leaderboards",
-            "/avery/go_to_answer",
-            "/avery/resume_game",
-            "/avery/go_to_result",
-            "/avery/new_game",
-            "/avery/logout",
-            "/avery/dashboard",
-            "/avery/answer",
-        ]
     )
 
     app.add_middleware(
