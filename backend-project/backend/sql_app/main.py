@@ -690,15 +690,15 @@ def read_programs(current_user: Annotated[schemas.User, Depends(get_current_user
 def get_rounds_by_leaderboard(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: int,
-    program: Optional[str] = "None",
+    program: Optional[str] = "none",
     db: Session = Depends(get_db),
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view")
     
-    if program == "None":
+    if program == "none":
         return []
-    elif program == "Overview":
+    elif program == "overview":
         return crud.get_rounds(
             db=db,
             leaderboard_id=leaderboard_id,
@@ -1499,9 +1499,9 @@ def read_generations(
     if player_id is None and current_user.user_type == "student":
         player_id = current_user.id
 
-    if program == "None":
+    if program == "none":
         return []
-    elif program == "Overview":
+    elif program == "overview":
         generations = crud.get_generations(
             db=db,
             skip=skip,
@@ -1515,6 +1515,19 @@ def read_generations(
             generations = [gen for gen in generations if gen[1].player.school_name == school_name]
 
         return generations
+    db_program = crud.get_program_by_name(db, program)
+    if db_program is None:
+        raise HTTPException(status_code=404, detail="Program not found")
+    generations = crud.get_generations(
+        db=db,
+        program_id=db_program.id,
+        skip=skip,
+        limit=limit,
+        player_id=player_id,
+        leaderboard_id=leaderboard_id,
+        order_by=order_by
+    )
+    return generations
 
 @app.get("/generation/{generation_id}/score", tags=["Generation"], response_model=schemas.Score)
 def get_generation_score(
