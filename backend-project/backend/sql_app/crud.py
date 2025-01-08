@@ -290,6 +290,16 @@ def create_description(db: Session, description: schemas.DescriptionBase):
     db.refresh(db_description)
     return db_description
 
+def create_program(db: Session, program: schemas.ProgramBase):
+    db_program = models.Program(**program.model_dump())
+    db.add(db_program)
+    db.commit()
+    db.refresh(db_program)
+    return db_program
+
+def get_programs(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Program).offset(skip).limit(limit).all()
+
 def get_round(db: Session, round_id: int):
     return db.query(models.Round).filter(models.Round.id == round_id).first()
 

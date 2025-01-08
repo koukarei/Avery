@@ -46,6 +46,16 @@ class Chat(ChatBase):
     class Config:
         orm_mode = True
 
+class ProgramBase(BaseModel):
+    name: str
+    description: str
+
+class Program(ProgramBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
 class SceneBase(BaseModel):
     name: str
     prompt: str

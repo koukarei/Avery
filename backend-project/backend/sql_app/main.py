@@ -665,6 +665,27 @@ def delete_leaderboard(
         raise HTTPException(status_code=404, detail="Leaderboard not found")
     return crud.delete_leaderboard(db=db, leaderboard_id=leaderboard_id)
 
+@app.post("/program", tags=["Program"], response_model=schemas.Program)
+def create_program(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    program: schemas.ProgramBase,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to create program")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    return crud.create_program(db=db, program=program)
+
+@app.get("/programs/", tags=["Program"], response_model=list[schemas.Program])
+def read_programs(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to read programs")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    programs = crud.get_programs(db, skip=skip, limit=limit)
+    return programs
+
 @app.get("/leaderboards/{leaderboard_id}/rounds/", tags=["Leaderboard", "Round"], response_model=list[schemas.RoundOut])
 def get_rounds_by_leaderboard(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
