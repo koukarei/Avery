@@ -51,10 +51,10 @@ def convert_history(chat_mdl: models.Chat):
 with gr.Blocks() as avery_gradio:
 
     app = gr.mount_gradio_app(
-        fastapi_app, 
+        Starlette(), 
         avery_gradio, 
-        path="/dashboard", 
-        root_path="/avery"
+        path="/",
+        root_path="/avery/dashboard"
     )
 
     app.add_middleware(
