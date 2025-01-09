@@ -2,7 +2,7 @@ import logging.config
 from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, BackgroundTasks, responses, Security, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-import time, os, datetime, io, requests, shutil, tempfile, zipfile
+import time, os, datetime, io, requests, shutil, tempfile, zipfile, zoneinfo
 import pandas as pd
 from pathlib import Path
 from PIL import Image
@@ -332,18 +332,18 @@ def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_current_
     school_name = current_user.school
     
     if not published_at_start and not published_at_end:
-        leaderboards = crud.get_leaderboards(db, school_name=school_name, skip=skip, limit=limit, published_at_end=datetime.datetime.now(tz=timezone.utc))
+        leaderboards = crud.get_leaderboards(db, school_name=school_name, skip=skip, limit=limit, published_at_end=datetime.datetime.now(tz=zoneinfo.ZoneInfo('Japan')))
         return leaderboards
     
     if published_at_start:
-        published_at_start = datetime.datetime.strptime(published_at_start, "%d%m%Y").replace(tzinfo=timezone.utc)
+        published_at_start = datetime.datetime.strptime(published_at_start, "%d%m%Y").replace(tzinfo=zoneinfo.ZoneInfo('Japan'))
     if published_at_end:
-        published_at_end = datetime.datetime.strptime(published_at_end, "%d%m%Y").replace(tzinfo=timezone.utc)
+        published_at_end = datetime.datetime.strptime(published_at_end, "%d%m%Y").replace(tzinfo=zoneinfo.ZoneInfo('Japan'))
         
     if current_user.user_type == "student":
-        if published_at_start and published_at_start > datetime.datetime.now(tz=timezone.utc):
+        if published_at_start and published_at_start > datetime.datetime.now(tz=zoneinfo.ZoneInfo('Japan')):
             published_at_start = datetime.datetime.now(tz=timezone.utc)
-        if published_at_end and published_at_end > datetime.datetime.now(tz=timezone.utc):
+        if published_at_end and published_at_end > datetime.datetime.now(tz=zoneinfo.ZoneInfo('Japan')):
             published_at_end = datetime.datetime.now(tz=timezone.utc)
             
     leaderboards = crud.get_leaderboards(db, school_name=school_name, skip=skip, limit=limit, published_at_start=published_at_start, published_at_end=published_at_end)
@@ -365,9 +365,9 @@ def read_leaderboards_admin(
         raise HTTPException(status_code=401, detail="You are not an admin")
     
     if published_at_start:
-        published_at_start = datetime.datetime.strptime(published_at_start, "%d%m%Y").replace(tzinfo=timezone.utc)
+        published_at_start = datetime.datetime.strptime(published_at_start, "%d%m%Y").replace(tzinfo=zoneinfo.ZoneInfo('Japan'))
     if published_at_end:
-        published_at_end = datetime.datetime.strptime(published_at_end, "%d%m%Y").replace(tzinfo=timezone.utc)
+        published_at_end = datetime.datetime.strptime(published_at_end, "%d%m%Y").replace(tzinfo=zoneinfo.ZoneInfo('Japan'))
 
     leaderboards = crud.get_leaderboards_admin(
         db=db,

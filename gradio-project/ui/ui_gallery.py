@@ -66,10 +66,6 @@ with gr.Blocks() as avery_gradio:
         if hasattr(request, "session"):
             if isinstance(request.session, dict) and request.session.get("roles") != "student" and request.session.get("username") == "admin":
                 is_admin = True
-            else:
-                print(f"type of request.session: {type(request.session)}")
-        else:
-            print("vars of request: ", vars(request))
         
         if published_at_start and published_at_end:
             published_at_start = datetime.datetime.fromtimestamp(published_at_start)
@@ -194,10 +190,6 @@ with gr.Blocks() as avery_gradio:
             if isinstance(request.session, dict) and request.session.get("roles", None) != "student" and request.session.get("username", None) == "admin":
                 is_admin = gr.update(visible=True)
                 schools = await get_schools(request=request, leaderboard_id=select_leaderboard.id)
-            else:
-                print(f"type of request.session: {type(request.session)}")
-        else:
-            print("vars of request: ", vars(request))
 
         unfinished_rounds = await get_unfinished_rounds_from_backend(request, select_leaderboard.id)
         if unfinished_rounds:
