@@ -235,6 +235,8 @@ def update_leaderboard(
                 models.Vocabulary
             ).filter(
                 models.Vocabulary.word == vocab.word
+            ).filter(
+                models.Vocabulary.pos == vocab.pos
             ).first()
             if db_vocab is None:
                 db_vocab = models.Vocabulary(
@@ -441,6 +443,7 @@ def get_generations(db: Session, program_id: int=None, skip: int = 0, limit: int
                 join(models.Round, models.Generation.round_id == models.Round.id).\
                 filter(models.Round.leaderboard_id == leaderboard_id).\
                 filter(models.Round.player_id == player_id).\
+                filter(models.Generation.is_completed == True).\
                 order_by(models.Generation.id.desc()).offset(skip).limit(limit).all()
             elif leaderboard_id:
                 generations = db.query(
@@ -450,6 +453,7 @@ def get_generations(db: Session, program_id: int=None, skip: int = 0, limit: int
                 join(models.Round, models.Generation.round_id == models.Round.id).\
                 filter(models.Round.leaderboard_id == leaderboard_id).\
                 filter(models.Round.program_id == program_id).\
+                filter(models.Generation.is_completed == True).\
                 order_by(models.Generation.id.desc()).offset(skip).limit(limit).all()
             elif player_id:
                 generations = db.query(
@@ -458,6 +462,7 @@ def get_generations(db: Session, program_id: int=None, skip: int = 0, limit: int
                 ).\
                 join(models.Round, models.Generation.round_id == models.Round.id).\
                 filter(models.Round.player_id == player_id).\
+                filter(models.Generation.is_completed == True).\
                 order_by(models.Generation.id.desc()).offset(skip).limit(limit).all()
             else:
                 generations = db.query(
@@ -466,6 +471,7 @@ def get_generations(db: Session, program_id: int=None, skip: int = 0, limit: int
                 ).\
                 join(models.Round, models.Generation.round_id == models.Round.id).\
                 filter(models.Round.program_id == program_id).\
+                filter(models.Generation.is_completed == True).\
                 order_by(models.Generation.id.desc()).offset(skip).limit(limit).all()
                 
         elif order_by == "total_score":
@@ -477,6 +483,7 @@ def get_generations(db: Session, program_id: int=None, skip: int = 0, limit: int
                 join(models.Round, models.Generation.round_id == models.Round.id).\
                 filter(models.Round.leaderboard_id == leaderboard_id).\
                 filter(models.Round.player_id == player_id).\
+                filter(models.Generation.is_completed == True).\
                 order_by(models.Generation.total_score.desc()).offset(skip).limit(limit).all()
             elif leaderboard_id:
                 generations = db.query(
@@ -486,6 +493,7 @@ def get_generations(db: Session, program_id: int=None, skip: int = 0, limit: int
                 join(models.Round, models.Generation.round_id == models.Round.id).\
                 filter(models.Round.leaderboard_id == leaderboard_id).\
                 filter(models.Round.program_id == program_id).\
+                filter(models.Generation.is_completed == True).\
                 order_by(models.Generation.total_score.desc()).offset(skip).limit(limit).all()
             elif player_id:
                 generations = db.query(
@@ -494,6 +502,7 @@ def get_generations(db: Session, program_id: int=None, skip: int = 0, limit: int
                 ).\
                 join(models.Round, models.Generation.round_id == models.Round.id).\
                 filter(models.Round.player_id == player_id).\
+                filter(models.Generation.is_completed == True).\
                 order_by(models.Generation.total_score.desc()).offset(skip).limit(limit).all()
             else:
                 generations = db.query(
@@ -502,6 +511,7 @@ def get_generations(db: Session, program_id: int=None, skip: int = 0, limit: int
                 ).\
                 join(models.Round, models.Generation.round_id == models.Round.id).\
                 filter(models.Round.program_id == program_id).\
+                filter(models.Generation.is_completed == True).\
                 order_by(models.Generation.total_score.desc()).offset(skip).limit(limit).all()
         else:
             raise ValueError("Invalid order_by value")
@@ -515,6 +525,7 @@ def get_generations(db: Session, program_id: int=None, skip: int = 0, limit: int
             join(models.Round, models.Generation.round_id == models.Round.id).\
             filter(models.Round.leaderboard_id == leaderboard_id).\
             filter(models.Round.player_id == player_id).\
+            filter(models.Generation.is_completed == True).\
             order_by(models.Generation.id.desc()).offset(skip).limit(limit).all()
         elif leaderboard_id:
             generations = db.query(
@@ -523,6 +534,7 @@ def get_generations(db: Session, program_id: int=None, skip: int = 0, limit: int
             ).\
             join(models.Round, models.Generation.round_id == models.Round.id).\
             filter(models.Round.leaderboard_id == leaderboard_id).\
+            filter(models.Generation.is_completed == True).\
             order_by(models.Generation.id.desc()).offset(skip).limit(limit).all()
         elif player_id:
             generations = db.query(
@@ -531,6 +543,7 @@ def get_generations(db: Session, program_id: int=None, skip: int = 0, limit: int
             ).\
             join(models.Round, models.Generation.round_id == models.Round.id).\
             filter(models.Round.player_id == player_id).\
+            filter(models.Generation.is_completed == True).\
             order_by(models.Generation.id.desc()).offset(skip).limit(limit).all()
         else:
             generations = db.query(
@@ -538,6 +551,7 @@ def get_generations(db: Session, program_id: int=None, skip: int = 0, limit: int
                 models.Round
             ).\
             join(models.Round, models.Generation.round_id == models.Round.id).\
+            filter(models.Generation.is_completed == True).\
             order_by(models.Generation.id.desc()).offset(skip).limit(limit).all()
             
     elif order_by == "total_score":
@@ -549,6 +563,7 @@ def get_generations(db: Session, program_id: int=None, skip: int = 0, limit: int
             join(models.Round, models.Generation.round_id == models.Round.id).\
             filter(models.Round.leaderboard_id == leaderboard_id).\
             filter(models.Round.player_id == player_id).\
+            filter(models.Generation.is_completed == True).\
             order_by(models.Generation.total_score.desc()).offset(skip).limit(limit).all()
         elif leaderboard_id:
             generations = db.query(
@@ -557,6 +572,7 @@ def get_generations(db: Session, program_id: int=None, skip: int = 0, limit: int
             ).\
             join(models.Round, models.Generation.round_id == models.Round.id).\
             filter(models.Round.leaderboard_id == leaderboard_id).\
+            filter(models.Generation.is_completed == True).\
             order_by(models.Generation.total_score.desc()).offset(skip).limit(limit).all()
         elif player_id:
             generations = db.query(
@@ -565,6 +581,7 @@ def get_generations(db: Session, program_id: int=None, skip: int = 0, limit: int
             ).\
             join(models.Round, models.Generation.round_id == models.Round.id).\
             filter(models.Round.player_id == player_id).\
+            filter(models.Generation.is_completed == True).\
             order_by(models.Generation.total_score.desc()).offset(skip).limit(limit).all()
         else:
             generations = db.query(
@@ -572,6 +589,7 @@ def get_generations(db: Session, program_id: int=None, skip: int = 0, limit: int
                 models.Round
             ).\
             join(models.Round, models.Generation.round_id == models.Round.id).\
+            filter(models.Generation.is_completed == True).\
             order_by(models.Generation.total_score.desc()).offset(skip).limit(limit).all()
     else:
         raise ValueError("Invalid order_by value")
@@ -591,6 +609,14 @@ def create_generation(db: Session, round_id: int, generation: schemas.Generation
     
     db.commit()
     db.refresh(db_round)
+    return db_generation
+
+def update_generation0(db: Session, generation: schemas.GenerationCreate, generation_id: int):
+    db_generation = db.query(models.Generation).filter(models.Generation.id == generation_id).first()
+    db_generation.created_at = generation.created_at
+    db_generation.sentence = generation.sentence
+    db.commit()
+    db.refresh(db_generation)
     return db_generation
 
 def update_generation1(db: Session, generation: schemas.GenerationCorrectSentence):

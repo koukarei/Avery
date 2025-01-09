@@ -13,46 +13,57 @@ BACKEND_URL = os.getenv("BACKEND_URL")
 
 http_client = httpx.AsyncClient()
 
-import httpx
-import threading
-from fastapi import HTTPException
-
 class BearerAuth(httpx.Auth):
     requires_request_body = True
-
     def __init__(self, access_token, refresh_token, refresh_url):
         self.access_token = access_token
         self.refresh_token = refresh_token
         self.refresh_url = refresh_url
         self._sync_lock = threading.RLock()
+        self._async_lock = asyncio.Lock()
 
-    def auth_flow(self, request):
-        request.headers["Authorization"] = f"Bearer {self.access_token}"
-        response = yield request
-        if response.status_code == 401:
-            
-            refresh_response = asyncio.run(self.build_refresh_request())
-            if not hasattr(refresh_response, "status_code"):
-                
-                raise HTTPException(status_code=302, detail="Redirect to login page", headers={"Location": "/avery/login"})
-            elif refresh_response.status_code != 200:
-                raise HTTPException(status_code=302, detail="Redirect to login page", headers={"Location": "/avery/login"})
-            self.update_tokens(refresh_response)
-
-            request.headers["Authorization"] = f"Bearer {self.access_token}"
-            yield request
-
-    def build_refresh_request(self):
+    def sync_get_token(self):
         with self._sync_lock:
             response = http_client.post(
                 self.refresh_url,
                 data={"refresh_token": self.refresh_token}
             )
+            response.raise_for_status()
         return response
-    
+
+    def sync_auth_flow(self, request):
+        request.headers["Authorization"] = f"Bearer {self.access_token}"
+        response = yield request
+
+        if response.status_code == 401:
+            refresh_response = self.sync_get_token()
+            self.update_tokens(refresh_response.json())
+
+            request.headers["Authorization"] = f"Bearer {self.access_token}"
+            yield request
+
+    async def async_get_token(self):
+        async with self._async_lock:
+            response = await http_client.post(
+                self.refresh_url,
+                data={"refresh_token": self.refresh_token}
+            )
+            response.raise_for_status()
+        return response
+
+    async def async_auth_flow(self, request):
+        request.headers["Authorization"] = f"Bearer {self.access_token}"
+        response = yield request
+
+        if response.status_code == 401:
+            refresh_response = await self.async_get_token()
+            self.update_tokens(refresh_response.json())
+
+            request.headers["Authorization"] = f"Bearer {self.access_token}"
+            yield request
+
     def update_tokens(self, response):
-        data = response.json()
-        self.access_token = data["access_token"]
+        self.access_token = response["access_token"]
 
 def convert_json(mdl: models.BaseModel):
     json_data = mdl.model_dump()
@@ -100,6 +111,7 @@ async def get_access_token_from_backend(
             )
             response.raise_for_status()
             token = models.Token(**response.json())  
+            
             return token
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code)
@@ -123,12 +135,15 @@ async def get_access_token_from_backend_lti(
         raise HTTPException(status_code=e.response.status_code)
 
 def get_auth(request: Request):
-    bearer = BearerAuth(
-        access_token=request.session["token"]["access_token"],
-        refresh_token=request.session["token"]["refresh_token"],
-        refresh_url=f"{BACKEND_URL}refresh_token"
-    )
-    return bearer
+    if hasattr(request, "session") and "token" in request.session:
+        bearer = BearerAuth(
+            access_token=request.session["token"]["access_token"],
+            refresh_token=request.session["token"]["refresh_token"],
+            refresh_url=f"{BACKEND_URL}refresh_token"
+        )
+        return bearer
+    else:
+        raise HTTPException(status_code=401, detail="Not authenticated")
 
 async def read_leaderboard(
         request: Request, 
@@ -217,8 +232,7 @@ async def get_original_images(leaderboard_id: int, request: Request):
         f"{BACKEND_URL}original_image/{leaderboard_id}",
         auth=get_auth(request),
     )
-    if response.status_code != 200:
-        return None
+    response.raise_for_status()
     image = PILImage.open(io.BytesIO(response.content))
     return image
 
@@ -232,8 +246,7 @@ async def create_round(new_round: models.RoundStart, request: Request, ):
         },
         auth=get_auth(request),
     )
-    if response.status_code != 200:
-        return None
+    response.raise_for_status()
     output = models.RoundStartOut(**response.json())
     return output
     
@@ -247,8 +260,7 @@ async def read_my_rounds(request: Request, is_completed: bool = False, leaderboa
         url,
         auth=get_auth(request),
     )
-    if response.status_code != 200:
-        return None
+    response.raise_for_status()
     output = [models.Round(**round) for round in response.json()]
     return output
 
@@ -262,8 +274,7 @@ async def send_message(round_id: int, new_message:models.MessageSend, request: R
         auth=get_auth(request),
         timeout=20
     )
-    if response.status_code != 200:
-        return None
+    response.raise_for_status()
     output = models.Chat(**response.json())
     return output
 
@@ -272,8 +283,7 @@ async def get_chat(round_id: int, request: Request, ):
         f"{BACKEND_URL}chat/{round_id}",
         auth=get_auth(request),
     )
-    if response.status_code != 200:
-        return None
+    response.raise_for_status()
     output = models.Chat(**response.json())
     return output
 
@@ -286,8 +296,7 @@ async def create_generation(new_generation: models.GenerationStart, request: Req
         },
         auth=get_auth(request),
     )
-    if response.status_code != 200:
-        return None
+    response.raise_for_status()
     output = models.GenerationCorrectSentence(**response.json())
     return output
 
@@ -301,8 +310,7 @@ async def get_interpretation(round_id: int, interpretation: models.GenerationCor
         auth=get_auth(request),
         timeout=90
     )
-    if response.status_code != 200:
-        return None
+    response.raise_for_status()
     output = models.GenerationInterpretation(**response.json())
     return output
 
@@ -311,8 +319,7 @@ async def get_interpreted_image(generation_id: int, request: Request, ):
         f"{BACKEND_URL}interpreted_image/{generation_id}",
         auth=get_auth(request),
     )
-    if response.status_code != 200:
-        return None
+    response.raise_for_status()
     image = PILImage.open(io.BytesIO(response.content))
     return image
 
@@ -326,8 +333,7 @@ async def complete_generation(round_id: int, generation: models.GenerationComple
         auth=get_auth(request),
         timeout=120
     )
-    if response.status_code != 200:
-        return None
+    response.raise_for_status()
     output = models.GenerationComplete(**response.json())
     return output
 
@@ -339,8 +345,7 @@ async def end_round(round_id: int, request: Request, ):
         },
         auth=get_auth(request),
     )
-    if response.status_code != 200:
-        return None
+    response.raise_for_status()
     output = models.Round(**response.json())
     return output
 
@@ -349,8 +354,7 @@ async def get_image_similarity(generation_id: int, request: Request, ):
         f"{BACKEND_URL}image_similarity/{generation_id}",
         auth=get_auth(request),
     )
-    if response.status_code != 200:
-        return None
+    response.raise_for_status()
     output = models.ImageSimilarity(**response.json())
     return output
 
@@ -360,8 +364,7 @@ async def get_rounds(leaderboard_id: int, request: Request):
         auth=get_auth(request),
         follow_redirects=True
     )
-    if response.status_code != 200:
-        return None
+    response.raise_for_status()
     output = [models.Round(**round) for round in response.json()]
     return output
 
@@ -370,8 +373,7 @@ async def get_generation(generation_id: int, request: Request):
         f"{BACKEND_URL}generation/{generation_id}",
         auth=get_auth(request),
     )
-    if response.status_code != 200:
-        return None
+    response.raise_for_status()
     output = models.GenerationOut(**response.json())
     return output
 
@@ -380,8 +382,7 @@ async def get_generation_score(generation_id: int, request: Request):
         f"{BACKEND_URL}generation/{generation_id}/score",
         auth=get_auth(request),
     )
-    if response.status_code != 200:
-        return None
+    response.raise_for_status()
     return response.json()
 
 async def check_playable(
@@ -393,8 +394,7 @@ async def check_playable(
         auth=get_auth(request),
     )
     
-    if response.status_code != 200:
-        return None
+    response.raise_for_status()
     return response.json()['is_playable']
 
 async def get_users(request: Request):
@@ -402,8 +402,7 @@ async def get_users(request: Request):
         f"{BACKEND_URL}users",
         auth=get_auth(request),
     )
-    if response.status_code != 200:
-        return None
+    response.raise_for_status()
     output = [models.User(**user) for user in response.json()]
     return output
 
@@ -413,31 +412,23 @@ async def get_generations(
     player_id: Optional[int] = None, 
     school_name: Optional[str] = None
 ):
-    if school_name:
-        if leaderboard_id and player_id:
-            url = f"{BACKEND_URL}generations/?leaderboard_id={leaderboard_id}&player_id={player_id}&school_name={school_name}"
-        elif leaderboard_id:
-            url = f"{BACKEND_URL}generations/?leaderboard_id={leaderboard_id}&school_name={school_name}"
-        elif player_id:
-            url = f"{BACKEND_URL}generations/?player_id={player_id}&school_name={school_name}"
-        else:
-            url = f"{BACKEND_URL}generations/?school_name={school_name}"
+    if hasattr(request, "session"):
+        program = request.session.get("program", 'none')
     else:
-        if leaderboard_id and player_id:
-            url = f"{BACKEND_URL}generations/?leaderboard_id={leaderboard_id}&player_id={player_id}"
-        elif leaderboard_id:
-            url = f"{BACKEND_URL}generations/?leaderboard_id={leaderboard_id}"
-        elif player_id:
-            url = f"{BACKEND_URL}generations/?player_id={player_id}"
-        else:
-            url = f"{BACKEND_URL}generations"
+        program = 'none'
+    url = "{}generations/?program={}".format(BACKEND_URL, program)
+    if school_name:
+        url+= f"&school_name={school_name}"
+    if leaderboard_id:
+        url+= f"&leaderboard_id={leaderboard_id}"
+    if player_id:
+        url+= f"&player_id={player_id}"
 
     response = await http_client.get(
         url,
         auth=get_auth(request),
     )
-    if response.status_code != 200:
-        return None
+    response.raise_for_status()
     output = [models.GenerationRound(
         generation=generation[0],
         round=generation[1]

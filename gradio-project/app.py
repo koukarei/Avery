@@ -125,6 +125,7 @@ async def login_form(request: Request):
         request.session["roles"] = "instructor" if form_data["username"] == "admin" else "student"
         request.session["program"] = "overview"
 
+        print(request.session)
         # app.state.token = token.model_dump()
         # app.state.username = form_data["username"]
 
@@ -239,9 +240,13 @@ async def retry(request: Request):
     request.app.state.round=the_round[0]
     return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)    
 
-@app.get("/resume_game")
-async def resume_game(request: Request):
-    leaderboard_id = request.app.state.selected_leaderboard.id
+@app.get("/resume_game/{leaderboard_id}")
+async def resume_game(request: Request, leaderboard_id: Optional[int]=None):
+    if not leaderboard_id:
+        return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
+    request.session["leaderboard_id"] = leaderboard_id
+    
+    # Check if the user has a round incompleted
     res = await read_my_rounds(
         request=request,
         is_completed=False,
@@ -251,21 +256,27 @@ async def resume_game(request: Request):
     if not res:
         return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
     last_round = res[0]
-    request.app.state.round = last_round
+    request.session["round"] = convert_json(last_round)
 
+    # Check if the user has started a generation
     if not last_round.last_generation_id:
-        request.app.state.generated_time = 0
+        request.session["generated_time"] = 0
         return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
 
     last_gen = await get_generation(
         generation_id=last_round.last_generation_id,
         request=request,
     )
+
     if last_gen:
-        request.app.state.generation=last_gen
+        request.session["generation_id"] = last_gen.id
+
+        # Check if the generation is completed
         if last_gen.is_completed:
-            request.app.state.generated_time = len(last_round.generations)
-            if request.app.state.generated_time > (MAX_GENERATION-1):
+            generated_time = len(last_round.generations)
+            request.session["generated_time"] = generated_time
+
+            if request.session["generated_time"] > (MAX_GENERATION-1):
                 output = await end_round(
                     round_id=last_round.id,
                     request=request,
@@ -275,7 +286,9 @@ async def resume_game(request: Request):
             return RedirectResponse(url="/avery/result", status_code=status.HTTP_303_SEE_OTHER)
         if last_gen.correct_sentence:
             if last_gen.interpreted_image:
-                return RedirectResponse(url="/avery/go_to_result", status_code=status.HTTP_303_SEE_OTHER)
+                generated_time = len(last_round.generations)
+                request.session["generated_time"] = generated_time
+                return RedirectResponse(url=f"/avery/go_to_result/{last_gen.id}/?generated_time={generated_time}", status_code=status.HTTP_303_SEE_OTHER)
             
             output = await get_interpretation(
                 round_id=last_round.id,
@@ -288,53 +301,73 @@ async def resume_game(request: Request):
 
             if not output:
                 raise HTTPException(status_code=500, detail="Failed to get interpretation")
-            return RedirectResponse(url="/avery/go_to_result", status_code=status.HTTP_303_SEE_OTHER)
-        request.app.state.generation=last_gen
+            return RedirectResponse(url=f"/avery/go_to_result/{last_gen.id}/?generated_time={generated_time}", status_code=status.HTTP_303_SEE_OTHER)
+        
+        request.session["generation"] = convert_json(last_gen)
         if len(last_round.generations) > 1:
-            request.app.state.generated_time = len(last_round.generations)-1
+            request.session["generated_time"] = len(last_round.generations)-1
         else:
-            request.app.state.generated_time = 0
+            request.session["generated_time"] = 0
     return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.get("/new_game")
 async def new_game(request: Request):
-    res = await end_round(request.app.state.round.id, request)
+    if hasattr(request.session, 'round'):
+        res = await end_round(request.session.get('round').id, request)
     if res:
-        request.app.state.round = None
-        request.app.state.generated_time = 0
-        request.app.state.generation = None
-        request.app.state.selected_leaderboard = None
+        request.session.pop('round', None)
+        request.session.pop('generation', None)
+        request.session.pop('generated_time', None)
+        request.session.pop('selected_leaderboard', None)
         return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
     raise HTTPException(status_code=500, detail="Failed to end round")
 
-@app.get("/go_to_answer")
-async def redirect_to_answer(request: Request):
-    if not hasattr(request.app.state, 'selected_leaderboard'):
+@app.get("/go_to_answer/{leaderboard_id}")
+async def redirect_to_answer(request: Request, leaderboard_id: Optional[int]=None):
+    if not leaderboard_id:
         return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
-    selected_leaderboard_id = request.app.state.selected_leaderboard.id
+    request.session["leaderboard_id"] = leaderboard_id
     output = await create_round(
         new_round=models.RoundStart(
-            leaderboard_id=selected_leaderboard_id,
+            leaderboard_id=leaderboard_id,
             program=request.session["program"],
             created_at=datetime.datetime.now(datetime.timezone.utc),
         ),
         request=request,
     )
-    request.app.state.round = output
-    request.app.state.generated_time = 0
+    request.session["round"] = convert_json(output)
+    request.session["generated_time"]= 0
     return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
 
-@app.get("/go_to_result")
+@app.get("/go_to_result/{generation_id}")
 @concurrency_control.limit_concurrency(max_concurrent=1, per_client=True)
-async def redirect_to_result(request: Request):
-    if (not hasattr(request.app.state, 'generation') or not request.app.state.generation) and request.app.state.generated_time < MAX_GENERATION:
-        return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
+async def redirect_to_result(request: Request, generation_id: Optional[int]=None, generated_time: Optional[int]=None):
+    if generation_id is None and generated_time is None:
+        if request.session.get('round', None):
+            return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
+        cur_round = await read_my_rounds(
+            request=request,
+            is_completed=False,
+            leaderboard_id=request.session.get('leaderboard_id'),
+        )
+        last_gen = await get_generation(
+            generation_id=cur_round[0].last_generation_id,
+            request=request,
+        )
+        if last_gen.interpreted_image and last_gen.correct_sentence:
+            generated_time = len(cur_round[0].generations)
+        else:
+            generated_time = len(cur_round[0].generations)-1
+            return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
+        request.session["generated_time"] = generated_time
+        request.session["generation_id"] = last_gen.id
     
+    cur_generation_id = request.session.get('generation_id', None)
     output = await complete_generation(
-        round_id=request.app.state.round.id,
+        round_id=request.session.get('round')['id'],
         generation=models.GenerationCompleteCreate(
-            id=request.app.state.generation.id,
+            id=cur_generation_id,
             at=datetime.datetime.now(datetime.timezone.utc),
         ),
         request=request,
@@ -342,9 +375,9 @@ async def redirect_to_result(request: Request):
     if not output:
         raise HTTPException(status_code=500, detail="Generation not completed")
 
-    if request.app.state.generated_time > (MAX_GENERATION-1):
+    if generated_time > (MAX_GENERATION-1):
         output = await end_round(
-            round_id=request.app.state.round.id, 
+            round_id=request.session.get('round')['id'], 
             request=request
         )
         if not output:
@@ -360,7 +393,7 @@ async def exception_handler(request: Request, exc: Exception):
 def get_root_url(
     request: Request, route_path: str, root_path: Optional[str] = None
 ):
-    print(f"route_path: {route_path}\nroot_path: {root_path}\nrequest: {request.url if hasattr(request, 'url') else None}")
+    # print(f"route_path: {route_path}\nroot_path: {root_path}\nrequest: {request.url if hasattr(request, 'url') else None}")
     root_path = root_path or request.scope.get("root_path", "")
     return root_path
 

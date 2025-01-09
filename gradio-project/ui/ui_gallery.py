@@ -62,9 +62,14 @@ with gr.Blocks() as avery_gradio:
     
     async def initialize_game(request: gr.Request, published_at_start: Optional[datetime.datetime]=None, published_at_end: Optional[datetime.datetime]=None):
         is_admin = False
-        if hasattr(request.session, "roles") and request.session.get("roles") != "student":
-            if hasattr(request.session, "username") and request.session.get("username") == "admin":
+        request = request.request
+        if hasattr(request, "session"):
+            if isinstance(request.session, dict) and request.session.get("roles") != "student" and request.session.get("username") == "admin":
                 is_admin = True
+            else:
+                print(f"type of request.session: {type(request.session)}")
+        else:
+            print("vars of request: ", vars(request))
         
         if published_at_start and published_at_end:
             published_at_start = datetime.datetime.fromtimestamp(published_at_start)
@@ -144,10 +149,9 @@ with gr.Blocks() as avery_gradio:
     )
 
     async def select_leaderboard_fn(evt: gr.SelectData, leaderboards, request: gr.Request):
+        request = request.request
         select_leaderboard = leaderboards[evt.index]
-
-        app.state.selected_leaderboard = select_leaderboard
-
+        
         # Get the related vocabularies
         leaderboard_vocabularies = [v.word for v in select_leaderboard.vocabularies]
         leaderboard_vocabularies = "/ ".join(leaderboard_vocabularies)
@@ -157,10 +161,11 @@ with gr.Blocks() as avery_gradio:
             leaderboard_vocabularies=""
         
         info = f"## {select_leaderboard.title}{leaderboard_vocabularies}"
-        if hasattr(app, "school"):
-            school_name = app.state.get("school")
+        if hasattr(request,"session") and isinstance(request.session, dict): 
+            school_name = request.session.get("school", None)
         else:
             school_name = None
+            
         round_generations = await get_generations(leaderboard_id=select_leaderboard.id,school_name=school_name, request=request)
         if round_generations:
             interpreted_images = []
@@ -179,24 +184,31 @@ with gr.Blocks() as avery_gradio:
         
         # Check if the player played the game before
         playable = await check_playable(select_leaderboard.id, request=request)
-        start_btn = gr.update(value="始める",interactive=playable, link="/avery/go_to_answer")
+        start_btn = gr.update(value="始める",interactive=playable, link="/avery/go_to_answer/{}".format(select_leaderboard.id))
 
         # Check if the player is an admin
         is_admin = gr.update(visible=False)
         schools = []
-        if hasattr(request.session, "roles") and request.session.get("roles") != "student":
-            if hasattr(request.session, "username") and request.session.get("username") == "admin":
+
+        if hasattr(request, "session"):
+            if isinstance(request.session, dict) and request.session.get("roles", None) != "student" and request.session.get("username", None) == "admin":
                 is_admin = gr.update(visible=True)
                 schools = await get_schools(request=request, leaderboard_id=select_leaderboard.id)
-                
+            else:
+                print(f"type of request.session: {type(request.session)}")
+        else:
+            print("vars of request: ", vars(request))
+
         unfinished_rounds = await get_unfinished_rounds_from_backend(request, select_leaderboard.id)
         if unfinished_rounds:
-            start_btn = gr.update(value="再開", link="/avery/resume_game",interactive=True)
+            link = "/avery/resume_game/{}".format(select_leaderboard.id)
+            start_btn = gr.update(value="再開", link=link,interactive=True)
             
         
         return select_leaderboard, start_btn, is_admin, info, interpreted_images, round_generations, unfinished_rounds,is_admin,is_admin,is_admin,is_admin,is_admin,is_admin, is_admin, select_leaderboard.is_public, select_leaderboard.published_at, schools
 
     async def delete_selected_leaderboard(request: gr.Request, selected_leaderboard, published_at_start: Optional[datetime.datetime]=None, published_at_end: Optional[datetime.datetime]=None):
+        request = request.request
         leaderboard = await delete_leaderboard(selected_leaderboard.id, request=request)
         if published_at_start and published_at_end:
             published_at_start = datetime.datetime.fromtimestamp(published_at_start)
@@ -219,6 +231,7 @@ with gr.Blocks() as avery_gradio:
         ], leaderboards
 
     async def select_interpreted_image(evt: gr.SelectData, generations, select_leaderboard, request: gr.Request):
+        request = request.request
         selected_interpreted = generations[evt.index]
         selected_round = selected_interpreted.round
         selected = selected_interpreted.generation
@@ -235,7 +248,7 @@ with gr.Blocks() as avery_gradio:
                 score = selected.score
                 duration = round(selected.duration/60,2)
                 
-                if hasattr(request.session, "roles") and request.session.get("roles")!= "student":
+                if hasattr(request, 'session') and isinstance(request.session, dict) and request.session.get("roles", None) != "student":
                     player_name = "作成者：{}　".format(selected_round.player.display_name)
                 else:
                     player_name = ""
@@ -265,8 +278,9 @@ with gr.Blocks() as avery_gradio:
             md = f"## {select_leaderboard.title}{leaderboard_vocabularies}"
         return md
 
-    async def submit_update_leaderboard(is_public, published_at, schools, word, pos, meaning, request: gr.Request):
-        leaderboard_id = app.state.selected_leaderboard.id
+    async def submit_update_leaderboard(selected_leaderboard, is_public, published_at, schools, word, pos, meaning, request: gr.Request):
+        request = request.request
+        leaderboard_id = selected_leaderboard.id
         
         published_at = datetime.datetime.fromtimestamp(published_at)
         if not all([word, pos, meaning]):
@@ -339,7 +353,7 @@ with gr.Blocks() as avery_gradio:
     gr.on(
         triggers=[gallery.update_btn.click],
         fn=submit_update_leaderboard,
-        inputs=[gallery.is_public, gallery.published_at, gallery.school_group, gallery.word, gallery.pos, gallery.meaning],
+        inputs=[selected_leaderboard, gallery.is_public, gallery.published_at, gallery.school_group, gallery.word, gallery.pos, gallery.meaning],
         outputs=[gallery.is_public, gallery.published_at, gallery.school_group, gallery.word, gallery.pos, gallery.meaning],
     )
 

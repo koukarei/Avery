@@ -164,6 +164,7 @@ async def login_for_access_token_lti(
 
 @app.post("/refresh_token")
 async def refresh_token(current_user: schemas.User = Security(get_current_user, scopes=["refresh_token"])):
+    print(current_user)
     if current_user:
             access_token = create_access_token(
                 data={"sub": current_user.username}
@@ -836,11 +837,19 @@ def get_user_answer(
     db_round = crud.get_round(db, round_id)
     if current_user.id != db_round.player_id:
         raise HTTPException(status_code=401, detail="You are not authorized to answer")
-    db_generation = crud.create_generation(
-        db=db,
-        round_id=round_id,
-        generation=generation,
-    )
+    db_generation = crud.get_generation(db, generation_id=db_round.last_generation_id)
+    if db_generation and not db_generation.is_completed:
+        db_generation = crud.update_generation0(
+            db=db,
+            generation=generation,
+            generation_id=db_generation.id
+        )
+    else:
+        db_generation = crud.create_generation(
+            db=db,
+            round_id=round_id,
+            generation=generation,
+        )
  
     try:
         status, correct_sentence=sentence.checkSentence(passage=db_generation.sentence)
@@ -1561,7 +1570,7 @@ def read_generations(
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view generations")
-    if player_id != current_user.id and current_user.user_type == "student":
+    if player_id and player_id != current_user.id and current_user.user_type == "student":
         raise HTTPException(status_code=401, detail="You are not authorized to view generations")
     if player_id is None and current_user.user_type == "student":
         player_id = current_user.id

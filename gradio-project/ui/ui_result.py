@@ -78,14 +78,17 @@ with gr.Blocks() as avery_gradio:
     )
 
     async def obtain_image(request: gr.Request):
-        if not hasattr(app.state, 'selected_leaderboard'):
+        request = request.request
+        leaderboard_id = request.session.get('leaderboard_id', None)
+        generation_id = request.session.get('generation_id', None)
+        if not leaderboard_id:
             return None
-        elif not hasattr(app.state, 'generation'):
+        elif not generation_id:
             return None
         
-        original_img = await get_original_images(int(app.state.selected_leaderboard.id), request)
-        ai_img = await get_interpreted_image(int(app.state.generation.id), request)
-        similarity = await get_image_similarity(int(app.state.generation.id), request)
+        original_img = await get_original_images(int(leaderboard_id), request)
+        ai_img = await get_interpreted_image(int(generation_id), request)
+        similarity = await get_image_similarity(int(generation_id), request)
         
         if similarity:
             similarity = float(similarity.similarity)*100
@@ -101,25 +104,28 @@ with gr.Blocks() as avery_gradio:
         return original_img, ai_img, similarity_md
     
     async def load_chat_content(request: gr.Request):
+        request = request.request
+        generation_id = request.session.get('generation_id', None)
+        cur_round = request.session.get('round', None)
         # complete the generation and get the chat
-        if not hasattr(app.state, 'generation'):
+        if not generation_id:
             raise Exception("Generation not found")
         
-        if not hasattr(app.state, 'round'):
+        if not cur_round:
             raise Exception("Round not found")
 
-        if app.state.round:
+        if cur_round:
             chat = await get_chat(
-                round_id=app.state.round.id,
+                round_id=cur_round['id'],
                 request=request,
             )
 
             if chat:
-                check_generated_time = app.state.generated_time < MAX_GENERATION
+                check_generated_time = request.session.get("generated_time", 0) < MAX_GENERATION
                 show_restart = gr.update(visible=check_generated_time)
                 if check_generated_time:
                     show_end = gr.update(visible=True, link=None)
-                    restart_value = "もう一回！({:.0f}/{:.0f})".format(MAX_GENERATION - app.state.generated_time, MAX_GENERATION)
+                    restart_value = "もう一回！({:.0f}/{:.0f})".format(MAX_GENERATION - request.session.get("generated_time", 0), MAX_GENERATION)
                 else:
                     show_end = gr.update(visible=True, link="/avery/new_game")
                     restart_value = "もう一回！"
@@ -134,9 +140,12 @@ with gr.Blocks() as avery_gradio:
                 yield None
 
     async def ask_hint( message: str, chat_history: list, request: gr.Request):
+        request = request.request
         if message == "":
             return None, chat_history
-        round_id = app.state.round.id
+        if not request.session.get('round', None):
+            raise Exception("Round not found")
+        round_id = request.session.get('round', None)['id']
         new_message = models.MessageSend(
             content=message,
             created_at=datetime.datetime.now(datetime.timezone.utc),

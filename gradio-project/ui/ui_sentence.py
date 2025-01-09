@@ -45,7 +45,7 @@ class Sentence:
             visible=False,
         )
 
-        self.next_btn=gr.Button("評価",scale=0,visible=False, link="/avery/go_to_result")
+        self.next_btn=gr.Button("評価",scale=0,visible=False, link="")
         
 
 def convert_history(chat_mdl: models.Chat):
@@ -70,21 +70,26 @@ with gr.Blocks() as avery_gradio:
         path="/answer",
     )
 
-    async def obtain_original_image(request: gr.Request):
-        if not hasattr(app.state, 'selected_leaderboard'):
-            return None, None
-        
-        original_img = await get_original_images(int(app.state.selected_leaderboard.id), request)
-        generated_time = app.state.generated_time
+    generation_id = gr.State()
+    generated_time = gr.State()
 
-        if generated_time:
-            if isinstance(app.state.round, models.RoundStartOut):
-                app.state.round = await read_my_rounds(
+    async def obtain_original_image(request: gr.Request):
+        request = request.request
+        leaderboard_id = request.session.get('leaderboard_id', None)
+
+        original_img = await get_original_images(int(leaderboard_id), request)
+        generated_time = request.session.get('generated_time', 0)
+        current_round = request.session.get('round', None)
+
+        if not current_round:
+            current_round = await read_my_rounds(
                     request=request,
                     is_completed=False,
-                    leaderboard_id=app.state.selected_leaderboard.id,
+                    leaderboard_id=leaderboard_id,
                 )
-            generations = app.state.round.generations
+
+            generations = current_round.generations
+            
             if generations:
                 generations = [i.id for i in generations]
                 prev_generation_id = max(generations)
@@ -94,15 +99,16 @@ with gr.Blocks() as avery_gradio:
                 prev_ans = None
         else:
             prev_ans = None
-        return original_img, prev_ans
+        return original_img, prev_ans, generated_time
     
     async def load_chat_content(request: gr.Request):
-        if not hasattr(app.state, 'round'):
+        request = request.request
+        cur_round = request.session.get('round', None)
+        if not cur_round:
             raise Exception("Round not found")
-        
-        if app.state.round:
+        else: 
             chat = await get_chat(
-                round_id=app.state.round.id,
+                round_id=cur_round["id"],
                 request=request,
             )
             if chat:
@@ -112,9 +118,13 @@ with gr.Blocks() as avery_gradio:
                 yield None
 
     async def ask_hint( message: str, chathist , request: gr.Request):
+        request = request.request
+        cur_round = request.session.get('round', None)
+        if not cur_round:
+            raise Exception("Round not found")
         if message == "":
             message = "ヒントをちょうだい。"
-        round_id = app.state.round.id
+        round_id = cur_round['id']
         new_message = models.MessageSend(
             content=message,
             created_at=datetime.datetime.now(datetime.timezone.utc),
@@ -159,52 +169,58 @@ with gr.Blocks() as avery_gradio:
             sentence=Sentence()
             sentence.create_sentence()
 
-            async def submit_answer(chat_history: list,sentence: str, request: gr.Request):
-                generated_time = int(app.state.generated_time) + 1
+            async def submit_answer(chat_history: list,sentence: str, generated_time: int, generation_id: int, request: gr.Request):
+                request = request.request
+                generated_time = generated_time + 1
+
+                cur_round = request.session.get('round', None)
 
                 generation = models.GenerationStart(
-                    round_id=app.state.round.id,
+                    round_id=cur_round['id'],
                     created_at=datetime.datetime.now(datetime.timezone.utc),
                     generated_time=generated_time,
                     sentence=sentence,
                 )
                 output = await create_generation(generation, request)
+                generation_id = output.id
                 if output:
-                    app.state.generated_time = generated_time
-                    app.state.generation = output
                     
                     show = gr.update(visible=True)
                     output = await get_interpretation(
-                        round_id=app.state.round.id,
+                        round_id=cur_round['id'],
                         interpretation=output,
                         request=request,
                     )
                     
                     ai_image = await get_interpreted_image(
-                        generation_id=output.id,
+                        generation_id=generation_id,
                         request=request
                     )
                     submit_show = gr.update(visible=False)
                     sentence_interactive = gr.update(interactive=False)
+                    link = "/avery/go_to_result/{}/?generated_time={}".format(generation_id, generated_time)
+                    next_btn = gr.update(link=link, visible=True)
                 else:
+                    generated_time = generated_time - 1
                     show = gr.update(visible=False)
                     ai_image = None
                     submit_show = gr.update(visible=True)
                     sentence_interactive = gr.update(interactive=True)
+                    next_btn = gr.update(visible=False)
 
                 chat = await get_chat(
-                    round_id=app.state.round.id,
+                    round_id=cur_round['id'],
                     request=request,
                 )
                 if chat:
                     chat_history = convert_history(chat)
-                return chat_history,show, show, ai_image, submit_show, sentence_interactive
+                return chat_history,show, next_btn, ai_image, submit_show, sentence_interactive, generated_time, generation_id
 
             gr.on(
                 triggers=[sentence.submit_btn.click, sentence.sentence.submit],
                 fn=submit_answer,
-                inputs=[guidance.chat, sentence.sentence],
-                outputs=[guidance.chat, sentence.ai_image, sentence.next_btn, sentence.ai_image, sentence.submit_btn,sentence.sentence],
+                inputs=[guidance.chat, sentence.sentence, generated_time, generation_id],
+                outputs=[guidance.chat, sentence.ai_image, sentence.next_btn, sentence.ai_image, sentence.submit_btn,sentence.sentence, generated_time, generation_id],
                 queue=False
             )
 
@@ -218,7 +234,7 @@ with gr.Blocks() as avery_gradio:
             #     inputs=[sentence.sentence]
             # )
 
-    avery_gradio.load(obtain_original_image, inputs=[], outputs=[sentence.image, sentence.sentence])
+    avery_gradio.load(obtain_original_image, inputs=[], outputs=[sentence.image, sentence.sentence, generated_time])
     avery_gradio.load(load_chat_content, inputs=[], outputs=[guidance.chat])
     avery_gradio.queue(max_size=128, default_concurrency_limit=50)
 

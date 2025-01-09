@@ -64,6 +64,7 @@ with gr.Blocks() as avery_gradio:
     users = gr.State()
 
     async def load_finished_game(request: gr.Request):
+        request = request.request
         leaderboards = await read_leaderboard(
             request=request,
         )
@@ -85,8 +86,11 @@ with gr.Blocks() as avery_gradio:
             var_name="score_type",
             value_name="score",
         )
+        if hasattr(request, "session"):
+            role = request.session.get("roles", "student")
+        else:
+            role = "student"
 
-        role = app.state.session.get("roles")
         if role != "student":
             users = await get_users(request=request)
             user_choices = [i.profiles.display_name for i in users]
