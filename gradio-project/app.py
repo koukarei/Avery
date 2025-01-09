@@ -314,13 +314,13 @@ async def resume_game(request: Request, leaderboard_id: Optional[int]=None):
 @app.get("/new_game")
 async def new_game(request: Request):
     if hasattr(request.session, 'round'):
-        res = await end_round(request.session.get('round').id, request)
-    if res:
-        request.session.pop('round', None)
-        request.session.pop('generation', None)
-        request.session.pop('generated_time', None)
-        request.session.pop('selected_leaderboard', None)
-        return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
+        res = await end_round(request.session.get('round')['id'], request)
+
+    request.session.pop('round', None)
+    request.session.pop('generation', None)
+    request.session.pop('generated_time', None)
+    request.session.pop('selected_leaderboard', None)
+    return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
     raise HTTPException(status_code=500, detail="Failed to end round")
 
 @app.get("/go_to_answer/{leaderboard_id}")
