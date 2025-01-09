@@ -22,92 +22,37 @@ class BearerAuth(httpx.Auth):
 
     def __init__(self, access_token, refresh_token, refresh_url):
         self.access_token = access_token
-        self.refresh_token = refresh_token 
+        self.refresh_token = refresh_token
         self.refresh_url = refresh_url
         self._sync_lock = threading.RLock()
 
     async def auth_flow(self, request):
         request.headers["Authorization"] = f"Bearer {self.access_token}"
         response = yield request
-        
         if response.status_code == 401:
-            refresh_response = yield self.build_refresh_request()
             
-            if refresh_response is None:
-                raise HTTPException(
-                    status_code=302, 
-                    detail="Redirect to login page", 
-                    headers={"Location": "/avery/login"}
-                )
-                
-            if refresh_response.status_code != 200:
-                raise HTTPException(
-                    status_code=302, 
-                    detail="Redirect to login page", 
-                    headers={"Location": "/avery/login"}
-                )
-                
+            refresh_response = self.build_refresh_request()
+            if not hasattr(refresh_response, "status_code"):
+                print(f"Check refresh response with no status code {refresh_response}")
+                raise HTTPException(status_code=302, detail="Redirect to login page", headers={"Location": "/avery/login"})
+            elif refresh_response.status_code != 200:
+                raise HTTPException(status_code=302, detail="Redirect to login page", headers={"Location": "/avery/login"})
             self.update_tokens(refresh_response)
+
             request.headers["Authorization"] = f"Bearer {self.access_token}"
             yield request
 
     async def build_refresh_request(self):
-        async with self._sync_lock:
-            try:
-                # Create a new async client for the refresh request
-                async with httpx.AsyncClient() as refresh_client:
-                    response = await refresh_client.post(
-                        self.refresh_url,
-                        data={"refresh_token": self.refresh_token}
-                    )
-                return response
-            except Exception as e:
-                print(f"Refresh token request failed: {str(e)}")
-                return None
-
+        with self._sync_lock:
+            response = await http_client.post(
+                self.refresh_url,
+                data={"refresh_token": self.refresh_token}
+            )
+        return response
+    
     def update_tokens(self, response):
         data = response.json()
-        self.access_token = data.get("access_token")
-        new_refresh = data.get("refresh_token")
-        if new_refresh:
-            self.refresh_token = new_refresh
-
-# class BearerAuth(httpx.Auth):
-#     requires_request_body = True
-
-#     def __init__(self, access_token, refresh_token, refresh_url):
-#         self.access_token = access_token
-#         self.refresh_token = refresh_token
-#         self.refresh_url = refresh_url
-#         self._sync_lock = threading.RLock()
-
-#     def auth_flow(self, request):
-#         request.headers["Authorization"] = f"Bearer {self.access_token}"
-#         response = yield request
-#         if response.status_code == 401:
-            
-#             refresh_response = self.build_refresh_request()
-#             if not hasattr(refresh_response, "status_code"):
-#                 print(f"Check refresh response with no status code {refresh_response}")
-#                 raise HTTPException(status_code=302, detail="Redirect to login page", headers={"Location": "/avery/login"})
-#             elif refresh_response.status_code != 200:
-#                 raise HTTPException(status_code=302, detail="Redirect to login page", headers={"Location": "/avery/login"})
-#             self.update_tokens(refresh_response)
-
-#             request.headers["Authorization"] = f"Bearer {self.access_token}"
-#             yield request
-
-#     def build_refresh_request(self):
-#         with self._sync_lock:
-#             response = http_client.post(
-#                 self.refresh_url,
-#                 data={"refresh_token": self.refresh_token}
-#             )
-#         return response
-    
-#     def update_tokens(self, response):
-#         data = response.json()
-#         self.access_token = data["access_token"]
+        self.access_token = data["access_token"]
 
 def convert_json(mdl: models.BaseModel):
     json_data = mdl.model_dump()
