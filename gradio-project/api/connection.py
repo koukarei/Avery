@@ -152,7 +152,7 @@ async def read_leaderboard(
         response.raise_for_status()
         
         output = [models.Leaderboard(
-            **leaderboard[0].dict(),
+            **leaderboard[0],
         ) for leaderboard in response.json()]
         return output
     except httpx.HTTPStatusError as e:
