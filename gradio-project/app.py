@@ -354,7 +354,8 @@ async def redirect_to_result(request: Request):
 
 @app.exception_handler(Exception)
 async def exception_handler(request: Request, exc: Exception):
-    return RedirectResponse(url="/avery/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    return RedirectResponse(url="/avery/logout", status_code=status.HTTP_303_SEE_OTHER)
 
 def get_root_url(
     request: Request, route_path: str, root_path: Optional[str] = None
