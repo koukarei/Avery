@@ -395,6 +395,13 @@ class LeaderboardOut(LeaderboardBase):
     class Config:
         orm_mode = True
 
+class SchoolOut(BaseModel):
+    school: str
+
+class SchoolLeaderboard(BaseModel):
+    school: SchoolOut
+    leaderboard: LeaderboardOut
+
 class DescriptionBase(BaseModel):
     content: str
     model: str

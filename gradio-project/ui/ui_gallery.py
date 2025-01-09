@@ -58,22 +58,22 @@ with gr.Blocks() as avery_gradio:
             published_at_start = datetime.datetime.fromtimestamp(published_at_start)
             published_at_end = datetime.datetime.fromtimestamp(published_at_end)
             
-            leaderboards = await read_leaderboard(request, published_at_start, published_at_end)
+            schoolleaderboards = await read_leaderboard(request, published_at_start, published_at_end)
         elif published_at_start:
             published_at_start = datetime.datetime.fromtimestamp(published_at_start)
-            leaderboards = await read_leaderboard(request, published_at_start)
+            schoolleaderboards = await read_leaderboard(request, published_at_start)
         elif published_at_end:
             published_at_end = datetime.datetime.fromtimestamp(published_at_end)
-            leaderboards = await read_leaderboard(request, published_at_end=published_at_end)
+            schoolleaderboards = await read_leaderboard(request, published_at_end=published_at_end)
         else:
             #published_at_start = datetime.datetime.now()
             published_at_start = datetime.datetime(2025,1,9)
             published_at_end = datetime.datetime.now()
-            leaderboards = await read_leaderboard(request, published_at_start, published_at_end)
+            schoolleaderboards = await read_leaderboard(request, published_at_start, published_at_end)
         return [
-            await get_original_images(leaderboard.id, request) 
-            for leaderboard in leaderboards
-        ], leaderboards
+            await get_original_images(leaderboard.leaderboard.id, request) 
+            for leaderboard in schoolleaderboards
+        ], [schoolleaderboard.leaderboard for schoolleaderboard in schoolleaderboards]
     
     async def get_unfinished_rounds_from_backend(request: gr.Request, leaderboard_id: int):
         rounds = await read_my_rounds(

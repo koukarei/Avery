@@ -57,6 +57,13 @@ class Leaderboard(BaseModel):
     is_public: bool
     vocabularies: list[Vocabulary]=[]
 
+class School(BaseModel):
+    school: str
+
+class SchoolLeaderboard(BaseModel):
+    school: School
+    leaderboard: Leaderboard
+
 class LeaderboardDetail(BaseModel):
     id: int
     title: str

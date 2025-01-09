@@ -129,7 +129,8 @@ def get_leaderboards(
         )
     else:
         school_leaderboards = db.query(
-            models.Leaderboard
+            models.Leaderboard,
+            models.School_Leaderboard
         )
 
     if published_at_start is None and published_at_end is None:
