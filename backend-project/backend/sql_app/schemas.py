@@ -424,3 +424,11 @@ class ImageSimilarity(BaseModel):
 class LeaderboardPlayable(BaseModel):
     id: int
     is_playable: bool
+
+class LeaderboardUpdate(BaseModel):
+    id: int
+    is_public: Optional[bool]=None
+    published_at: Optional[datetime.datetime]=None
+    title: Optional[str]=None
+    school: list[str]=[]
+    vocabularies: list[VocabularyBase]=[]

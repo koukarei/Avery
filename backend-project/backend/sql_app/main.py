@@ -650,6 +650,22 @@ def read_leaderboard(current_user: Annotated[schemas.User, Depends(get_current_u
         raise HTTPException(status_code=404, detail="Leaderboard not found")
     return db_leaderboard
 
+@app.put("/leaderboards/{leaderboard_id}", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
+def update_leaderboard(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    leaderboard_id: int,
+    leaderboard: schemas.LeaderboardUpdate,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to update leaderboard")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
+    if db_leaderboard is None:
+        raise HTTPException(status_code=404, detail="Leaderboard not found")
+    return crud.update_leaderboard(db=db, leaderboard=leaderboard)
+
 @app.delete("/leaderboards/{leaderboard_id}", tags=["Leaderboard"], response_model=schemas.IdOnly)
 def delete_leaderboard(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
