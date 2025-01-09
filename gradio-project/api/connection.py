@@ -29,6 +29,7 @@ class BearerAuth(httpx.Auth):
             
             refresh_response = self.build_refresh_request()
             if not hasattr(refresh_response, "status_code"):
+                print(f"Check refresh response with no status code {refresh_response}")
                 raise HTTPException(status_code=302, detail="Redirect to login page", headers={"Location": "/avery/login"})
             elif refresh_response.status_code != 200:
                 raise HTTPException(status_code=302, detail="Redirect to login page", headers={"Location": "/avery/login"})
@@ -150,7 +151,7 @@ async def read_leaderboard(
             follow_redirects=True
         )
         response.raise_for_status()
-        
+
         output = [models.Leaderboard(
             **leaderboard[0],
         ) for leaderboard in response.json()]
