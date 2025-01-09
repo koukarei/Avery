@@ -26,12 +26,12 @@ class BearerAuth(httpx.Auth):
         self.refresh_url = refresh_url
         self._sync_lock = threading.RLock()
 
-    def auth_flow(self, request):
+    async def auth_flow(self, request):
         request.headers["Authorization"] = f"Bearer {self.access_token}"
         response = yield request
         
         if response.status_code == 401:
-            refresh_response = yield from self.build_refresh_request()
+            refresh_response = yield self.build_refresh_request()
             
             if refresh_response is None:
                 raise HTTPException(
