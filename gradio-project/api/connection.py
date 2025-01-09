@@ -150,7 +150,9 @@ async def read_leaderboard(
             follow_redirects=True
         )
         response.raise_for_status()
-        
+        print(
+            f"Response: {response.json()}"
+        )
         output = [models.Leaderboard(
             **leaderboard[0],
         ) for leaderboard in response.json()]
