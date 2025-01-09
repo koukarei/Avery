@@ -346,6 +346,13 @@ def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_current_
             published_at_end = datetime.datetime.now(tz=timezone.utc)
             
     leaderboards = crud.get_leaderboards(db, school_name=school_name, skip=skip, limit=limit, published_at_start=published_at_start, published_at_end=published_at_end)
+    
+    if isinstance(leaderboards[0], tuple):
+        leaderboards = [
+            leaderboard[0]
+            for leaderboard in leaderboards
+        ]
+    
     return leaderboards
 
 @app.post("/leaderboards/", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
