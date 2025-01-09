@@ -131,6 +131,9 @@ def get_leaderboards(
         school_leaderboards = db.query(
             models.Leaderboard,
             models.School_Leaderboard
+        ).join(
+            models.Leaderboard,
+            models.Leaderboard.id == models.School_Leaderboard.leaderboard_id
         )
 
     if published_at_start is None and published_at_end is None:
