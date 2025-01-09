@@ -22,12 +22,12 @@ class BearerAuth(httpx.Auth):
         self.refresh_url = refresh_url
         self._sync_lock = threading.RLock()
 
-    def auth_flow(self, request):
+    async def auth_flow(self, request):
         request.headers["Authorization"] = f"Bearer {self.access_token}"
         response = yield request
         if response.status_code == 401:
             
-            refresh_response = self.build_refresh_request()
+            refresh_response = await self.build_refresh_request()
             if not hasattr(refresh_response, "status_code"):
                 print(f"Check refresh response with no status code {refresh_response}")
                 raise HTTPException(status_code=302, detail="Redirect to login page", headers={"Location": "/avery/login"})
