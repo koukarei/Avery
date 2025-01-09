@@ -88,7 +88,8 @@ with gr.Blocks() as avery_gradio:
                     leaderboard_id=leaderboard_id,
                 )
 
-            generations = current_round.generations
+            latest_round = max(current_round, key=lambda x: x.created_at)
+            generations = latest_round.generations
             
             if generations:
                 generations = [i.id for i in generations]
@@ -97,8 +98,16 @@ with gr.Blocks() as avery_gradio:
                 prev_ans = prev_generation.sentence
             else:
                 prev_ans = None
+                
         else:
+            generations = current_round['generations']
             prev_ans = None
+            if generations:
+                generations = [i['id'] for i in generations]
+                prev_generation_id = max(generations)
+                prev_generation = await get_generation(prev_generation_id, request)
+                prev_ans = prev_generation.sentence
+            
         return original_img, prev_ans, generated_time
     
     async def load_chat_content(request: gr.Request):

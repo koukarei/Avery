@@ -229,15 +229,17 @@ async def redirect_page(request: Request):
     
 @app.get("/retry")
 async def retry(request: Request):
-    request.app.state.generation=None
+    request.session.pop('generation_id', None)
+    leaderboard_id = request.session.get('leaderboard_id', None)
     the_round=await read_my_rounds(
         request=request,
         is_completed=False,
-        leaderboard_id=request.app.state.selected_leaderboard.id,
+        leaderboard_id=leaderboard_id,
     )
     if not the_round:
         return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
-    request.app.state.round=the_round[0]
+    request.session["round"]=convert_json(the_round[0])
+    
     return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)    
 
 @app.get("/resume_game/{leaderboard_id}")
@@ -313,15 +315,15 @@ async def resume_game(request: Request, leaderboard_id: Optional[int]=None):
 
 @app.get("/new_game")
 async def new_game(request: Request):
-    if hasattr(request.session, 'round'):
-        res = await end_round(request.session.get('round')['id'], request)
+    cur_round = request.session.get('round', None)
+    if cur_round:
+        res = await end_round(cur_round['id'], request)
 
     request.session.pop('round', None)
-    request.session.pop('generation', None)
+    request.session.pop('generation_id', None)
     request.session.pop('generated_time', None)
-    request.session.pop('selected_leaderboard', None)
+    request.session.pop('leaderboard_id', None)
     return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
-    raise HTTPException(status_code=500, detail="Failed to end round")
 
 @app.get("/go_to_answer/{leaderboard_id}")
 async def redirect_to_answer(request: Request, leaderboard_id: Optional[int]=None):
@@ -363,7 +365,10 @@ async def redirect_to_result(request: Request, generation_id: Optional[int]=None
         request.session["generated_time"] = generated_time
         request.session["generation_id"] = last_gen.id
     
-    cur_generation_id = request.session.get('generation_id', None)
+    cur_generation_id = request.session.get('generation_id', generation_id)
+    if cur_generation_id is None:
+        raise HTTPException(status_code=500, detail="Generation not found")
+
     output = await complete_generation(
         round_id=request.session.get('round')['id'],
         generation=models.GenerationCompleteCreate(
