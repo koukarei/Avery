@@ -77,6 +77,10 @@ concurrency_control = EndpointConcurrencyControl()
 
 app = FastAPI(
     root_path="/avery",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+    title="Avery",
 )
 
 @app.on_event("shutdown")
@@ -355,7 +359,7 @@ async def exception_handler(request: Request, exc: Exception):
 def get_root_url(
     request: Request, route_path: str, root_path: Optional[str] = None
 ):
-    print(f"route_path: {route_path}\nroot_path: {root_path}\nrequest: {request.url if hasattr(request, 'url') else None}")
+    # print(f"route_path: {route_path}\nroot_path: {root_path}\nrequest: {request.url if hasattr(request, 'url') else None}")
     root_path = root_path or request.scope.get("root_path", "")
     return root_path
 
