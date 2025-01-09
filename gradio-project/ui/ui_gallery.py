@@ -66,7 +66,8 @@ with gr.Blocks() as avery_gradio:
             published_at_end = datetime.datetime.fromtimestamp(published_at_end)
             leaderboards = await read_leaderboard(request, published_at_end=published_at_end)
         else:
-            published_at_start = datetime.datetime.now()
+            #published_at_start = datetime.datetime.now()
+            published_at_start = datetime.datetime(2025,1,9)
             published_at_end = datetime.datetime.now()
             leaderboards = await read_leaderboard(request, published_at_start, published_at_end)
         return [
