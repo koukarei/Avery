@@ -7,7 +7,7 @@ import datetime
 from starlette.applications import Starlette
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import RedirectResponse, Response
-from api.connection import read_leaderboard, get_original_images, get_interpreted_image, get_rounds, get_generation, check_playable, read_my_rounds, get_generations, delete_leaderboard
+from api.connection import read_leaderboard, get_original_images, get_interpreted_image, get_rounds, get_generation, check_playable, read_my_rounds, get_generations, delete_leaderboard, update_leaderboard, get_schools
 from api.connection import models
 
 from app import app as fastapi_app
@@ -38,6 +38,13 @@ class Gallery:
             with gr.Row():
                 self.submit_btn = gr.Button("始める", scale=0, interactive=False, link="/avery/go_to_answer")
                 self.delete_btn = gr.Button("削除", scale=0, visible=False)
+                self.published_at = gr.DateTime(include_time=False, label="公開日", visible=False)
+                self.is_public = gr.Checkbox("is_public", label="公開", visible=False)
+                self.school_group = gr.CheckboxGroup(["saikyo", "lms"], label="学校", info="Which school can access this leaderboard?", visible=False)
+                self.word = gr.Textbox(label="word", placeholder="word", visible=False)
+                self.pos = gr.Textbox(label="pos", placeholder="pos", visible=False)
+                self.meaning = gr.Textbox(label="meaning", placeholder="meaning", visible=False)
+                self.update_btn = gr.Button("更新", scale=0, visible=False)
 
     def upload_picture(self, image):
         return image[0][0]
@@ -54,22 +61,27 @@ with gr.Blocks() as avery_gradio:
     unfinished = gr.State()
     
     async def initialize_game(request: gr.Request, published_at_start: Optional[datetime.datetime]=None, published_at_end: Optional[datetime.datetime]=None):
+        is_admin = False
+        if hasattr(request.session, "roles") and request.session.get("roles") != "student":
+            if hasattr(request.session, "username") and request.session.get("username") == "admin":
+                is_admin = True
+        
         if published_at_start and published_at_end:
             published_at_start = datetime.datetime.fromtimestamp(published_at_start)
             published_at_end = datetime.datetime.fromtimestamp(published_at_end)
             
-            leaderboards = await read_leaderboard(request, published_at_start, published_at_end)
+            leaderboards = await read_leaderboard(request, published_at_start, published_at_end, is_admin=is_admin)
         elif published_at_start:
             published_at_start = datetime.datetime.fromtimestamp(published_at_start)
-            leaderboards = await read_leaderboard(request, published_at_start)
+            leaderboards = await read_leaderboard(request, published_at_start, is_admin=is_admin)
         elif published_at_end:
             published_at_end = datetime.datetime.fromtimestamp(published_at_end)
-            leaderboards = await read_leaderboard(request, published_at_end=published_at_end)
+            leaderboards = await read_leaderboard(request, published_at_end=published_at_end, is_admin=is_admin)
         else:
             #published_at_start = datetime.datetime.now()
             published_at_start = datetime.datetime(2025,1,9)
             published_at_end = datetime.datetime.now()
-            leaderboards = await read_leaderboard(request, published_at_start, published_at_end)
+            leaderboards = await read_leaderboard(request, published_at_start, published_at_end, is_admin=is_admin)
         return [
             await get_original_images(leaderboard.id, request) 
             for leaderboard in leaderboards
@@ -170,16 +182,19 @@ with gr.Blocks() as avery_gradio:
         start_btn = gr.update(value="始める",interactive=playable, link="/avery/go_to_answer")
 
         # Check if the player is an admin
-        delete_btn = gr.update(visible=False)
+        is_admin = gr.update(visible=False)
+        schools = []
         if hasattr(request.session, "roles") and request.session.get("roles") != "student":
             if hasattr(request.session, "username") and request.session.get("username") == "admin":
-                delete_btn = gr.update(visible=True)
+                is_admin = gr.update(visible=True)
+                schools = await get_schools(request=request, leaderboard_id=select_leaderboard.id)
                 
         unfinished_rounds = await get_unfinished_rounds_from_backend(request, select_leaderboard.id)
         if unfinished_rounds:
             start_btn = gr.update(value="再開", link="/avery/resume_game",interactive=True)
             
-        return select_leaderboard, start_btn, delete_btn, info, interpreted_images, round_generations, unfinished_rounds
+        
+        return select_leaderboard, start_btn, is_admin, info, interpreted_images, round_generations, unfinished_rounds,is_admin,is_admin,is_admin,is_admin,is_admin,is_admin, is_admin, select_leaderboard.is_public, select_leaderboard.published_at, schools
 
     async def delete_selected_leaderboard(request: gr.Request, selected_leaderboard, published_at_start: Optional[datetime.datetime]=None, published_at_end: Optional[datetime.datetime]=None):
         leaderboard = await delete_leaderboard(selected_leaderboard.id, request=request)
@@ -249,7 +264,26 @@ with gr.Blocks() as avery_gradio:
         else:
             md = f"## {select_leaderboard.title}{leaderboard_vocabularies}"
         return md
-            
+
+    async def submit_update_leaderboard(is_public, published_at, schools, word, pos, meaning, request: gr.Request):
+        leaderboard_id = app.state.selected_leaderboard.id
+        
+        published_at = datetime.datetime.fromtimestamp(published_at)
+        if not all([word, pos, meaning]):
+            vocabularies = []
+        else:
+            vocabularies = [models.VocabularyBase(word=word, pos=pos, meaning=meaning)]
+        leaderboard = models.LeaderboardUpdate(
+            id = leaderboard_id,
+            is_public=is_public,
+            published_at=published_at,
+            school=schools,
+            vocabularies=vocabularies,
+        )
+        leaderboard = await update_leaderboard(leaderboard, request=request)
+        schools = await get_schools(request=request, leaderboard_id=leaderboard_id)
+        leaderboard_published_at = leaderboard.published_at.timestamp()
+        return leaderboard.is_public, leaderboard_published_at, schools, '', '', ''
 
     # Load leaderboards
     gr.on(
@@ -264,7 +298,25 @@ with gr.Blocks() as avery_gradio:
         triggers=[gallery.gallery.select],
         fn=select_leaderboard_fn,
         inputs=[leaderboards],
-        outputs=[selected_leaderboard, gallery.submit_btn, gallery.delete_btn, gallery.info, gallery.generated_img, related_generations, unfinished],
+        outputs=[
+            selected_leaderboard, 
+            gallery.submit_btn, 
+            gallery.delete_btn, 
+            gallery.info, 
+            gallery.generated_img, 
+            related_generations, 
+            unfinished, 
+            gallery.is_public,
+            gallery.published_at,
+            gallery.school_group,
+            gallery.word,
+            gallery.pos,
+            gallery.meaning,
+            gallery.update_btn,
+            gallery.is_public,
+            gallery.published_at,
+            gallery.school_group,
+        ],
     )
 
     # Set the selected interpreted image
@@ -281,6 +333,14 @@ with gr.Blocks() as avery_gradio:
         fn=delete_selected_leaderboard,
         inputs=[selected_leaderboard, published_at_start_dropdown, published_at_end_dropdown],
         outputs=[gallery.gallery, leaderboards],
+    )
+
+    # Change accessibilities of the schools
+    gr.on(
+        triggers=[gallery.update_btn.click],
+        fn=submit_update_leaderboard,
+        inputs=[gallery.is_public, gallery.published_at, gallery.school_group, gallery.word, gallery.pos, gallery.meaning],
+        outputs=[gallery.is_public, gallery.published_at, gallery.school_group, gallery.word, gallery.pos, gallery.meaning],
     )
 
 

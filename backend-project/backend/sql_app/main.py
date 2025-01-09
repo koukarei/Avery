@@ -349,6 +349,34 @@ def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_current_
     
     return leaderboards
 
+@app.get("/leaderboards/admin/", tags=["Leaderboard"], response_model=list[schemas.LeaderboardOut])
+def read_leaderboards_admin(
+        current_user: Annotated[schemas.User, Depends(get_current_user)],
+        skip: int = 0,
+        limit: int = 100,
+        published_at_start: str = None,
+        published_at_end: str = None,
+        db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view leaderboards")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    
+    if published_at_start:
+        published_at_start = datetime.datetime.strptime(published_at_start, "%d%m%Y").replace(tzinfo=timezone.utc)
+    if published_at_end:
+        published_at_end = datetime.datetime.strptime(published_at_end, "%d%m%Y").replace(tzinfo=timezone.utc)
+
+    leaderboards = crud.get_leaderboards_admin(
+        db=db,
+        skip=skip,
+        limit=limit,
+        published_at_start=published_at_start,
+        published_at_end=published_at_end,
+    )
+    return leaderboards
+
 @app.post("/leaderboards/", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
 def create_leaderboard(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
@@ -415,6 +443,7 @@ def create_leaderboards(
     zipped_image_files: Annotated[UploadFile, File()],
     csv_file: Annotated[UploadFile, File()],
     background_tasks: BackgroundTasks,
+    school: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     # Check arguments
@@ -592,6 +621,18 @@ def create_leaderboards(
                 diff = set(added_vocabularies) - set(preset_vocabularies)
                 if diff:
                     util.logger1.info(f"Leaderboard {index} Added vocabularies: {diff}")
+            
+            # Add school
+            if school:
+                crud.update_leaderboard(
+                    db=db,
+                    leaderboard=schemas.LeaderboardUpdate(
+                        id=db_leaderboard.id,
+                        school=[school],
+                        vocabularies=[]
+                    )
+                )
+            
             leaderboard_list.append(db_leaderboard)
 
             # Generate descriptions
@@ -650,6 +691,15 @@ def read_leaderboard(current_user: Annotated[schemas.User, Depends(get_current_u
         util.logger1.error(f"Leaderboard not found: {leaderboard_id}")
         raise HTTPException(status_code=404, detail="Leaderboard not found")
     return db_leaderboard
+
+@app.get("/leaderboards/{leaderboard_id}/schools/", tags=["Leaderboard"], response_model=list[schemas.SchoolOut])
+def read_schools(current_user: Annotated[schemas.User, Depends(get_current_user)], leaderboard_id: int, db: Session = Depends(get_db)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view schools")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    schools = crud.get_school_leaderboard(db, leaderboard_id=leaderboard_id)
+    return schools
 
 @app.put("/leaderboards/{leaderboard_id}", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
 def update_leaderboard(

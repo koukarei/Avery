@@ -55,6 +55,7 @@ class Leaderboard(BaseModel):
     title: str
     story_extract: str
     is_public: bool
+    published_at: Optional[datetime]=None
     vocabularies: list[Vocabulary]=[]
 
 class LeaderboardDetail(BaseModel):
@@ -192,3 +193,15 @@ class ImageSimilarity(BaseModel):
     ssim: float
     similarity: float
     
+class VocabularyBase(BaseModel):
+    word: str
+    meaning: str
+    pos: str
+
+class LeaderboardUpdate(BaseModel):
+    id: int
+    is_public: Optional[bool]=None
+    published_at: Optional[datetime]=None
+    title: Optional[str]=None
+    school: list[str]=[]
+    vocabularies: list[VocabularyBase]=[]

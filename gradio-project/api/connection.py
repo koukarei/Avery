@@ -60,6 +60,8 @@ def convert_json(mdl: models.BaseModel):
         json_data["created_at"] = json_data["created_at"].isoformat()
     if "at" in json_data:
         json_data["at"] = json_data["at"].isoformat()
+    if "published_at" in json_data:
+        json_data["published_at"] = json_data["published_at"].isoformat()
     return json_data
 
 async def create_user(newuser: models.UserCreate):
@@ -131,10 +133,15 @@ def get_auth(request: Request):
 async def read_leaderboard(
         request: Request, 
         published_at_start: Optional[datetime.datetime] = None,
-        published_at_end: Optional[datetime.datetime] = datetime.datetime.now()
+        published_at_end: Optional[datetime.datetime] = datetime.datetime.now(),
+        is_admin: Optional[bool] = False
 ):
     auth = get_auth(request)
-    url = f"{BACKEND_URL}leaderboards"
+    if is_admin:
+        url = f"{BACKEND_URL}leaderboards/admin/"
+    else:
+        url = f"{BACKEND_URL}leaderboards"
+
     if published_at_start:
         # convert to utczone
         published_at_start = published_at_start.astimezone(datetime.timezone.utc)
@@ -154,11 +161,17 @@ async def read_leaderboard(
             auth=auth,
             follow_redirects=True
         )
+
         response.raise_for_status()
 
-        output = [models.Leaderboard(
-            **leaderboard[0],
-        ) for leaderboard in response.json()]
+        if is_admin:
+            output = [models.Leaderboard(
+                **leaderboard,
+            ) for leaderboard in response.json()]
+        else:
+            output = [models.Leaderboard(
+                **leaderboard[0],
+            ) for leaderboard in response.json()]
         return output
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code, detail=e.response.json())
@@ -170,6 +183,33 @@ async def delete_leaderboard(leaderboard_id: int, request: Request):
     )
     response.raise_for_status()
     output = models.IdOnly(**response.json())
+    return output
+
+async def update_leaderboard(
+        new_leaderboard: models.LeaderboardUpdate, 
+        request: Request
+):
+    json_data = convert_json(new_leaderboard)
+    response = await http_client.put(
+        f"{BACKEND_URL}leaderboards/{new_leaderboard.id}",
+        json=json_data,
+        auth=get_auth(request),
+    )
+    response.raise_for_status()
+    output = models.Leaderboard(**response.json())
+    return output
+
+async def get_schools(
+        leaderboard_id: int, 
+        request: Request
+):
+    response = await http_client.get(
+        f"{BACKEND_URL}leaderboards/{leaderboard_id}/schools",
+        auth=get_auth(request),
+        follow_redirects=True
+    )
+    response.raise_for_status()
+    output = [school['school'] for school in response.json()]
     return output
 
 async def get_original_images(leaderboard_id: int, request: Request):
