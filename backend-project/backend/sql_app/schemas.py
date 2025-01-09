@@ -399,8 +399,7 @@ class SchoolOut(BaseModel):
     school: str
 
 class SchoolLeaderboard(BaseModel):
-    school: SchoolOut
-    leaderboard: LeaderboardOut
+    result: Tuple[LeaderboardOut, SchoolOut]
 
 class DescriptionBase(BaseModel):
     content: str

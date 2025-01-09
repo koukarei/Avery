@@ -150,7 +150,10 @@ async def read_leaderboard(
             follow_redirects=True
         )
         response.raise_for_status()
-        output = [models.SchoolLeaderboard(**leaderboard) for leaderboard in response.json()]
+        
+        output = [models.Leaderboard(
+            **leaderboard[0].dict(),
+        ) for leaderboard in response.json()]
         return output
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code, detail=e.response.json())
