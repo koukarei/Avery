@@ -324,7 +324,7 @@ def create_story(
     return crud.create_story(db=db, story=storyCreate)
 
 
-@app.get("/leaderboards/", tags=["Leaderboard"], response_model=list[schemas.SchoolLeaderboard])
+@app.get("/leaderboards/", tags=["Leaderboard"], response_model=list[Tuple[schemas.LeaderboardOut, schemas.SchoolOut]])
 def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_current_user)],skip: int = 0, limit: int = 100, published_at_start: str=None, published_at_end: str=None, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view leaderboards")
