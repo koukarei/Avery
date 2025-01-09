@@ -99,7 +99,7 @@ with gr.Blocks() as avery_gradio:
             else:
                 prev_ans = None
                 
-        else:
+        elif 'generations' in current_round:
             generations = current_round['generations']
             prev_ans = None
             if generations:
@@ -107,6 +107,8 @@ with gr.Blocks() as avery_gradio:
                 prev_generation_id = max(generations)
                 prev_generation = await get_generation(prev_generation_id, request)
                 prev_ans = prev_generation.sentence
+        else:
+            prev_ans = None
             
         return original_img, prev_ans, generated_time
     
