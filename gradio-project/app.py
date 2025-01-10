@@ -290,7 +290,7 @@ async def resume_game(request: Request, leaderboard_id: Optional[int]=None):
             if last_gen.interpreted_image:
                 generated_time = len(last_round.generations)
                 request.session["generated_time"] = generated_time
-                return RedirectResponse(url=f"/avery/go_to_result/{last_gen.id}/?generated_time={generated_time}", status_code=status.HTTP_303_SEE_OTHER)
+                return RedirectResponse(url=f"/avery/go_to_result/{last_gen.id}", status_code=status.HTTP_303_SEE_OTHER)
             
             output = await get_interpretation(
                 round_id=last_round.id,
@@ -303,7 +303,7 @@ async def resume_game(request: Request, leaderboard_id: Optional[int]=None):
 
             if not output:
                 raise HTTPException(status_code=500, detail="Failed to get interpretation")
-            return RedirectResponse(url=f"/avery/go_to_result/{last_gen.id}/?generated_time={generated_time}", status_code=status.HTTP_303_SEE_OTHER)
+            return RedirectResponse(url=f"/avery/go_to_result/{last_gen.id}", status_code=status.HTTP_303_SEE_OTHER)
         
         request.session["generation"] = convert_json(last_gen)
         if len(last_round.generations) > 1:
@@ -344,8 +344,8 @@ async def redirect_to_answer(request: Request, leaderboard_id: Optional[int]=Non
 
 @app.get("/go_to_result/{generation_id}")
 @concurrency_control.limit_concurrency(max_concurrent=40, per_client=True)
-async def redirect_to_result(request: Request, generation_id: Optional[int]=None, generated_time: Optional[int]=None):
-    if generation_id is None and generated_time is None:
+async def redirect_to_result(request: Request, generation_id: Optional[int]=None):
+    if generation_id is None:
         if request.session.get('round', None):
             return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
         cur_round = await read_my_rounds(

@@ -209,7 +209,7 @@ with gr.Blocks() as avery_gradio:
                     )
                     submit_show = gr.update(visible=False)
                     sentence_interactive = gr.update(interactive=False)
-                    link = "/avery/go_to_result/{}/?generated_time={}".format(generation_id, generated_time)
+                    link = "/avery/go_to_result/{}".format(generation_id)
                     next_btn = gr.update(link=link, visible=True)
                 else:
                     generated_time = generated_time - 1
