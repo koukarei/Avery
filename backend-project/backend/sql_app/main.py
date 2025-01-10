@@ -804,12 +804,16 @@ def create_round(
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to create a round")
     player_id = current_user.id
+
+    db_program = crud.get_program_by_name(db, thisround.program)
+
     db_round = crud.create_round(
         db=db,
         leaderboard_id=thisround.leaderboard_id,
         user_id=player_id,
         model_name=thisround.model,
         created_at=thisround.created_at,
+        program_id=db_program.id
     )
 
     crud.create_message(
@@ -1563,7 +1567,6 @@ def read_generations(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     player_id: Optional[int] = None,
     leaderboard_id: Optional[int] = None,
-    school_name: Optional[str] = None,
     program: Optional[str] = None,
     order_by: Optional[str] = "total_score",
     skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
