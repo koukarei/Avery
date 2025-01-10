@@ -113,7 +113,7 @@ class Round(Base):
     chat_history=Column(Integer,ForeignKey("chats.id"))
     leaderboard_id=Column(Integer,ForeignKey("leaderboards.id"))
     player_id = Column(Integer, ForeignKey("user_profiles.id"))
-    program_id = Column(Integer, ForeignKey("programs.id"))
+    program_id = Column(Integer, ForeignKey("programs.id"), nullable=True)
 
     model=Column(String(100), index=True)
 
