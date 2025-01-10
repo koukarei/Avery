@@ -1570,10 +1570,8 @@ def read_generations(
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view generations")
-    if player_id and player_id != current_user.id and current_user.user_type == "student":
+    if player_id is not None and player_id != current_user.id and current_user.user_type == "student":
         raise HTTPException(status_code=401, detail="You are not authorized to view generations")
-    if player_id is None and current_user.user_type == "student":
-        player_id = current_user.id
 
     if program == "none":
         return []
@@ -1587,9 +1585,6 @@ def read_generations(
             order_by=order_by
         )
         
-        if school_name and current_user.school:
-            generations = [gen for gen in generations if gen[1].player.school_name == school_name]
-
         return generations
     db_program = crud.get_program_by_name(db, program)
     if db_program is None:
