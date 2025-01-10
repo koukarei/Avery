@@ -108,10 +108,10 @@ with gr.Blocks() as avery_gradio:
         generation_id = request.session.get('generation_id', None)
         cur_round = request.session.get('round', None)
         # complete the generation and get the chat
-        if not generation_id:
+        if generation_id is None:
             raise Exception("Generation not found")
         
-        if not cur_round:
+        if cur_round is None:
             raise Exception("Round not found")
 
         if cur_round:

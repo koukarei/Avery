@@ -366,6 +366,8 @@ async def redirect_to_result(request: Request, generation_id: Optional[int]=None
             return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
         request.session["generated_time"] = generated_time
         request.session["generation_id"] = last_gen.id
+    else:
+        request.session["generation_id"] = generation_id
     
     cur_generation_id = request.session.get('generation_id', generation_id)
     if cur_generation_id is None:
