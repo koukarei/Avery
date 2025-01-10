@@ -1587,7 +1587,7 @@ def read_generations(
             order_by=order_by
         )
         
-        if school_name:
+        if school_name and current_user.school:
             generations = [gen for gen in generations if gen[1].player.school_name == school_name]
 
         return generations

@@ -303,6 +303,7 @@ class UserProfile(UserProfileBase):
 class User(UserBase):
     id: int
     is_active: bool
+    school: Optional[str]=None
     profiles: UserProfile
 
     class Config:
