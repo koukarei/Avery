@@ -231,6 +231,7 @@ async def get_original_images(leaderboard_id: int, request: Request):
     response = await http_client.get(
         f"{BACKEND_URL}original_image/{leaderboard_id}",
         auth=get_auth(request),
+        timeout=120
     )
     response.raise_for_status()
     image = PILImage.open(io.BytesIO(response.content))
@@ -318,6 +319,7 @@ async def get_interpreted_image(generation_id: int, request: Request, ):
     response = await http_client.get(
         f"{BACKEND_URL}interpreted_image/{generation_id}",
         auth=get_auth(request),
+        timeout=120
     )
     response.raise_for_status()
     image = PILImage.open(io.BytesIO(response.content))
@@ -353,6 +355,7 @@ async def get_image_similarity(generation_id: int, request: Request, ):
     response = await http_client.get(
         f"{BACKEND_URL}image_similarity/{generation_id}",
         auth=get_auth(request),
+        timeout=120
     )
     response.raise_for_status()
     output = models.ImageSimilarity(**response.json())

@@ -145,6 +145,8 @@ with gr.Blocks() as avery_gradio:
             return None, chat_history
         if not request.session.get('round', None):
             raise Exception("Round not found")
+        if 'id' not in request.session.get('round', None):
+            raise Exception("Round not found")
         round_id = request.session.get('round', None)['id']
         new_message = models.MessageSend(
             content=message,
