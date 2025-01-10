@@ -68,12 +68,12 @@ with gr.Blocks() as avery_gradio:
         leaderboards = await read_leaderboard(
             request=request,
         )
-        print(leaderboards)
+        #print(leaderboards)
         leaderboard_choices = [i.title for i in leaderboards]
         generations = await get_generations(
             request=request,
         )
-        print(generations)
+        #print(generations)
 
         df_generations = pd.DataFrame([i.model_dump() for i,j in generations])
 

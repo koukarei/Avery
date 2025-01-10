@@ -125,7 +125,7 @@ async def login_form(request: Request):
         request.session["roles"] = "instructor" if form_data["username"] == "admin" else "student"
         request.session["program"] = "overview"
 
-        print(request.session)
+        # print(request.session)
         # app.state.token = token.model_dump()
         # app.state.username = form_data["username"]
 
