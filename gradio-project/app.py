@@ -26,7 +26,7 @@ class EndpointConcurrencyControl:
         # Store active requests for each endpoint-client combination
         self.active_requests: Dict[str, Dict[str, float]] = {}
     
-    def limit_concurrency(self, max_concurrent: int = 1, per_client: bool = True):
+    def limit_concurrency(self, max_concurrent: int = 40, per_client: bool = True):
         def decorator(func):
             # Create a unique key for this endpoint
             endpoint_key = f"{func.__module__}.{func.__name__}"
@@ -108,7 +108,7 @@ templates = Jinja2Templates(directory="templates")
 MAX_GENERATION = int(os.getenv("MAX_GENERATION", 5))
 
 @app.route("/login", methods=["GET", "POST"])
-@concurrency_control.limit_concurrency(max_concurrent=1, per_client=True)
+@concurrency_control.limit_concurrency(max_concurrent=40, per_client=True)
 async def login_form(request: Request):
     if request.method == "POST":
 
@@ -134,7 +134,7 @@ async def login_form(request: Request):
     return templates.TemplateResponse("login_form.html", {"request": request})
 
 @app.route('/lti/login',methods=["POST"])
-@concurrency_control.limit_concurrency(max_concurrent=1, per_client=True)
+@concurrency_control.limit_concurrency(max_concurrent=40, per_client=True)
 async def lti_login(request: Request):
     valid = await validate_lti_request(request)
     if not valid:
@@ -191,7 +191,7 @@ async def lti_login(request: Request):
     raise HTTPException(status_code=500, detail="Failed to login")
 
 @app.route('/logout')
-@concurrency_control.limit_concurrency(max_concurrent=1, per_client=True)
+@concurrency_control.limit_concurrency(max_concurrent=40, per_client=True)
 async def logout(request: Request):
 
     school = request.session.pop('school', None)
@@ -343,7 +343,7 @@ async def redirect_to_answer(request: Request, leaderboard_id: Optional[int]=Non
     return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
 
 @app.get("/go_to_result/{generation_id}")
-@concurrency_control.limit_concurrency(max_concurrent=1, per_client=True)
+@concurrency_control.limit_concurrency(max_concurrent=40, per_client=True)
 async def redirect_to_result(request: Request, generation_id: Optional[int]=None, generated_time: Optional[int]=None):
     if generation_id is None and generated_time is None:
         if request.session.get('round', None):
