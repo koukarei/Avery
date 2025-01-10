@@ -806,15 +806,23 @@ def create_round(
     player_id = current_user.id
 
     db_program = crud.get_program_by_name(db, thisround.program)
- 
-    db_round = crud.create_round(
-        db=db,
-        leaderboard_id=thisround.leaderboard_id,
-        user_id=player_id,
-        model_name=thisround.model,
-        created_at=thisround.created_at,
-        program_id=db_program.id
-    )
+    if db_program is None:
+        db_round = crud.create_round(
+            db=db,
+            leaderboard_id=thisround.leaderboard_id,
+            user_id=player_id,
+            model_name=thisround.model,
+            created_at=thisround.created_at,
+        )      
+    else:  
+        db_round = crud.create_round(
+            db=db,
+            leaderboard_id=thisround.leaderboard_id,
+            user_id=player_id,
+            model_name=thisround.model,
+            created_at=thisround.created_at,
+            program_id=db_program.id
+        )
 
     crud.create_message(
         db=db,
