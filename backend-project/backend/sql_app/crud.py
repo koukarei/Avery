@@ -410,20 +410,28 @@ def get_rounds(db: Session, skip: int = 0, limit: int = 100, player_id: int = No
     else:
         return rounds.filter(models.Round.is_completed == is_completed).order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
 
-def create_round(db: Session, leaderboard_id:int, user_id: int, program_id: int, created_at: datetime.datetime, model_name: str="gpt-4o-mini"):
+def create_round(db: Session, leaderboard_id:int, user_id: int, created_at: datetime.datetime, model_name: str="gpt-4o-mini", program_id: Optional[int]=None, ):
     db_chat=models.Chat()
     db.add(db_chat)
     db.commit()
     db.refresh(db_chat)
-
-    db_round = models.Round(
-        player_id=user_id,
-        chat_history=db_chat.id,
-        leaderboard_id=leaderboard_id,
-        model=model_name,
-        created_at=created_at,
-        program_id=program_id
-    )
+    if program_id:
+        db_round = models.Round(
+            player_id=user_id,
+            chat_history=db_chat.id,
+            leaderboard_id=leaderboard_id,
+            model=model_name,
+            created_at=created_at,
+            program_id=program_id
+        )
+    else:
+        db_round = models.Round(
+            player_id=user_id,
+            chat_history=db_chat.id,
+            leaderboard_id=leaderboard_id,
+            model=model_name,
+            created_at=created_at
+        )
     
     db.add(db_round)
     db.commit()
