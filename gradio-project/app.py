@@ -345,7 +345,9 @@ async def redirect_to_answer(request: Request, leaderboard_id: Optional[int]=Non
 @app.get("/go_to_result/{generation_id}")
 @concurrency_control.limit_concurrency(max_concurrent=40, per_client=True)
 async def redirect_to_result(request: Request, generation_id: Optional[int]=None):
-    if generation_id is None:
+    generated_time = request.session.get('generated_time', None)
+    
+    if generation_id is None or generated_time is None:
         if request.session.get('round', None):
             return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
         cur_round = await read_my_rounds(
@@ -379,6 +381,7 @@ async def redirect_to_result(request: Request, generation_id: Optional[int]=None
     )
     if not output:
         raise HTTPException(status_code=500, detail="Generation not completed")
+
 
     if generated_time > (MAX_GENERATION-1):
         output = await end_round(
