@@ -1,7 +1,12 @@
 from pydantic import BaseModel, Field, field_validator
 
 import datetime
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Any
+
+class TaskStatus(BaseModel):
+    id: str
+    status: Optional[str]
+    result: Optional[Any]
 
 class ImageBase(BaseModel):
     image: str
@@ -228,6 +233,9 @@ class GenerationComplete(BaseModel):
     n_pronouns: Optional[int] = None
     n_prepositions: Optional[int] = None
 
+    grammar_errors: Optional[str] = None
+    spelling_errors: Optional[str] = None
+
     n_grammar_errors: Optional[int] = None
     n_spelling_errors: Optional[int] = None
 
@@ -436,3 +444,8 @@ class LeaderboardUpdate(BaseModel):
     title: Optional[str]=None
     school: list[str]=[]
     vocabularies: list[VocabularyBase]=[]
+
+class Task(BaseModel):
+    id: str
+    generation_id: Optional[int]=None
+    leaderboard_id: Optional[int]=None

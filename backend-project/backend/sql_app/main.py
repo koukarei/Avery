@@ -1,5 +1,5 @@
 import logging.config
-from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, BackgroundTasks, responses, Security, status
+from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, responses, Security, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 import time, os, datetime, io, requests, shutil, tempfile, zipfile, zoneinfo
@@ -7,7 +7,7 @@ import pandas as pd
 from pathlib import Path
 from PIL import Image
 
-from . import crud, models, schemas
+from . import crud, models, schemas, tasks
 from .database import SessionLocal, engine
 
 from .dependencies import sentence, gen_image, score, dictionary, openai_chatbot, util
@@ -20,9 +20,6 @@ from datetime import timezone, timedelta
 import torch, stanza
 from contextlib import asynccontextmanager
 import logging
-
-
-from .background_tasks import *
 
 models.Base.metadata.create_all(bind=engine)
 nlp_models = {}
@@ -77,6 +74,48 @@ app = FastAPI(
 @app.get("/")
 def hello_world():
     return {"message": "Hello World"}
+
+@app.get("/tasks/{task_id}", tags=["Task"], response_model=schemas.TaskStatus)
+def check_status(
+    task_id: str, 
+    db: Session = Depends(get_db)
+):
+    result = tasks.celery.AsyncResult(task_id)
+    status = schemas.TaskStatus(
+        id=task_id,
+        status=result.status,
+        result=result.result
+    )
+    if result.status == "SUCCESS":
+        crud.delete_task(db, task_id)
+    return status
+
+@app.get("/tasks/generation/{generation_id}", tags=["Task"], response_model=list[schemas.TaskStatus])
+def check_generation_task_status(
+    generation_id: int, 
+):
+    return tasks.check_factors_done(generation_id)
+
+@app.get("/tasks/leaderboard/{leaderboard_id}", tags=["Task"], response_model=list[schemas.TaskStatus])
+def check_leaderboard_task_status(
+    leaderboard_id: int, 
+    db: Session = Depends(get_db)
+):
+    celery_tasks = crud.get_tasks(db, leaderboard_id=leaderboard_id)
+    output = []
+    for t in celery_tasks:
+        result = tasks.celery.AsyncResult(t.task_id)
+        output.append(
+            schemas.TaskStatus(
+                id=t.task_id,
+                status=result.status,
+                result=result.result
+            )
+        )
+        if result.status == "SUCCESS":
+            crud.delete_task(db, t.task_id)
+
+    return output
 
 async def get_current_user(db: Annotated[Session, Depends(get_db)],token: Annotated[schemas.TokenData, Depends(oauth2_scheme)]):
 #async def get_current_user(db: Annotated[Session, Depends(get_db)],username: str):
@@ -164,7 +203,6 @@ async def login_for_access_token_lti(
 
 @app.post("/refresh_token")
 async def refresh_token(current_user: schemas.User = Security(get_current_user, scopes=["refresh_token"])):
-    print(current_user)
     if current_user:
             access_token = create_access_token(
                 data={"sub": current_user.username}
@@ -382,7 +420,6 @@ def read_leaderboards_admin(
 def create_leaderboard(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard: schemas.LeaderboardCreateIn,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     if not current_user:
@@ -427,13 +464,19 @@ def create_leaderboard(
                     vocabulary_id=vocab.id
                 )
 
-    background_tasks.add_task(
-        generateDescription,
-        db=db,
+    t = tasks.generateDescription.delay(
         leaderboard_id=result.id, 
         image=db_original_image.image, 
         story=story, 
         model_name="gpt-4o-mini"
+    )
+
+    crud.create_task(
+        db=db,
+        task=schemas.Task(
+            task_id=t.id,
+            leaderboard_id=result.id,
+        )
     )
 
     return result
@@ -443,7 +486,6 @@ def create_leaderboards(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     zipped_image_files: Annotated[UploadFile, File()],
     csv_file: Annotated[UploadFile, File()],
-    background_tasks: BackgroundTasks,
     school: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
@@ -516,6 +558,7 @@ def create_leaderboards(
                         image=img
                     )
                 )
+
                 title = image_file.split(".")[0]
                 images[title] = db_original_image
 
@@ -539,9 +582,14 @@ def create_leaderboards(
             else:
                 story_extract = ''
 
-            img = images.get(util.remove_special_chars(index), None)
+            if 'id' in leaderboards.columns:
+                img_title = row['id'] + ' ' + index
+            else:
+                img_title = index
+            img = images.get(util.remove_special_chars(img_title), None)
+
             if img is None:
-                util.logger1.error(f"Image not found: {index}")
+                util.logger1.error(f"Image not found: {img_title}")
                 continue
 
             # Create leaderboard
@@ -636,24 +684,29 @@ def create_leaderboards(
             
             leaderboard_list.append(db_leaderboard)
 
-            # Generate descriptions
-            background_tasks.add_task(
-                generateDescription,
-                db=db,
+            # Generate description
+            t = tasks.generateDescription.delay(
                 leaderboard_id=db_leaderboard.id, 
                 image=img.image, 
                 story=story_extract, 
                 model_name="gpt-4o-mini"
             )
-
-        # Remove the temporary directory
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
-
-        return leaderboard_list
+            crud.create_task(
+                db=db,
+                task=schemas.Task(
+                    id=t.id,
+                    leaderboard_id=db_leaderboard.id,
+                )
+            )
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error reading CSV file: {str(e)}")
+
+    # Remove the temporary directory
+    if os.path.exists(temp_dir):
+        shutil.rmtree(temp_dir)
+
+    return leaderboard_list
 
 @app.post("/leaderboards/image", tags=["Leaderboard"], response_model=schemas.IdOnly)
 def create_leaderboard_image(
@@ -841,7 +894,6 @@ def get_user_answer(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     round_id: int,
     generation: schemas.GenerationCreate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     if not current_user:
@@ -872,9 +924,7 @@ def get_user_answer(
     
     db_round = crud.get_round(db, round_id)
 
-    background_tasks.add_task(
-        update_vocab_used_time,
-        db=db,
+    tasks.update_vocab_used_time.delay(
         sentence=db_generation.sentence,
         user_id=db_round.player_id
     )
@@ -914,7 +964,6 @@ async def get_interpretation(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     round_id: int,
     generation: schemas.GenerationCorrectSentence,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     if not current_user:
@@ -961,49 +1010,77 @@ async def get_interpretation(
             at=db_generation.created_at
         )
 
+        # Check if description generation is done
+        celery_tasks = check_leaderboard_task_status(
+            db=db,
+            leaderboard_id=db_round.leaderboard_id,
+        )
+        if celery_tasks:
+            while not all([t.status == "SUCCESS" for t in celery_tasks]):
+                time.sleep(1)
+                celery_tasks = check_leaderboard_task_status(
+                    db=db,
+                    leaderboard_id=db_round.leaderboard_id,
+                )
+
         # Get descriptions
         descriptions =  crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
         descriptions = [des.content for des in descriptions]
 
+        celery_tasks = []
+
         # Safe background task addition with error handling
         try:
-
-            # if 'en_nlp' not in nlp_models or 'perplexity_model' not in nlp_models or 'tokenizer' not in nlp_models:
-            #     nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = model_load()
-
             # Update scores in background
-            background_tasks.add_task(
-                update_perplexity,
-                db=db,
+            celery_tasks.append(
+                tasks.update_perplexity.delay(
                 en_nlp=nlp_models['en_nlp'],
                 perplexity_model=nlp_models['perplexity_model'],
                 tokenizer=nlp_models['tokenizer'],
                 generation=generation_complete,
                 descriptions=descriptions
+                )
             )
             
-            background_tasks.add_task(
-                update_content_score,
-                db=db,
-                generation=generation_complete
+            celery_tasks.append(
+                tasks.update_content_score.delay(
+                    generation=generation_complete
+                )
             )
 
-            # background_tasks.add_task(
-            #     update_frequency_word,
-            #     db=db,
-            #     en_nlp=nlp_models['en_nlp'],
-            #     generation=generation_complete
+            # celery_tasks.append(
+            #     tasks.update_frequency_word.delay(
+            #         en_nlp=nlp_models['en_nlp'],
+            #         generation=generation_complete
+            #     )
             # )
 
-            background_tasks.add_task(
-                update_n_words,
-                db=db,
-                en_nlp=nlp_models['en_nlp'],
-                generation=generation_complete
+            celery_tasks.append(
+                tasks.update_n_words.delay(
+                    en_nlp=nlp_models['en_nlp'],
+                    generation=generation_complete
+                )
             )
+
+            celery_tasks.append(
+                tasks.update_grammar_spelling.delay(
+                    en_nlp=nlp_models['en_nlp'],
+                    generation=generation_complete
+                )
+            )
+
         except Exception as e:
             # Log the background task error without raising
             util.logger1.error(f"Error in background task addition: {str(e)}")
+
+        for t in celery_tasks:
+            crud.create_task(
+                db=db,
+                task=schemas.Task(
+                    task_id=t.id,
+                    generation_id=db_generation.id,
+                )
+            )
 
         # Get round and create message
         db_round = crud.get_round(db, round_id)
@@ -1053,27 +1130,24 @@ def complete_generation(
     db_chat = crud.get_chat(db=db,chat_id=db_round.chat_history)
     cb=openai_chatbot.Hint_Chatbot()
 
-    # if 'en_nlp' not in nlp_models or 'perplexity_model' not in nlp_models or 'tokenizer' not in nlp_models:
-    #     nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = model_load()
+    # Check if the score calculation is done
+    timeout = time.time() + 60
+    while True:
+        if time.time() > timeout:
+            raise HTTPException(status_code=500, detail="The calculation took time. Please try again.")
+        factors = tasks.check_factors_done(
+            generation_id=generation.id
+        )
+        factors = [f.status == "SUCCESS" for f in factors]
+        if all(factors):
+            db_generation = crud.get_generation(db, generation_id=generation.id)
+            break
+        time.sleep(1)
 
-    factors, scores_dict = calculate_score(
-        db=db,
-        en_nlp=nlp_models['en_nlp'],
-        perplexity_model=nlp_models['perplexity_model'],
-        tokenizer=nlp_models['tokenizer'],
+    factors, scores_dict = tasks.calculate_score(
         generation=generation,
         is_completed=True,
     )
-    if 'grammar_error' in factors:
-        grammar_errors=str(factors['grammar_error'])
-        spelling_errors=str(factors['spelling_error'])
-    elif factors['n_grammar_errors'] > 0:
-        errors = score.grammar_spelling_errors(db_generation.sentence, en_nlp=nlp_models['en_nlp'])
-        grammar_errors=str(errors['grammar_error'])
-        spelling_errors=str(errors['spelling_error'])
-    else:
-        grammar_errors='None'
-        spelling_errors='None'
 
     evaluation = cb.get_result(
         sentence=db_generation.sentence,
@@ -1082,8 +1156,8 @@ def complete_generation(
         rank=db_generation.rank,
         base64_image=db_round.leaderboard.original_image.image,
         chat_history=db_chat.messages,
-        grammar_errors=grammar_errors,
-        spelling_errors=spelling_errors
+        grammar_errors=db_generation.grammar_errors,
+        spelling_errors=db_generation.spelling_errors,
     )
 
     if evaluation:
@@ -1096,8 +1170,8 @@ def complete_generation(
 構造性: {structure_score} (満点3)
 内容得点: {content_score} (満点100)
 合計点: {total_score} (満点100)
-ランク: {rank}　(A-最高, B-上手, C-良い, D-普通, E-悪い, F-最悪)
-        """.format(
+ランク: {rank}　(A-最高, B-上手, C-良い, D-普通, E-悪い, F-最悪)""". \
+    format(
             user_sentence=db_generation.sentence,
             correct_sentence=db_generation.correct_sentence,
             grammar_score=round(scores_dict['grammar_score'],2),
@@ -1120,8 +1194,8 @@ def complete_generation(
 {content_feedback}
 
 **整体的なコメント**
-{overall_feedback}
-        """.format(
+{overall_feedback}""". \
+        format(
             grammar_feedback=evaluation.grammar_evaluation,
             spelling_feedback=evaluation.spelling_evaluation,
             style_feedback=evaluation.style_evaluation,

@@ -27,3 +27,5 @@ passlib[bcrypt]
 pylti
 opencv-python
 scikit-image
+celery[redis]
+flower

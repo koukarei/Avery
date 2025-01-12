@@ -1,13 +1,41 @@
 from sqlalchemy.orm import Session
+from sqlalchemy.ext.declarative import DeclarativeMeta
 from .dependencies import sentence, score, dictionary
-from . import crud, schemas
+from . import crud, schemas, database
 from typing import Union, List, Annotated, Optional
 from fastapi import HTTPException
 from datetime import timezone
 from .dependencies.util import computing_time_tracker
+from .database import SessionLocal, engine
 
-def generateDescription(db: Session, leaderboard_id: int, image: str, story: Optional[str], model_name: str="gpt-4o-mini"):
-    
+import os, time, json
+from celery import Celery
+
+app = Celery(__name__)
+app.conf.broker_url = os.environ.get('BROKER_URL',
+                                        'redis://localhost:7876')
+app.conf.result_backend = os.environ.get('RESULT_BACKEND',
+                                            'redis://localhost:7876')
+
+class AlchemyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj.__class__, DeclarativeMeta):
+            # Convert SQLAlchemy model to dictionary
+            fields = {}
+            for field in [x for x in dir(obj) if not x.startswith('_') and x != 'metadata']:
+                data = obj.__getattribute__(field)
+                try:
+                    json.dumps(data)
+                    fields[field] = data
+                except TypeError:
+                    fields[field] = None
+            return fields
+        return json.JSONEncoder.default(self, obj)
+
+@app.task(name='tasks.generateDescription')
+def generateDescription(leaderboard_id: int, image: str, story: Optional[str], model_name: str="gpt-4o-mini"):
+    db=database.SessionLocal()
+
     contents = sentence.generateSentence(
         base64_image=image,
         story=story
@@ -35,72 +63,43 @@ def generateDescription(db: Session, leaderboard_id: int, image: str, story: Opt
         difficulty_level=len(contents)
     )
 
-    return db_descriptions
+    output = [
+        json.dumps(db_descriptions, cls=AlchemyEncoder)
+        for db_description in db_descriptions
+    ]
+
+    return output
 
 def check_factors_done(
-    db: Session,
-    en_nlp,
-    perplexity_model,
-    tokenizer,
-    generation: schemas.GenerationCompleteCreate,
-    descriptions: list
+    generation_id: int,
 ):
-    db_generation = crud.get_generation(db, generation_id=generation.id)
-
-    if db_generation.total_score==0:
-        if (not db_generation.n_words) or (not db_generation.n_clauses):
-            update_n_words(db=db, en_nlp=en_nlp, generation=generation)
-        # if (not db_generation.f_word) or (not db_generation.f_bigram):
-        #     update_frequency_word(db=db, en_nlp=en_nlp, generation=generation)
-        if not db_generation.perplexity:
-            update_perplexity(db=db, en_nlp=en_nlp, perplexity_model=perplexity_model, tokenizer=tokenizer, generation=generation, descriptions=descriptions)
-        if not db_generation.content_score:
-            update_content_score(db=db, generation=generation)
-        
-    return
+    db=database.SessionLocal()
+    celery_tasks = crud.get_tasks(db, generation_id=generation_id)
+    output = []
+    for t in celery_tasks:
+        result = app.AsyncResult(t.task_id)
+        output.append(
+            schemas.TaskStatus(
+                id=t.task_id,
+                status=result.status,
+                result=result.result
+            )
+        )
+        if result.status == "SUCCESS":
+            crud.delete_task(t.task_id)
+    
+    return output
 
 
 def calculate_score(
-    db: Session,
-    en_nlp,
-    perplexity_model,
-    tokenizer,
     generation: schemas.GenerationCompleteCreate,
     is_completed: bool=False, 
 ):
-    
+    db=database.SessionLocal()
     db_generation = crud.get_generation(db, generation_id=generation.id)
     if db_generation is None:
         raise HTTPException(status_code=404, detail="Generation not found")
     db_round = crud.get_round(db, round_id=db_generation.round_id)
-    ai_play = crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
-
-    if not ai_play:
-        if db_round.leaderboard.story:
-            story=db_round.leaderboard.story.content
-        elif db_round.leaderboard.story_extract:
-            story=db_round.leaderboard.story_extract
-        else:
-            story=None
-        
-        ai_play = generateDescription(
-            db=db,
-            leaderboard_id=db_round.leaderboard_id, 
-            image=str(db_round.leaderboard.original_image.image), 
-            story=story, 
-            model_name="gpt-4o-mini"
-        )
-    
-    descriptions = [d.content for d in ai_play]
-
-    check_factors_done(
-        db=db,
-        en_nlp=en_nlp,
-        perplexity_model=perplexity_model,
-        tokenizer=tokenizer,
-        generation=generation, 
-        descriptions=descriptions
-    )
 
     if is_completed:
         generation_aware = generation.at.replace(tzinfo=timezone.utc)
@@ -109,8 +108,6 @@ def calculate_score(
     else: 
         duration = 0
 
-    grammar_spelling = score.grammar_spelling_errors(db_generation.sentence, en_nlp=en_nlp)
-
     factors = {
         'n_words': db_generation.n_words,
         'n_conjunctions': db_generation.n_conjunctions,
@@ -118,10 +115,10 @@ def calculate_score(
         'n_adv': db_generation.n_adv,
         'n_pronouns': db_generation.n_pronouns,
         'n_prepositions': db_generation.n_prepositions,
-        'n_grammar_errors': grammar_spelling['n_grammar_errors'],
-        'grammar_errors': grammar_spelling['grammar_error'],
-        'n_spelling_errors': grammar_spelling['n_spelling_errors'],
-        'spelling_errors': grammar_spelling['spelling_error'],
+        'n_grammar_errors': db_generation.n_grammar_errors,
+        'grammar_errors': db_generation.grammar_errors,
+        'n_spelling_errors': db_generation.n_spelling_errors,
+        'spelling_errors': db_generation.spelling_errors,
         'perplexity': db_generation.perplexity,
         'f_word': db_generation.f_word,
         'f_bigram': db_generation.f_bigram,
@@ -138,8 +135,6 @@ def calculate_score(
 
     generation_com = schemas.GenerationComplete(
         id=db_generation.id,
-        n_grammar_errors=grammar_spelling['n_grammar_errors'],
-        n_spelling_errors=grammar_spelling['n_spelling_errors'],
         total_score=scores['total_score'],
         rank=score.rank(scores['total_score']),
         duration=duration,
@@ -153,11 +148,12 @@ def calculate_score(
 
     return factors, scores
 
+@app.task(name='tasks.update_vocab_used_time')
 def update_vocab_used_time(
-        db: Session,
         sentence: str,
         user_id: int,
 ):
+    db=database.SessionLocal()
     updated_vocab = []
     doc = dictionary.get_sentence_nlp(sentence)
     for token in doc:
@@ -183,13 +179,19 @@ def update_vocab_used_time(
                         )
                     )
                 )
-    return updated_vocab
 
+    output = [
+        json.dumps(db_vocab, cls=AlchemyEncoder)
+        for db_vocab in updated_vocab
+    ]
+    return output
+
+@app.task(name='tasks.update_n_words')
 def update_n_words(
-    db: Session,
     en_nlp,
     generation: schemas.GenerationCompleteCreate,
 ):
+   db=database.SessionLocal()
    t = computing_time_tracker("Update n_words")
    db_generation = crud.get_generation(db, generation_id=generation.id)
 
@@ -217,11 +219,12 @@ def update_n_words(
    t.stop_timer()
    return
 
+@app.task(name='tasks.update_grammar_spelling')
 def update_grammar_spelling(
-        db: Session,
         generation: schemas.GenerationCompleteCreate,
         en_nlp
 ):
+    db=database.SessionLocal()
     t = computing_time_tracker("Update grammar spelling")
     db_generation = crud.get_generation(db, generation_id=generation.id)
 
@@ -231,6 +234,8 @@ def update_grammar_spelling(
         db=db,
         generation=schemas.GenerationComplete(
             id=db_generation.id,
+            grammar_errors=str(factors['grammar_error']),
+            spelling_errors=str(factors['spelling_error']),
             n_grammar_errors=factors['n_grammar_errors'],
             n_spelling_errors=factors['n_spelling_errors'],
             is_completed=False
@@ -239,11 +244,12 @@ def update_grammar_spelling(
     t.stop_timer()
     return
 
+@app.task(name='tasks.update_frequency_word')
 def update_frequency_word(
-        db: Session,
         en_nlp,
         generation: schemas.GenerationCompleteCreate,
 ):
+    db=database.SessionLocal()
     t = computing_time_tracker("Update frequency word")
     db_generation = crud.get_generation(db, generation_id=generation.id)
 
@@ -264,14 +270,15 @@ def update_frequency_word(
     t.stop_timer()
     return
 
+@app.task(name='tasks.update_perplexity')
 def update_perplexity(
-        db: Session,
         en_nlp,
         perplexity_model,
         tokenizer,
         generation: schemas.GenerationCompleteCreate,
-        descriptions: list
+        descriptions: list[str]
 ):
+    db=database.SessionLocal()
     t = computing_time_tracker("Update perplexity")
     db_generation = crud.get_generation(db, generation_id=generation.id)
     doc = en_nlp(db_generation.sentence)
@@ -299,10 +306,11 @@ def update_perplexity(
     t.stop_timer()
     return
 
+@app.task(name='tasks.update_content_score')
 def update_content_score(
-    db: Session,
     generation: schemas.GenerationCompleteCreate,
 ):
+    db=database.SessionLocal()
     t = computing_time_tracker("Update content score")
 
     db_generation = crud.get_generation(db, generation_id=generation.id)

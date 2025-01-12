@@ -66,20 +66,10 @@ services:
     container_name: backend
     build:
       context: backend-project
-      dockerfile: Dockerfile
+      dockerfile: server.dockerfile
     volumes:
       - ./backend-project/backend:/backend
     command: "fastapi dev --host 0.0.0.0 --port 8000 /backend/main.py"
-    # command: >
-    #   sh -c "
-    #     echo 'Waiting for database to be ready...'
-    #     while ! nc -z db 3306; do
-    #       sleep 1
-    #     done
-    #     echo 'Database is ready!'
-    #     ls
-    #     fastapi dev --host 0.0.0.0 --port 8000 /backend/main.py
-    #   " 
     ports:
       - "7871:8000"
     tty: true
@@ -89,11 +79,65 @@ services:
       timeout: 30s
       retries: 5
       start_period: 90s
+    depends_on:
+      - db
+      - worker
+      - dashboard
+    environment:
+      APP_MODULE: backend.main:app
+      PORT: 7871
     networks:
       - avery-network
+
+  worker:
+    build: 
+      context: backend-project
+      dockerfile: worker.dockerfile
+    container_name: worker
     depends_on:
-      db:
-        condition: service_healthy
+      - redis
+    volumes:
+      - ./backend-project/backend:/backend
+    command:
+      - celery
+      - --app=sql_app.tasks.app
+      - worker
+      - --loglevel=info
+    env_file:
+      - backend-project/.env
+    environment:
+      APP_MODULE: backend.main:app
+      PORT: 7871
+    networks:
+      - avery-network
+
+  dashboard:
+    image: mher/flower:0.9.7
+    container_name: dashboard
+    command: ['flower', '--broker=redis://redis:7876', '--port=7877']
+    ports:
+      - "7877:7877"
+    depends_on:
+      - redis
+    env_file:
+      - backend-project/.env
+    environment:
+      APP_MODULE: backend.main:app
+      PORT: 7871
+    networks:
+      - avery-network
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    command: redis-server --port 7876
+    ports:
+      - 7876:7876
+    environment:
+      APP_MODULE: backend.main:app
+      PORT: 7871
+    networks:
+      - avery-network
 
   blip2-project:
     container_name: blip2

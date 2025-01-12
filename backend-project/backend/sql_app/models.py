@@ -144,6 +144,9 @@ class Generation(Base):
     n_pronouns = Column(Integer, default=0,nullable=True)
     n_prepositions = Column(Integer, default=0,nullable=True)
 
+    grammar_errors = Column(MEDIUMTEXT, nullable=True)
+    spelling_errors = Column(MEDIUMTEXT, nullable=True)
+
     n_grammar_errors = Column(Integer, default=0,nullable=True)
     n_spelling_errors = Column(Integer, default=0,nullable=True)
 
@@ -285,3 +288,11 @@ class School_Leaderboard(Base):
     id = Column(Integer, primary_key=True)
     school = Column(String(100))
     leaderboard_id = Column(Integer, ForeignKey("leaderboards.id"))
+
+class Task(Base):
+    __tablename__ = "tasks"
+
+    id = Column(String(100), primary_key=True)
+    generation_id = Column(Integer, ForeignKey("generations.id"), nullable=True)
+    
+    leaderboard_id = Column(Integer, ForeignKey("leaderboards.id"), nullable=True)

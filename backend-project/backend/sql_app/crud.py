@@ -833,3 +833,30 @@ def create_goodround(db: Session, user_id: int, round_id: int):
     db.refresh(db_goodround)
     return db_goodround
 
+def create_task(db: Session, task: schemas.Task):
+    db_task = models.Task(
+        id = task.id,
+        generation_id = task.generation_id,
+    )
+    db.add(db_task)
+    db.commit()
+    db.refresh(db_task)
+    return db_task
+
+def get_task(db: Session, task_id: int):
+    return db.query(models.Task).filter(models.Task.id == task_id).first()
+
+def get_tasks(db: Session, generation_id: Optional[int] = None, leaderboard_id: Optional[int] = None):
+    if generation_id:
+        return db.query(models.Task).filter(models.Task.generation_id == generation_id).all()
+    elif leaderboard_id:
+        return db.query(models.Task).filter(models.Task.leaderboard_id == leaderboard_id).all()
+    else:
+        return db.query(models.Task).all()
+    
+def delete_task(db: Session, task_id: int):
+    db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if db_task:
+        db.delete(db_task)
+        db.commit()
+    return db_task
