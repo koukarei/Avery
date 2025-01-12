@@ -1,10 +1,17 @@
-FROM python:3.10
+FROM python:3.10.11
+USER root
 
-WORKDIR /app
+RUN mkdir /backend
+WORKDIR /backend
+COPY requirements.txt ./
 
-# Copy your requirements file
-COPY requirements.txt .
+RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
+RUN pip install --upgrade stanza torch transformers
 
-# Copy the entire backend directory
-COPY . .
+# Install OpenJDK-11
+RUN apt-get update && \
+    apt-get install -y openjdk-11-jdk && \
+    apt-get install -y ant && \
+    apt-get clean
+    
