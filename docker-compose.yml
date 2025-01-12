@@ -103,6 +103,8 @@ services:
       - --app=sql_app.tasks.app
       - worker
       - --loglevel=info
+      - --pool=gevent
+      - --concurrency=500
     env_file:
       - backend-project/.env
     environment:

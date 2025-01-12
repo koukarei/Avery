@@ -22,21 +22,6 @@ from contextlib import asynccontextmanager
 import logging
 
 models.Base.metadata.create_all(bind=engine)
-nlp_models = {}
-
-def model_load():
-    util.logger1.info("Loading models: stanza, GPT-2")
-    en_nlp = stanza.Pipeline('en', processors='tokenize,pos,constituency', package='default_accurate')
-    from transformers import GPT2Tokenizer, GPT2LMHeadModel
-    tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-    perplexity_model = GPT2LMHeadModel.from_pretrained("gpt2")
-    perplexity_model.eval()
-    if torch.cuda.is_available():
-        perplexity_model.to('cuda')
-    return en_nlp, tokenizer, perplexity_model
-
-nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = model_load()
-
 # Define the directory where the images will be stored
 media_dir = Path(os.getenv("MEDIA_DIR", "/static"))
 media_dir.mkdir(parents=True, exist_ok=True)
@@ -49,26 +34,26 @@ def get_db():
     finally:
         db.close()
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await util.logger1.info("Starting up")
-    try:
-        # Download the English model for stanza
-        stanza.download('en')
-        nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = await model_load()
-        util.logger1.info("Models loaded successfully")
-        yield
-    except Exception as e:
-        print(f"Error in lifespan startup: {e}")
-        raise
-    finally:
-        await util.logger1.info("Shutting down")
-        await nlp_models.clear()
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     await util.logger1.info("Starting up")
+#     try:
+#         # Download the English model for stanza
+#         stanza.download('en')
+#         nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = await model_load()
+#         util.logger1.info("Models loaded successfully")
+#         yield
+#     except Exception as e:
+#         print(f"Error in lifespan startup: {e}")
+#         raise
+#     finally:
+#         await util.logger1.info("Shutting down")
+#         await nlp_models.clear()
 
 app = FastAPI(
     debug=True,
     title="AVERY",
-    lifespan=lifespan,
+    # lifespan=lifespan,
 )
 
 @app.get("/")
@@ -80,7 +65,7 @@ def check_status(
     task_id: str, 
     db: Session = Depends(get_db)
 ):
-    result = tasks.celery.AsyncResult(task_id)
+    result = tasks.app.AsyncResult(task_id)
     status = schemas.TaskStatus(
         id=task_id,
         status=result.status,
@@ -104,7 +89,7 @@ def check_leaderboard_task_status(
     celery_tasks = crud.get_tasks(db, leaderboard_id=leaderboard_id)
     output = []
     for t in celery_tasks:
-        result = tasks.celery.AsyncResult(t.task_id)
+        result = tasks.app.AsyncResult(t.task_id)
         output.append(
             schemas.TaskStatus(
                 id=t.task_id,
@@ -1034,38 +1019,32 @@ async def get_interpretation(
             # Update scores in background
             celery_tasks.append(
                 tasks.update_perplexity.delay(
-                en_nlp=nlp_models['en_nlp'],
-                perplexity_model=nlp_models['perplexity_model'],
-                tokenizer=nlp_models['tokenizer'],
-                generation=generation_complete,
+                generation=generation_complete.model_dump(),
                 descriptions=descriptions
                 )
             )
             
             celery_tasks.append(
                 tasks.update_content_score.delay(
-                    generation=generation_complete
+                    generation=generation_complete.model_dump(),
                 )
             )
 
             # celery_tasks.append(
             #     tasks.update_frequency_word.delay(
-            #         en_nlp=nlp_models['en_nlp'],
-            #         generation=generation_complete
+            #         generation=generation_complete.model_dump(),
             #     )
             # )
 
             celery_tasks.append(
                 tasks.update_n_words.delay(
-                    en_nlp=nlp_models['en_nlp'],
-                    generation=generation_complete
+                    generation=generation_complete.model_dump(),
                 )
             )
 
             celery_tasks.append(
                 tasks.update_grammar_spelling.delay(
-                    en_nlp=nlp_models['en_nlp'],
-                    generation=generation_complete
+                    generation=generation_complete.model_dump(),
                 )
             )
 
@@ -1077,7 +1056,7 @@ async def get_interpretation(
             crud.create_task(
                 db=db,
                 task=schemas.Task(
-                    task_id=t.id,
+                    id=t.id,
                     generation_id=db_generation.id,
                 )
             )
