@@ -296,6 +296,7 @@ async def create_generation(new_generation: models.GenerationStart, request: Req
         headers={"Content-Type": "application/json",
         },
         auth=get_auth(request),
+        timeout=120
     )
     response.raise_for_status()
     output = models.GenerationCorrectSentence(**response.json())
@@ -309,7 +310,7 @@ async def get_interpretation(round_id: int, interpretation: models.GenerationCor
         headers={"Content-Type": "application/json",
         },
         auth=get_auth(request),
-        timeout=90
+        timeout=120
     )
     response.raise_for_status()
     output = models.GenerationInterpretation(**response.json())
