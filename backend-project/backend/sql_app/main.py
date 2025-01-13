@@ -1119,7 +1119,6 @@ def complete_generation(
         )
         factors = [f.status == "SUCCESS" for f in factors]
         if all(factors):
-            db_generation = crud.get_generation(db, generation_id=generation.id)
             break
         time.sleep(1)
 
@@ -1127,6 +1126,8 @@ def complete_generation(
         generation=generation,
         is_completed=True,
     )
+
+    db_generation = crud.get_generation(db, generation_id=generation.id)
 
     evaluation = cb.get_result(
         sentence=db_generation.sentence,
