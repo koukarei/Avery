@@ -290,6 +290,8 @@ def delete_leaderboard(db: Session, leaderboard_id: int):
 
     db_description = db.query(models.Description).filter(models.Description.leaderboard_id == leaderboard_id).all()
 
+    db_school = db.query(models.School_Leaderboard).filter(models.School_Leaderboard.leaderboard_id == leaderboard_id).all()
+
     if db_original_images:
         for image in db_original_images:
             db.delete(image)
@@ -303,6 +305,11 @@ def delete_leaderboard(db: Session, leaderboard_id: int):
     if db_leaderboard_vocab:
         for vocab in db_leaderboard_vocab:
             db.delete(vocab)
+        db.commit()
+
+    if db_school:
+        for school in db_school:
+            db.delete(school)
         db.commit()
 
     if db_leaderboard:
