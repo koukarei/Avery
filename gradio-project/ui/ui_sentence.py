@@ -237,7 +237,6 @@ with gr.Blocks() as avery_gradio:
                 fn=submit_answer,
                 inputs=[guidance.chat, sentence.sentence, generated_time, generation_id],
                 outputs=[guidance.chat, sentence.ai_image, sentence.next_btn, sentence.ai_image, sentence.submit_btn,sentence.sentence, generated_time, generation_id],
-                queue=False
             )
 
             # gr.Examples(
