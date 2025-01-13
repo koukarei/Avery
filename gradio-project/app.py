@@ -181,6 +181,7 @@ async def lti_login(request: Request):
         else:
             response.raise_for_status()
         
+        print(token)
         request.session["school"] = school
         request.session["token"] = token.model_dump()
         request.session["username"] = username
