@@ -181,6 +181,11 @@ with gr.Blocks() as avery_gradio:
             sentence.create_sentence()
 
             async def submit_answer(chat_history: list,sentence: str, generated_time: int, generation_id: int, request: gr.Request):
+                if sentence == "":
+                    show = gr.update(visible=True)
+                    Noshow = gr.update(visible=False)
+                    return chat_history, None, Noshow, Noshow, show, show, generated_time, generation_id
+                
                 request = request.request
                 generated_time = generated_time + 1
 
