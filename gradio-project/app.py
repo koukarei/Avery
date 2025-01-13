@@ -261,7 +261,7 @@ async def resume_game(request: Request, leaderboard_id: Optional[int]=None):
     request.session["round"] = convert_json(last_round)
 
     # Check if the user has started a generation
-    if not last_round.last_generation_id:
+    if last_round.last_generation_id is None:
         request.session["generated_time"] = 0
         return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -345,38 +345,32 @@ async def redirect_to_answer(request: Request, leaderboard_id: Optional[int]=Non
 @app.get("/go_to_result/{generation_id}")
 @concurrency_control.limit_concurrency(max_concurrent=40, per_client=True)
 async def redirect_to_result(request: Request, generation_id: Optional[int]=None):
-    generated_time = request.session.get('generated_time', None)
     
-    if generation_id is None or generated_time is None:
-        if request.session.get('round', None):
-            return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
-        cur_round = await read_my_rounds(
-            request=request,
-            is_completed=False,
-            leaderboard_id=request.session.get('leaderboard_id'),
-        )
-        last_gen = await get_generation(
-            generation_id=cur_round[0].last_generation_id,
-            request=request,
-        )
-        if last_gen.interpreted_image and last_gen.correct_sentence:
-            generated_time = len(cur_round[0].generations)
-        else:
-            generated_time = len(cur_round[0].generations)-1
-            return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
-        request.session["generated_time"] = generated_time
-        request.session["generation_id"] = last_gen.id
-    else:
-        request.session["generation_id"] = generation_id
+    if request.session.get('round', None):
+        return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
     
-    cur_generation_id = request.session.get('generation_id', generation_id)
-    if cur_generation_id is None:
-        raise HTTPException(status_code=500, detail="Generation not found")
+    cur_round = await read_my_rounds(
+        request=request,
+        is_completed=False,
+        leaderboard_id=request.session.get('leaderboard_id'),
+    )
+
+    latest_gen = await get_generation(
+        generation_id=cur_round[0].last_generation_id,
+        request=request,
+    )
+    
+    generated_time = len(cur_round[0].generations)
+    if latest_gen.interpreted_image is None or latest_gen.correct_sentence is None:
+        generated_time = len(cur_round[0].generations)-1
+        return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
+    request.session["generated_time"] = generated_time
+    request.session["generation_id"] = latest_gen.id
 
     output = await complete_generation(
         round_id=request.session.get('round')['id'],
         generation=models.GenerationCompleteCreate(
-            id=cur_generation_id,
+            id=latest_gen.id,
             at=datetime.datetime.now(datetime.timezone.utc),
         ),
         request=request,
