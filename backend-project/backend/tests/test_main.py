@@ -155,7 +155,7 @@ class TestAdmin:
         ]
 
         for program in programs:
-            response = client.post("/sqlapp/scene/", json=program.copy(),headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"})
+            response = client.post("/sqlapp/program", json=program.copy(),headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"})
             assert response.status_code == 200, response.json()
 
     def test_read_stories(self):
