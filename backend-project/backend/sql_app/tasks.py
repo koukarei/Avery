@@ -116,11 +116,11 @@ def check_factors_done(
 
 
 def calculate_score(
+    db: Session,
     generation: schemas.GenerationCompleteCreate,
     is_completed: bool=False, 
 ):
     try:
-        db=database.SessionLocal()
         db_generation = crud.get_generation(db, generation_id=generation.id)
         if db_generation is None:
             raise HTTPException(status_code=404, detail="Generation not found")
@@ -174,8 +174,6 @@ def calculate_score(
         return factors, scores
     except Exception as e:
         print(f"Calculate score error: {e}")
-    finally:
-        db.close()
 
 @app.task(name='tasks.update_vocab_used_time')
 def update_vocab_used_time(

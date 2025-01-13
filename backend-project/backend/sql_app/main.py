@@ -1123,6 +1123,7 @@ def complete_generation(
         time.sleep(1)
 
     factors, scores_dict = tasks.calculate_score(
+        db=db,
         generation=generation,
         is_completed=True,
     )
