@@ -346,7 +346,7 @@ async def redirect_to_answer(request: Request, leaderboard_id: Optional[int]=Non
 @concurrency_control.limit_concurrency(max_concurrent=40, per_client=True)
 async def redirect_to_result(request: Request, generation_id: Optional[int]=None):
     
-    if request.session.get('round', None):
+    if request.session.get('leaderboard_id', None) is None:
         return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
     
     cur_round = await read_my_rounds(
@@ -355,6 +355,9 @@ async def redirect_to_result(request: Request, generation_id: Optional[int]=None
         leaderboard_id=request.session.get('leaderboard_id'),
     )
 
+    if cur_round is None:
+        return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
+    
     latest_gen = await get_generation(
         generation_id=cur_round[0].last_generation_id,
         request=request,
