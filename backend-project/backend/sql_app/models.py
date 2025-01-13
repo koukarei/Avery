@@ -15,7 +15,7 @@ class User(Base):
     lti_user_id = Column(Integer, nullable=True)
     lti_username = Column(String(100), nullable=True)
     school = Column(String(100), nullable=True)
-    email = Column(String(255), unique=True, index=True)
+    email = Column(String(255), index=True)
     username = Column(String(100), unique=True, index=True)
     hashed_password = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True)

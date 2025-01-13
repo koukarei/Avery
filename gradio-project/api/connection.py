@@ -132,7 +132,7 @@ async def get_access_token_from_backend_lti(
         token = models.Token(**response.json())  
         return token
     except httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=e.response.status_code)
+        raise HTTPException(status_code=e.response.status_code, detail=e.response.json())
 
 def get_auth(request: Request):
     if hasattr(request, "session") and "token" in request.session:
