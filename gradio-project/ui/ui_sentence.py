@@ -163,7 +163,6 @@ with gr.Blocks() as avery_gradio:
                   fn=ask_hint,
                   inputs=[guidance.msg, guidance.chat],
                   outputs=[guidance.msg, guidance.chat],
-                  queue=False
             )
 
             # gr.Examples(

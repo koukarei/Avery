@@ -171,7 +171,6 @@ with gr.Blocks() as avery_gradio:
                     fn=ask_hint,
                     inputs=[guidance.msg, guidance.chat],
                     outputs=[guidance.msg, guidance.chat],
-                    queue=False
             )
 
         with gr.Column(scale=2):
