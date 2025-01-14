@@ -319,7 +319,7 @@ async def get_interpretation(round_id: int, interpretation: models.GenerationCor
     # wait for interpretation to finish
     timeout = time.time() + 120
     while True:
-        time.sleep(10)
+        time.sleep(5)
         if time.time() > timeout:
             raise HTTPException(status_code=500, detail="Interpretation took too long")
         response = await http_client.get(
