@@ -1117,7 +1117,40 @@ def complete_generation(
         factors = tasks.check_factors_done(
             generation_id=generation.id
         )
+
+        if factors is None or len(factors) == 0:
+            if db_generation.updated_n_words and \
+                db_generation.updated_grammar_errors and \
+                db_generation.updated_perplexity and \
+                db_generation.updated_content_score:
+                break
+
+            if not db_generation.updated_n_words:
+                tasks.update_n_words.delay(
+                    generation=generation.model_dump(),
+                )
+            if not db_generation.updated_grammar_errors:
+                tasks.update_grammar_spelling.delay(
+                    generation=generation.model_dump(),
+                )
+            if not db_generation.updated_perplexity:
+                tasks.update_perplexity.delay(
+                    generation=generation.model_dump(),
+                    descriptions=[
+                        des.content 
+                        for des 
+                        in crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
+                    ]
+                )
+            if not db_generation.updated_content_score:
+                tasks.update_content_score.delay(
+                    generation=generation.model_dump(),
+                )
+                
+            break
+
         factors = [f.status == "SUCCESS" for f in factors]
+
         if all(factors):
             break
         time.sleep(1)

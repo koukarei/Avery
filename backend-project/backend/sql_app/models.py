@@ -163,6 +163,12 @@ class Generation(Base):
     rank = Column(String(1), default='F',nullable=True)
     generated_time = Column(Integer, default=1,nullable=True)
 
+    updated_n_words = Column(Boolean, default=False)
+    updated_grammar_errors = Column(Boolean, default=False)
+    updated_perplexity = Column(Boolean, default=False)
+    updated_f_word = Column(Boolean, default=False)
+    updated_content_score = Column(Boolean, default=False)
+
     created_at = Column(DateTime, default=datetime.datetime.now())
     duration = Column(Integer, default=0,nullable=True)
 

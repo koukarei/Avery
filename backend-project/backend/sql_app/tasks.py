@@ -249,7 +249,8 @@ def update_n_words(
                 n_pronouns=factors['n_pronouns'],
                 n_prepositions=factors['n_prepositions'],
                 n_clauses=factors['n_clauses'],
-                is_completed=False
+                is_completed=False,
+                updated_n_words=True
             )
         )
         t.stop_timer()
@@ -282,7 +283,8 @@ def update_grammar_spelling(
                 spelling_errors=str(factors['spelling_error']),
                 n_grammar_errors=factors['n_grammar_errors'],
                 n_spelling_errors=factors['n_spelling_errors'],
-                is_completed=False
+                is_completed=False,
+                updated_grammar_errors=True
             )
         )
         t.stop_timer()
@@ -315,7 +317,8 @@ def update_frequency_word(
                 id=db_generation.id,
                 f_word=factors['f_word'],
                 f_bigram=factors['f_bigram'],
-                is_completed=False
+                is_completed=False,
+                updated_f_word=True
             )
         )
 
@@ -360,7 +363,8 @@ def update_perplexity(
             generation=schemas.GenerationComplete(
                 id=db_generation.id,
                 perplexity=factors['perplexity'],
-                is_completed=False
+                is_completed=False,
+                updated_perplexity=True
             )
         )
 
@@ -396,7 +400,8 @@ def update_content_score(
             generation=schemas.GenerationComplete(
                 id=db_generation.id,
                 content_score=factors['content_score'],
-                is_completed=False
+                is_completed=False,
+                updated_content_score=True
             )
         )
         t.stop_timer()
