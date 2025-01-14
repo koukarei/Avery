@@ -107,6 +107,8 @@ def check_factors_done(
             )
             if result.status == "SUCCESS":
                 crud.delete_task(db, t.id)
+            elif result.date_created < (time.time() - 600):
+                app.control.revoke(t.id, terminate=True)
         
         return output
     except Exception as e:
