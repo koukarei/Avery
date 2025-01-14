@@ -201,12 +201,12 @@ with gr.Blocks() as avery_gradio:
                 if output:
                     
                     show = gr.update(visible=True)
-                    output = await get_interpretation(
+                    
+                    await get_interpretation(
                         round_id=cur_round['id'],
                         interpretation=output,
                         request=request,
                     )
-                    
                     ai_image = await get_interpreted_image(
                         generation_id=generation_id,
                         request=request

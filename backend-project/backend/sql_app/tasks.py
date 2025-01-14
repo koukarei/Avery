@@ -1,16 +1,16 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.declarative import DeclarativeMeta
-from .dependencies import sentence, score, dictionary
+from .dependencies import sentence, score, dictionary, gen_image
 from . import crud, schemas, database
 from typing import Union, List, Annotated, Optional
 from fastapi import HTTPException
 from datetime import timezone
-from .dependencies.util import computing_time_tracker
+from .dependencies.util import computing_time_tracker, encode_image
 from .database import SessionLocal, engine
 
 import torch, stanza
 
-import os, time, json
+import os, time, json, io, requests
 from celery import Celery
 
 app = Celery(__name__)
@@ -91,9 +91,28 @@ def generateDescription(leaderboard_id: int, image: str, story: Optional[str], m
 
 def check_factors_done(
     generation_id: int,
+    delete_tasks: bool=False
 ):
     try:
         db=database.SessionLocal()
+
+        db_generation = crud.get_generation(db, generation_id=generation_id)
+        if db_generation is None:
+            raise HTTPException(status_code=404, detail="Generation not found")
+        if all([
+            db_generation.updated_n_words,
+            db_generation.updated_grammar_errors,
+            db_generation.updated_perplexity,
+            db_generation.updated_content_score
+        ]):
+            celery_tasks = crud.get_tasks(db, generation_id=generation_id)
+            for t in celery_tasks:
+                crud.delete_task(db, t.id)
+            return {
+                "status": "FINISHED",
+                "tasks": []
+            }
+
         celery_tasks = crud.get_tasks(db, generation_id=generation_id)
         output = []
         for t in celery_tasks:
@@ -107,10 +126,14 @@ def check_factors_done(
             )
             if result.status == "SUCCESS":
                 crud.delete_task(db, t.id)
-            elif result.date_created < (time.time() - 600):
+            elif delete_tasks:
                 app.control.revoke(t.id, terminate=True)
+                crud.delete_task(db, t.id)
         
-        return output
+        return {
+            "status": "PENDING",
+            "tasks": output
+        }
     except Exception as e:
         print(f"Check factors done error: {e}")
     finally:
@@ -410,5 +433,45 @@ def update_content_score(
         return output
     except Exception as e:
         print(f"Update content score error: {e}")
+    finally:
+        db.close()
+
+@app.task(name='tasks.generate_interpretation')
+def generate_interpretation(
+    generation_id: int,
+    sentence: str,
+):
+    try:
+        db=database.SessionLocal()
+        t = computing_time_tracker("Generate interpretation")
+        url = gen_image.generate_interpretion(sentence)
+        t.stop_timer()
+
+        # Download and save image
+        try:
+            b_interpreted_image = io.BytesIO(requests.get(url).content)
+            image = encode_image(image_file=b_interpreted_image)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid image file: {str(e)}")
+        
+        # Database operations
+        db_interpreted_image = crud.create_interpreted_image(
+            db=db,
+            image=schemas.ImageBase(
+                image=image,
+            )
+        )
+
+        db_generation = crud.update_generation2(
+            db=db,
+            generation=schemas.GenerationInterpretation(
+                id=generation_id,
+                interpreted_image_id=db_interpreted_image.id,
+            )
+        )
+
+        return db_generation.id
+    except Exception as e:
+        print(f"Generate interpretation error: {e}")
     finally:
         db.close()

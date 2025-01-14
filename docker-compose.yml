@@ -137,7 +137,6 @@ services:
     - --port 7876
     - --maxmemory 32gb
     - --maxmemory-policy allkeys-lfu
-    - --expire 1800
     ports:
       - 7876:7876
     environment:

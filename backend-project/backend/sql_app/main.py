@@ -34,21 +34,24 @@ def get_db():
     finally:
         db.close()
 
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     await util.logger1.info("Starting up")
-#     try:
-#         # Download the English model for stanza
-#         stanza.download('en')
-#         nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = await model_load()
-#         util.logger1.info("Models loaded successfully")
-#         yield
-#     except Exception as e:
-#         print(f"Error in lifespan startup: {e}")
-#         raise
-#     finally:
-#         await util.logger1.info("Shutting down")
-#         await nlp_models.clear()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await util.logger1.info("Starting up")
+    try:
+        # # Download the English model for stanza
+        # stanza.download('en')
+        # nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = await model_load()
+        # util.logger1.info("Models loaded successfully")
+        util.logger1.info("Startup complete")
+        yield
+    except Exception as e:
+        print(f"Error in lifespan startup: {e}")
+        raise
+    finally:
+        await util.logger1.info("Shutting down")
+        # await nlp_models.clear()
+        with get_db() as db:
+            await crud.delete_all_tasks(db=db)
 
 app = FastAPI(
     debug=True,
@@ -59,6 +62,12 @@ app = FastAPI(
 @app.get("/")
 def hello_world():
     return {"message": "Hello World"}
+
+@app.get("/tasks", tags=["Task"], response_model=list[schemas.Task])
+def read_tasks(
+    db: Session = Depends(get_db),
+):
+    return crud.get_all_tasks(db)
 
 @app.get("/tasks/{task_id}", tags=["Task"], response_model=schemas.TaskStatus)
 def check_status(
@@ -75,7 +84,7 @@ def check_status(
         crud.delete_task(db, task_id)
     return status
 
-@app.get("/tasks/generation/{generation_id}", tags=["Task"], response_model=list[schemas.TaskStatus])
+@app.get("/tasks/generation/{generation_id}", tags=["Task"], response_model=schemas.TasksOut)
 def check_generation_task_status(
     generation_id: int, 
 ):
@@ -944,7 +953,7 @@ def get_user_answer(
         )
     raise HTTPException(status_code=400, detail="Invalid sentence")
 
-@app.put("/round/{round_id}/interpretation", tags=["Round"], response_model=schemas.GenerationInterpretation)
+@app.put("/round/{round_id}/interpretation", tags=["Round"], response_model=schemas.IdOnly)
 async def get_interpretation(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     round_id: int,
@@ -960,33 +969,12 @@ async def get_interpretation(
     db_generation = crud.get_generation(db, generation_id=generation.id)
 
     try:
-        # Image generation
-        gen_img_tracker = util.computing_time_tracker(message="Image generation started - DALLE 3")
-        interpreted_image_url = gen_image.generate_interpretion(
-            sentence=db_generation.sentence,
-        )
-        gen_img_tracker.stop_timer()
+        celery_tasks = []
 
-        # Download and save image
-        try:
-            b_interpreted_image = io.BytesIO(requests.get(interpreted_image_url).content)
-            image = util.encode_image(image_file=b_interpreted_image)
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Invalid image file: {str(e)}")
-        
-        # Database operations
-        db_interpreted_image = crud.create_interpreted_image(
-            db=db,
-            image=schemas.ImageBase(
-                image=image,
-            )
-        )
-
-        db_generation = crud.update_generation2(
-            db=db,
-            generation=schemas.GenerationInterpretation(
-                id=generation.id,
-                interpreted_image_id=db_interpreted_image.id,
+        celery_tasks.append(
+            tasks.generate_interpretation.delay(
+                generation_id=generation.id,
+                sentence=db_generation.sentence,
             )
         )
 
@@ -996,23 +984,22 @@ async def get_interpretation(
         )
 
         # Check if description generation is done
-        celery_tasks = check_leaderboard_task_status(
+        leaderboard_tasks = check_leaderboard_task_status(
             db=db,
             leaderboard_id=db_round.leaderboard_id,
         )
-        if celery_tasks:
+        
+        if leaderboard_tasks:
             while not all([t.status == "SUCCESS" for t in celery_tasks]):
                 time.sleep(1)
-                celery_tasks = check_leaderboard_task_status(
+                leaderboard_tasks = check_leaderboard_task_status(
                     db=db,
                     leaderboard_id=db_round.leaderboard_id,
                 )
 
         # Get descriptions
         descriptions =  crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
-        descriptions = [des.content for des in descriptions]
-
-        celery_tasks = []
+        descriptions = [des.content for des in descriptions]        
 
         # Safe background task addition with error handling
         try:
@@ -1111,20 +1098,23 @@ def complete_generation(
 
     # Check if the score calculation is done
     timeout = time.time() + 60
+    counter=0
     while True:
+        counter+=1
         if time.time() > timeout:
+            factors = tasks.check_factors_done(
+                generation_id=generation.id,
+                delete_tasks=True
+            )
             raise HTTPException(status_code=500, detail="The calculation took time. Please try again.")
+
         factors = tasks.check_factors_done(
             generation_id=generation.id
         )
+        if factors["status"] == "FINISHED":
+            break
 
-        if factors is None or len(factors) == 0:
-            if db_generation.updated_n_words and \
-                db_generation.updated_grammar_errors and \
-                db_generation.updated_perplexity and \
-                db_generation.updated_content_score:
-                break
-
+        if factors['status'] == "PENDING" and (factors['tasks'] is None or len(factors['tasks']) == 0):
             if not db_generation.updated_n_words:
                 tasks.update_n_words.delay(
                     generation=generation.model_dump(),
@@ -1146,13 +1136,11 @@ def complete_generation(
                 tasks.update_content_score.delay(
                     generation=generation.model_dump(),
                 )
-                
-            break
 
-        factors = [f.status == "SUCCESS" for f in factors]
-
-        if all(factors):
-            break
+            factors = tasks.check_factors_done(
+                generation_id=generation.id
+            )
+            
         time.sleep(1)
 
     factors, scores_dict = tasks.calculate_score(

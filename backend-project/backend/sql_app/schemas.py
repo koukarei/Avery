@@ -8,6 +8,10 @@ class TaskStatus(BaseModel):
     status: Optional[str]
     result: Optional[Any]
 
+class TasksOut(BaseModel):
+    status: str
+    tasks: List[TaskStatus]
+
 class ImageBase(BaseModel):
     image: str
 
@@ -232,26 +236,26 @@ class GenerationComplete(BaseModel):
     n_adv: Optional[int] = None
     n_pronouns: Optional[int] = None
     n_prepositions: Optional[int] = None
-    updated_n_words: Optional[bool] = False
+    updated_n_words: Optional[bool] = None
 
     grammar_errors: Optional[str] = None
     spelling_errors: Optional[str] = None
 
     n_grammar_errors: Optional[int] = None
     n_spelling_errors: Optional[int] = None
-    updated_grammar_errors: Optional[bool] = False
+    updated_grammar_errors: Optional[bool] = None
 
     perplexity: Optional[float] = None
-    updated_perplexity: Optional[bool] = False
+    updated_perplexity: Optional[bool] = None
 
     f_word: Optional[float] = None
     f_bigram: Optional[float] = None
-    updated_f_word: Optional[bool] = False
+    updated_f_word: Optional[bool] = None
 
     n_clauses: Optional[int] = None
 
     content_score: Optional[int] = None
-    updated_content_score: Optional[bool] = False
+    updated_content_score: Optional[bool] = None
 
     total_score: Optional[int] = None
     rank: Optional[str] = None

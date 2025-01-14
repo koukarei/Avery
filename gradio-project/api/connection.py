@@ -5,7 +5,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import FastAPI, Request, Depends, status, HTTPException
 from typing import Annotated, Optional
 from PIL import Image as PILImage
-import io, datetime
+import io, datetime, time
 
 from api import models
 
@@ -313,8 +313,25 @@ async def get_interpretation(round_id: int, interpretation: models.GenerationCor
         timeout=120
     )
     response.raise_for_status()
-    output = models.GenerationInterpretation(**response.json())
-    return output
+
+    generation_id = interpretation.id
+
+    # wait for interpretation to finish
+    timeout = time.time() + 120
+    while True:
+        time.sleep(10)
+        if time.time() > timeout:
+            raise HTTPException(status_code=500, detail="Interpretation took too long")
+        response = await http_client.get(
+            f"{BACKEND_URL}tasks/generation/{generation_id}",
+            timeout=120
+        )
+        response.raise_for_status()
+        output = response.json()
+        if output["status"] == "FINISHED" or len(output["tasks"])==0:
+            break
+    
+    return True
 
 async def get_interpreted_image(generation_id: int, request: Request, ):
     response = await http_client.get(

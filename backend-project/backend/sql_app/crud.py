@@ -652,6 +652,7 @@ def update_generation2(db: Session, generation: schemas.GenerationInterpretation
     return db_generation
 
 def update_generation3(db: Session, generation: schemas.GenerationComplete):
+    
     db.bulk_update_mappings(models.Generation, [generation.model_dump(exclude_none=True)])
     db.commit()
     db_generation = db.query(models.Generation).filter(models.Generation.id == generation.id).first()
@@ -867,3 +868,14 @@ def delete_task(db: Session, task_id: int):
         db.delete(db_task)
         db.commit()
     return db_task
+
+def delete_all_tasks(db: Session):
+    db_tasks = db.query(models.Task).all()
+    if db_tasks:
+        for task in db_tasks:
+            db.delete(task)
+        db.commit()
+    return db_tasks
+
+def get_all_tasks(db: Session):
+    return db.query(models.Task).all()

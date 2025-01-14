@@ -114,6 +114,7 @@ with gr.Blocks() as avery_gradio:
                     "ダッシュボード",
                     scale=0,
                     link="/avery/dashboard",
+                    visible=False,
                 )
 
                 gr.Button(
