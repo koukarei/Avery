@@ -251,9 +251,11 @@ def update_n_words(
         generation = schemas.GenerationCompleteCreate(**generation)
         en_nlp = nlp_models['en_nlp']
         db=database.SessionLocal()
-        t = computing_time_tracker("Update n_words")
         db_generation = crud.get_generation(db, generation_id=generation.id)
+        if db_generation.updated_n_words:
+            return json.dumps(db_generation, cls=AlchemyEncoder)
 
+        t = computing_time_tracker("Update n_words")
         doc = en_nlp(db_generation.sentence)
         words=[w for s in doc.sentences for w in s.words]
         factors=score.n_wordsNclauses(
@@ -293,8 +295,11 @@ def update_grammar_spelling(
         generation = schemas.GenerationCompleteCreate(**generation)
         en_nlp = nlp_models['en_nlp']
         db=database.SessionLocal()
-        t = computing_time_tracker("Update grammar spelling")
         db_generation = crud.get_generation(db, generation_id=generation.id)
+        if db_generation.updated_grammar_errors:
+            return json.dumps(db_generation, cls=AlchemyEncoder)
+        
+        t = computing_time_tracker("Update grammar spelling")
 
         factors = score.grammar_spelling_errors(db_generation.sentence, en_nlp=en_nlp)
 
@@ -327,9 +332,11 @@ def update_frequency_word(
         generation = schemas.GenerationCompleteCreate(**generation)
         en_nlp = nlp_models['en_nlp']
         db=database.SessionLocal()
-        t = computing_time_tracker("Update frequency word")
         db_generation = crud.get_generation(db, generation_id=generation.id)
+        if db_generation.updated_f_word:
+            return json.dumps(db_generation, cls=AlchemyEncoder)
 
+        t = computing_time_tracker("Update frequency word")
         doc = en_nlp(db_generation.sentence)
         words=[w for s in doc.sentences for w in s.words]
         factors = score.frequency_score(words=words)
@@ -361,11 +368,15 @@ def update_perplexity(
 ):
     try:
         generation = schemas.GenerationCompleteCreate(**generation)
+        db=database.SessionLocal()
+
+        db_generation = crud.get_generation(db, generation_id=generation.id)
+        if db_generation.updated_perplexity:
+            return json.dumps(db_generation, cls=AlchemyEncoder)
         en_nlp = nlp_models['en_nlp']
         perplexity_model = nlp_models['perplexity_model']
         tokenizer = nlp_models['tokenizer']
 
-        db=database.SessionLocal()
         t = computing_time_tracker("Update perplexity")
         db_generation = crud.get_generation(db, generation_id=generation.id)
         doc = en_nlp(db_generation.sentence)
@@ -407,9 +418,11 @@ def update_content_score(
     try:
         generation = schemas.GenerationCompleteCreate(**generation)
         db=database.SessionLocal()
+        db_generation = crud.get_generation(db, generation_id=generation.id)
+        if db_generation.updated_content_score:
+            return json.dumps(db_generation, cls=AlchemyEncoder)
         t = computing_time_tracker("Update content score")
 
-        db_generation = crud.get_generation(db, generation_id=generation.id)
 
         db_round = crud.get_round(db, round_id=db_generation.round_id)
 
