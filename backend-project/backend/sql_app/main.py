@@ -1115,6 +1115,7 @@ def complete_generation(
             break
 
         if factors['status'] == "PENDING" and (factors['tasks'] is None or len(factors['tasks']) == 0):
+            util.logger1.info(f"Generation {generation.id} has no tasks. Retrying evaluation.")
             if not db_generation.updated_n_words:
                 tasks.update_n_words.delay(
                     generation=generation.model_dump(),
@@ -1140,6 +1141,8 @@ def complete_generation(
             factors = tasks.check_factors_done(
                 generation_id=generation.id
             )
+
+            util.logger1.info(f"Retried. Generation {generation.id} has tasks: {factors['tasks']}")
             
         time.sleep(1)
 
