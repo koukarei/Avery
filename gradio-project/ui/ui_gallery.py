@@ -149,13 +149,14 @@ with gr.Blocks() as avery_gradio:
         request = request.request
         select_leaderboard = leaderboards[evt.index]
         
-        # Get the related vocabularies
-        leaderboard_vocabularies = [v.word for v in select_leaderboard.vocabularies]
-        leaderboard_vocabularies = "/ ".join(leaderboard_vocabularies)
-        if leaderboard_vocabularies:
-            leaderboard_vocabularies=f"\n\n関連単語：*{leaderboard_vocabularies}*"
-        else:
-            leaderboard_vocabularies=""
+        # # Get the related vocabularies
+        # leaderboard_vocabularies = [v.word for v in select_leaderboard.vocabularies]
+        # leaderboard_vocabularies = "/ ".join(leaderboard_vocabularies)
+        # if leaderboard_vocabularies:
+        #     leaderboard_vocabularies=f"\n\n関連単語：*{leaderboard_vocabularies}*"
+        # else:
+        #     leaderboard_vocabularies=""
+        leaderboard_vocabularies = ""
         
         info = f"## {select_leaderboard.title}{leaderboard_vocabularies}"
         if hasattr(request,"session") and isinstance(request.session, dict): 
@@ -229,12 +230,13 @@ with gr.Blocks() as avery_gradio:
         selected_round = selected_interpreted.round
         selected = selected_interpreted.generation
 
-        leaderboard_vocabularies=[v.word for v in select_leaderboard.vocabularies]
-        leaderboard_vocabularies="/ ".join(leaderboard_vocabularies)
-        if leaderboard_vocabularies:
-            leaderboard_vocabularies=f"\n\n関連単語：*{leaderboard_vocabularies}*"
-        else:
-            leaderboard_vocabularies=""
+        # leaderboard_vocabularies=[v.word for v in select_leaderboard.vocabularies]
+        # leaderboard_vocabularies="/ ".join(leaderboard_vocabularies)
+        # if leaderboard_vocabularies:
+        #     leaderboard_vocabularies=f"\n\n関連単語：*{leaderboard_vocabularies}*"
+        # else:
+        #     leaderboard_vocabularies=""
+        leaderboard_vocabularies = ""
 
         if selected:
             if hasattr(selected, 'score'):
