@@ -1099,52 +1099,59 @@ def complete_generation(
     # Check if the score calculation is done
     timeout = time.time() + 60
     counter=0
-    while True:
-        counter+=1
-        if time.time() > timeout:
-            factors = tasks.check_factors_done(
-                generation_id=generation.id,
-                delete_tasks=True
-            )
-            raise HTTPException(status_code=500, detail="The calculation took time. Please try again.")
 
-        factors = tasks.check_factors_done(
-            generation_id=generation.id
-        )
-        if factors["status"] == "FINISHED":
-            break
-
-        if factors['status'] == "PENDING" and (factors['tasks'] is None or len(factors['tasks']) == 0):
-            util.logger1.info(f"Generation {generation.id} has no tasks. Retrying evaluation.")
-            if not db_generation.updated_n_words:
-                tasks.update_n_words.delay(
-                    generation=generation.model_dump(),
+    factors = tasks.check_factors_done(
+        generation_id=generation.id
+    )
+    
+    if factors["status"] != "FINISHED":
+        while True:
+            counter+=1
+            time.sleep(10)
+            if time.time() > timeout:
+                factors = tasks.check_factors_done(
+                    generation_id=generation.id,
+                    delete_tasks=True
                 )
-            if not db_generation.updated_grammar_errors:
-                tasks.update_grammar_spelling.delay(
-                    generation=generation.model_dump(),
-                )
-            if not db_generation.updated_perplexity:
-                tasks.update_perplexity.delay(
-                    generation=generation.model_dump(),
-                    descriptions=[
-                        des.content 
-                        for des 
-                        in crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
-                    ]
-                )
-            if not db_generation.updated_content_score:
-                tasks.update_content_score.delay(
-                    generation=generation.model_dump(),
-                )
+                raise HTTPException(status_code=500, detail="The calculation took time. Please try again.")
 
             factors = tasks.check_factors_done(
                 generation_id=generation.id
             )
+            if factors["status"] == "FINISHED":
+                break
 
-            util.logger1.info(f"Retried. Generation {generation.id} has tasks: {factors['tasks']}")
-            
-        time.sleep(1)
+            if factors['status'] == "PENDING" and (factors['tasks'] is None or len(factors['tasks']) == 0):
+                util.logger1.info(f"Generation {generation.id} has no tasks. Retrying evaluation.")
+                if not db_generation.updated_n_words:
+                    tasks.update_n_words.delay(
+                        generation=generation.model_dump(),
+                    )
+                if not db_generation.updated_grammar_errors:
+                    tasks.update_grammar_spelling.delay(
+                        generation=generation.model_dump(),
+                    )
+                if not db_generation.updated_perplexity:
+                    tasks.update_perplexity.delay(
+                        generation=generation.model_dump(),
+                        descriptions=[
+                            des.content 
+                            for des 
+                            in crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
+                        ]
+                    )
+                if not db_generation.updated_content_score:
+                    tasks.update_content_score.delay(
+                        generation=generation.model_dump(),
+                    )
+
+                factors = tasks.check_factors_done(
+                    generation_id=generation.id
+                )
+
+                util.logger1.info(f"Retried. Generation {generation.id} has tasks: {factors['tasks']}")
+                
+            time.sleep(1)
 
     factors, scores_dict = tasks.calculate_score(
         db=db,
