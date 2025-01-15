@@ -1182,7 +1182,7 @@ def complete_generation(
 構造性: {structure_score} (満点3)
 内容得点: {content_score} (満点100)
 合計点: {total_score} (満点100)
-ランク: {rank}　(A-最高, B-上手, C-良い, D-普通, E-悪い, F-最悪)""". \
+ランク: {rank}　(A-最高, B-上手, C-良い, D-普通, E-もう少し, F-頑張ろう)""". \
     format(
             user_sentence=db_generation.sentence,
             correct_sentence=db_generation.correct_sentence,
@@ -1198,6 +1198,7 @@ def complete_generation(
 
         if len(db_round.generations) > 2:
             recommended_vocabs = db_round.leaderboard.vocabularies
+            recommended_vocabs = [vocab.word for vocab in recommended_vocabs]
             recommended_vocab = "\n\n**おすすめの単語**\n" + ", ".join(recommended_vocabs.word)
         else:
             recommended_vocab = ""
