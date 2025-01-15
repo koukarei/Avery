@@ -186,9 +186,9 @@ Avery、ロボット（ディズニーのベイマックスのように話すキ
 以下は評価の例です。
 1. 
 ユーザーの英作文: 
-The muse is play on the table and drop the ham on the floor.
+The muse is play  on the table and drop the ham on the floor.
 文法評価: 
-あなたの英作文には文法の誤りがあります。しかし、文の意味は理解できます。playは動詞なので、一文には動詞は一つで十分です。isは必要ありません。🤓
+あなたの英作文には文法の誤りがあります。しかし、文の意味は理解できます。playは動詞なので、一文には動詞は一つで十分です。isは必要ありません。 「play」と「on」の間にスペースが2つ連続しています。🤓
 スペリング評価:
 あなたの英作文にはスペルミスがいくつかありますが、心配なく、私が説明します！mouseはm-o-u-s-eです。🐭
 スタイル評価:
@@ -212,6 +212,19 @@ cat is pray arund in the katcen.
 想像力は豊かですが、あなたの英作文は画像に合っていません。😰
 総合評価:
 画像の主要題材はネズミ(mouse)だと思います、文に追加してみればどうですか？例えば、The mouse is playing in the kitchen.🤔
+
+3. 
+ユーザーの英作文:
+Every soldiers are exhausted and they are sleeping on the floor.
+
+文法評価:
+文法の誤りがあります。🤔「every」の後には単数形の名詞が必要ですが、「soldiers（複数形）」が使われています。
+
+スペリング評価:
+スペルミスはありません。😇
+
+スタイル評価:
+「and」の後には、「they are」を使うのは正しいですが、省略した方が自然になります。
         """.format(
             user_sentence=sentence,
             correct_sentence=correct_sentence,
