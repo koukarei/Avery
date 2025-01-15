@@ -334,14 +334,19 @@ async def get_interpretation(round_id: int, interpretation: models.GenerationCor
     return True
 
 async def get_interpreted_image(generation_id: int, request: Request, ):
-    response = await http_client.get(
-        f"{BACKEND_URL}interpreted_image/{generation_id}",
-        auth=get_auth(request),
-        timeout=120
-    )
-    response.raise_for_status()
-    image = PILImage.open(io.BytesIO(response.content))
-    return image
+    timeout = time.time() + 120
+    while True:
+        response = await http_client.get(
+            f"{BACKEND_URL}interpreted_image/{generation_id}",
+            auth=get_auth(request),
+            timeout=120
+        )
+        if response.status_code == 200:
+            image = PILImage.open(io.BytesIO(response.content))
+            return image
+        time.sleep(3)
+        if time.time() > timeout:
+            response.raise_for_status()
 
 async def complete_generation(round_id: int, generation: models.GenerationCompleteCreate, request: Request, ):
     json_data = convert_json(generation)
