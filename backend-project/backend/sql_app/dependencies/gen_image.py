@@ -26,7 +26,7 @@ def generate_interpretion(sentence):
     prompt="""
             I NEED to test how the tool works with extremely simple prompts. DO NOT add any detail, just use it AS-IS:
             Generate a image in the style of Japanese Anime for the passage below.
-            The image must not contain any text, wording or sentence.
+            Only show picture.
             passage: {passage}
             """.format(passage=sentence)
     url = gen_image(prompt)
