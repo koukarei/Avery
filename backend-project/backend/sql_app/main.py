@@ -1211,7 +1211,7 @@ def complete_generation(
         if len(db_round.generations) > 2:
             recommended_vocabs = db_round.leaderboard.vocabularies
             recommended_vocabs = [vocab.word for vocab in recommended_vocabs]
-            recommended_vocab = "\n\n**おすすめの単語**\n" + ", ".join(recommended_vocabs.word)
+            recommended_vocab = "\n\n**おすすめの単語**\n" + ", ".join(recommended_vocabs)
         else:
             recommended_vocab = ""
 
