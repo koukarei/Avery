@@ -1103,7 +1103,7 @@ def complete_generation(
     factors = tasks.check_factors_done(
         generation_id=generation.id
     )
-    
+
     if factors["status"] != "FINISHED":
         while True:
             counter+=1
@@ -1196,6 +1196,12 @@ def complete_generation(
             rank=db_generation.rank,
         )
 
+        if len(db_round.generations) > 2:
+            recommended_vocabs = db_round.leaderboard.vocabularies
+            recommended_vocab = "\n\n**おすすめの単語**\n" + ", ".join(recommended_vocabs.word)
+        else:
+            recommended_vocab = ""
+
         evaluation_message = """**文法**
 {grammar_feedback}
 **スペル**
@@ -1206,13 +1212,14 @@ def complete_generation(
 {content_feedback}
 
 **整体的なコメント**
-{overall_feedback}""". \
+{overall_feedback}{recommended_vocab}""". \
         format(
             grammar_feedback=evaluation.grammar_evaluation,
             spelling_feedback=evaluation.spelling_evaluation,
             style_feedback=evaluation.style_evaluation,
             content_feedback=evaluation.content_evaluation,
-            overall_feedback=evaluation.overall_evaluation
+            overall_feedback=evaluation.overall_evaluation,
+            recommended_vocab=recommended_vocab
         )
 
         crud.create_message(
