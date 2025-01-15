@@ -15,3 +15,5 @@ RUN apt-get update && \
     apt-get install -y ant && \
     apt-get clean
     
+# Set environment variables
+ENV TOKENIZERS_PARALLELISM false
