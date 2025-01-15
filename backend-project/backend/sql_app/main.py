@@ -932,7 +932,8 @@ def get_user_answer(
                 spelling_errors=str(spelling_mistakes),
                 n_grammar_errors=len(grammar_mistakes),
                 n_spelling_errors=len(spelling_mistakes),
-                updated_grammar_errors=True
+                updated_grammar_errors=True,
+                is_completed=False
             )
         )
         return crud.update_generation1(
