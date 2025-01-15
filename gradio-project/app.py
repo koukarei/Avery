@@ -273,9 +273,9 @@ async def resume_game(request: Request, leaderboard_id: Optional[int]=None):
 
     if last_gen:
         request.session["generation_id"] = last_gen.id
-
         # Check if the generation is completed
         if last_gen.is_completed:
+            
             generated_time = len(last_round.generations)
             request.session["generated_time"] = generated_time
 
@@ -287,8 +287,8 @@ async def resume_game(request: Request, leaderboard_id: Optional[int]=None):
                 if not output:
                     raise HTTPException(status_code=500, detail="Failed to end round")
             return RedirectResponse(url="/avery/result", status_code=status.HTTP_303_SEE_OTHER)
-        if last_gen.correct_sentence:
-            if last_gen.interpreted_image:
+        if last_gen.correct_sentence is not None:
+            if last_gen.interpreted_image is not None:
                 generated_time = len(last_round.generations)
                 request.session["generated_time"] = generated_time
                 return RedirectResponse(url=f"/avery/go_to_result/{last_gen.id}", status_code=status.HTTP_303_SEE_OTHER)
