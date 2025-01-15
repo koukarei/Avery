@@ -910,7 +910,7 @@ def get_user_answer(
         )
  
     try:
-        status, correct_sentence=sentence.checkSentence(passage=db_generation.sentence)
+        status, correct_sentence, spelling_mistakes, grammar_mistakes=sentence.checkSentence(passage=db_generation.sentence)
 
     except Exception as e:
         util.logger1.error(f"Error in get_user_answer: {str(e)}")
@@ -924,6 +924,17 @@ def get_user_answer(
     )
 
     if status == 0:
+        crud.update_generation3(
+            db=db,
+            generation=schemas.GenerationComplete(
+                id=db_generation.id,
+                grammar_errors=str(grammar_mistakes),
+                spelling_errors=str(spelling_mistakes),
+                n_grammar_errors=len(grammar_mistakes),
+                n_spelling_errors=len(spelling_mistakes),
+                updated_grammar_errors=True
+            )
+        )
         return crud.update_generation1(
             db=db,
             generation=schemas.GenerationCorrectSentence(

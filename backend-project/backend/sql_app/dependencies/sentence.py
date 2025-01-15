@@ -4,9 +4,20 @@ from pydantic import BaseModel
 class Description(BaseModel):
    details: list[str]
 
+class SpellingMistake(BaseModel):
+   word: str
+   correction: str
+
+class GrammarMistake(BaseModel):
+   extracted_text: str
+   explanation: str
+   correction: str
+
 class Passage(BaseModel):
    status: int
    corrected_passage: str
+   spelling_mistakes: list[SpellingMistake]
+   grammar_mistakes: list[GrammarMistake]
 
 
 def generateSentence(base64_image,story: str=None, model_name="gpt-4o-2024-08-06"):
@@ -118,13 +129,16 @@ Analyze a passage to determine:
 
 ## Example
 Input: "This is an exmple of bad grammar!"
-Output: `{"status": 0, "message": "This is an example of bad grammar!"}`
+Output: `{"status": 0, "message": "This is an example of bad grammar!", "spelling_mistakes": [{"word":"exmple","correction":"example"}], "grammar_mistakes": []}`
 
 Input: "Esto es un ejemplo."
-Output: `{"status": 1, "message": "ブー！英語で答えてください。"}`
+Output: `{"status": 1, "message": "ブー！英語で答えてください。", "spelling_mistakes": [], "grammar_mistakes": []}`
 
 Input: "Fuck You!"
-Output: `{"status": 2, "message": "ブー！不適切な言葉が含まれています。"}`
+Output: `{"status": 2, "message": "ブー！不適切な言葉が含まれています。", "spelling_mistakes": [], "grammar_mistakes": []}`
+       
+Input: "I am walk in a dessert"
+Output: `{"status": 0, "message": "I walk in a desert", "spelling_mistakes": [{"word":"dessert","correction":"desert"}], "grammar_mistakes": [{"extracted_text": "I am walk","explanation":"一般動詞の原形・現在形・過去形は単独で述語動詞になるので、be動詞と一緒に使うことはできません。","correction":"I walk"}]}`
 """},
       {"role": "user", "content": f"{passage}"}
     ],
@@ -134,6 +148,6 @@ Output: `{"status": 2, "message": "ブー！不適切な言葉が含まれてい
   )
   output = completion.choices[0].message.parsed
   if output:
-    return output.status, output.corrected_passage
+    return output.status, output.corrected_passage, output.spelling_mistakes, output.grammar_mistakes
   else:
      raise Exception("Sentence correction failed.")
