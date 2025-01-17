@@ -220,13 +220,14 @@ def token(request: Request):
 
 @app.get("/")
 async def redirect_page(request: Request):
-    if "token" not in request.session:
+    if "token" in request.session:
         try:
             response = await read_leaderboard(request)
             assert response.status_code == 401
         except:
             return RedirectResponse(url="/avery/logout", status_code=status.HTTP_303_SEE_OTHER)
-    return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url="/avery/logout", status_code=status.HTTP_303_SEE_OTHER)
     
 @app.get("/retry")
 async def retry(request: Request):

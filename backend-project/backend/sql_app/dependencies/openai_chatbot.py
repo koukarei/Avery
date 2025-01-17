@@ -167,7 +167,7 @@ Avery、ロボット（ディズニーのベイマックスのように話すキ
 内容得点: 画像に合っているかどうかに基づいています。満点は100点です。
 
 ### 現状
-1. ユーザー：{user_sentence}
+1. ユーザーの英作文（評価対象）：{user_sentence}
 2. 修正された英作文: {correct_sentence}
 3. 文法得点: {grammar_score}
 検出された文法の誤り: {grammar_errors}
@@ -225,6 +225,12 @@ Every soldiers are exhausted and they are sleeping on the floor.
 
 スタイル評価:
 「and」の後には、「they are」を使うのは正しいですが、省略した方が自然になります。
+
+内容評価:
+画像には兵士がいません。😅
+
+総合評価:
+文法の誤りを修正して、画像に合った内容に変更してください。😇
         """.format(
             user_sentence=sentence,
             correct_sentence=correct_sentence,

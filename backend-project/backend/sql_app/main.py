@@ -7,7 +7,9 @@ import pandas as pd
 from pathlib import Path
 from PIL import Image
 
-from . import crud, models, schemas, tasks
+from . import crud, models, schemas
+from .tasks import app as celery_app
+from .tasks import check_factors_done, generateDescription, update_vocab_used_time, generate_interpretation, update_perplexity, update_content_score, update_frequency_word, update_n_words, update_grammar_spelling, calculate_score
 from .database import SessionLocal, engine
 
 from .dependencies import sentence, gen_image, score, dictionary, openai_chatbot, util
@@ -17,7 +19,6 @@ tracemalloc.start()
 
 from typing import Tuple, List, Annotated, Optional
 from datetime import timezone, timedelta
-import torch, stanza
 from contextlib import asynccontextmanager
 import logging
 
@@ -74,7 +75,7 @@ def check_status(
     task_id: str, 
     db: Session = Depends(get_db)
 ):
-    result = tasks.app.AsyncResult(task_id)
+    result = celery_app.AsyncResult(task_id)
     status = schemas.TaskStatus(
         id=task_id,
         status=result.status,
@@ -88,7 +89,7 @@ def check_status(
 def check_generation_task_status(
     generation_id: int, 
 ):
-    return tasks.check_factors_done(generation_id)
+    return check_factors_done(generation_id)
 
 @app.get("/tasks/leaderboard/{leaderboard_id}", tags=["Task"], response_model=list[schemas.TaskStatus])
 def check_leaderboard_task_status(
@@ -98,7 +99,7 @@ def check_leaderboard_task_status(
     celery_tasks = crud.get_tasks(db, leaderboard_id=leaderboard_id)
     output = []
     for t in celery_tasks:
-        result = tasks.app.AsyncResult(t.task_id)
+        result = celery_app.AsyncResult(t.task_id)
         output.append(
             schemas.TaskStatus(
                 id=t.task_id,
@@ -458,7 +459,7 @@ def create_leaderboard(
                     vocabulary_id=vocab.id
                 )
 
-    t = tasks.generateDescription.delay(
+    t = generateDescription.delay(
         leaderboard_id=result.id, 
         image=db_original_image.image, 
         story=story, 
@@ -679,7 +680,7 @@ def create_leaderboards(
             leaderboard_list.append(db_leaderboard)
 
             # Generate description
-            t = tasks.generateDescription.delay(
+            t = generateDescription.delay(
                 leaderboard_id=db_leaderboard.id, 
                 image=img.image, 
                 story=story_extract, 
@@ -918,7 +919,7 @@ def get_user_answer(
     
     db_round = crud.get_round(db, round_id)
 
-    tasks.update_vocab_used_time.delay(
+    update_vocab_used_time.delay(
         sentence=db_generation.sentence,
         user_id=db_round.player_id
     )
@@ -984,7 +985,7 @@ async def get_interpretation(
         celery_tasks = []
 
         celery_tasks.append(
-            tasks.generate_interpretation.delay(
+            generate_interpretation.delay(
                 generation_id=generation.id,
                 sentence=db_generation.sentence,
             )
@@ -1017,32 +1018,32 @@ async def get_interpretation(
         try:
             # Update scores in background
             celery_tasks.append(
-                tasks.update_perplexity.delay(
+                update_perplexity.delay(
                 generation=generation_complete.model_dump(),
                 descriptions=descriptions
                 )
             )
             
             celery_tasks.append(
-                tasks.update_content_score.delay(
+                update_content_score.delay(
                     generation=generation_complete.model_dump(),
                 )
             )
 
             # celery_tasks.append(
-            #     tasks.update_frequency_word.delay(
+            #     update_frequency_word.delay(
             #         generation=generation_complete.model_dump(),
             #     )
             # )
 
             celery_tasks.append(
-                tasks.update_n_words.delay(
+                update_n_words.delay(
                     generation=generation_complete.model_dump(),
                 )
             )
 
             celery_tasks.append(
-                tasks.update_grammar_spelling.delay(
+                update_grammar_spelling.delay(
                     generation=generation_complete.model_dump(),
                 )
             )
@@ -1112,7 +1113,7 @@ def complete_generation(
     timeout = time.time() + 60
     counter=0
 
-    factors = tasks.check_factors_done(
+    factors = check_factors_done(
         generation_id=generation.id
     )
 
@@ -1121,13 +1122,13 @@ def complete_generation(
             counter+=1
             time.sleep(10)
             if time.time() > timeout:
-                factors = tasks.check_factors_done(
+                factors = check_factors_done(
                     generation_id=generation.id,
                     delete_tasks=True
                 )
                 raise HTTPException(status_code=500, detail="The calculation took time. Please try again.")
 
-            factors = tasks.check_factors_done(
+            factors = check_factors_done(
                 generation_id=generation.id
             )
             if factors["status"] == "FINISHED":
@@ -1136,15 +1137,15 @@ def complete_generation(
             if factors['status'] == "PENDING" and (factors['tasks'] is None or len(factors['tasks']) == 0):
                 util.logger1.info(f"Generation {generation.id} has no tasks. Retrying evaluation.")
                 if not db_generation.updated_n_words:
-                    tasks.update_n_words.delay(
+                    update_n_words.delay(
                         generation=generation.model_dump(),
                     )
                 if not db_generation.updated_grammar_errors:
-                    tasks.update_grammar_spelling.delay(
+                    update_grammar_spelling.delay(
                         generation=generation.model_dump(),
                     )
                 if not db_generation.updated_perplexity:
-                    tasks.update_perplexity.delay(
+                    update_perplexity.delay(
                         generation=generation.model_dump(),
                         descriptions=[
                             des.content 
@@ -1153,11 +1154,11 @@ def complete_generation(
                         ]
                     )
                 if not db_generation.updated_content_score:
-                    tasks.update_content_score.delay(
+                    update_content_score.delay(
                         generation=generation.model_dump(),
                     )
 
-                factors = tasks.check_factors_done(
+                factors = check_factors_done(
                     generation_id=generation.id
                 )
 
@@ -1165,7 +1166,7 @@ def complete_generation(
                 
             time.sleep(1)
 
-    factors, scores_dict = tasks.calculate_score(
+    factors, scores_dict = calculate_score(
         db=db,
         generation=generation,
         is_completed=True,
