@@ -984,12 +984,13 @@ async def get_interpretation(
     try:
         celery_tasks = []
 
-        celery_tasks.append(
-            generate_interpretation.delay(
-                generation_id=generation.id,
-                sentence=db_generation.sentence,
+        if db_generation.interpreted_image_id is None:
+            celery_tasks.append(
+                generate_interpretation.delay(
+                    generation_id=generation.id,
+                    sentence=db_generation.sentence,
+                )
             )
-        )
 
         generation_complete = schemas.GenerationCompleteCreate(
             id=generation.id,
