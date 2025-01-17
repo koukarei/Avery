@@ -57,6 +57,7 @@ class memory_tracker:
         self.logger.addHandler(self.filehandler)
         self.filehandler.setFormatter(formatter)
         self.logger.warning(f"{message} - Memory tracker started")
+        tracemalloc.start()
         self.snapshot1 = tracemalloc.take_snapshot()
 
     def get_top_stats(self, message=None):

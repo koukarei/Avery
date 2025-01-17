@@ -889,6 +889,7 @@ def get_user_answer(
     generation: schemas.GenerationCreate,
     db: Session = Depends(get_db),
 ):
+    mem_track = util.memory_tracker(message="Get user answer: {}".format(generation.sentence))
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to answer")
     db_round = crud.get_round(db, round_id)
@@ -935,6 +936,7 @@ def get_user_answer(
                 is_completed=False
             )
         )
+        mem_track.get_top_stats(message="Got user answer: {}".format(generation.sentence))
         return crud.update_generation1(
             db=db,
             generation=schemas.GenerationCorrectSentence(
@@ -962,6 +964,7 @@ def get_user_answer(
             ),
             chat_id=db_round.chat_history
         )
+    mem_track.get_top_stats(message="Got user answer: {}".format(generation.sentence))
     raise HTTPException(status_code=400, detail="Invalid sentence")
 
 @app.put("/round/{round_id}/interpretation", tags=["Round"], response_model=schemas.IdOnly)
@@ -971,6 +974,7 @@ async def get_interpretation(
     generation: schemas.GenerationCorrectSentence,
     db: Session = Depends(get_db),
 ):
+    mem_track = util.memory_tracker(message="Get interpretation: {}".format(generation.id))
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to get interpretation")
     db_round = crud.get_round(db, round_id)
@@ -1076,6 +1080,7 @@ async def get_interpretation(
             chat_id=db_round.chat_history
         )
 
+        mem_track.get_top_stats(message="Got interpretation: {}".format(generation.id))
         return db_generation
 
     except HTTPException:
@@ -1092,6 +1097,7 @@ def complete_generation(
     generation: schemas.GenerationCompleteCreate,
     db: Session = Depends(get_db),
 ):
+    mem_track = util.memory_tracker(message="Complete generation: {}".format(generation.id))
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to complete generation")
     
@@ -1268,7 +1274,7 @@ def complete_generation(
             ),
             generation_id=generation.id
         )
-
+    mem_track.get_top_stats("Completed generation: {}".format(generation.id))
     return crud.get_generation(db, generation_id=generation.id)
 
 @app.post("/round/{round_id}/end",tags=["Round"], response_model=schemas.RoundOut)
