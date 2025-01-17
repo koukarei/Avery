@@ -14,8 +14,6 @@ from .database import SessionLocal, engine
 
 from .dependencies import sentence, gen_image, score, dictionary, openai_chatbot, util
 from .authentication import authenticate_user, authenticate_user_2, create_access_token, oauth2_scheme, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, REFRESH_TOKEN_EXPIRE_MINUTES, JWTError, jwt
-import tracemalloc
-tracemalloc.start()
 
 from typing import Tuple, List, Annotated, Optional
 from datetime import timezone, timedelta

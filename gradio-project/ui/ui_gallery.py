@@ -54,7 +54,7 @@ class Gallery:
         return evt.value['image']['path']
 
 
-with gr.Blocks() as avery_gradio:
+with gr.Blocks(title="AVERY") as avery_gradio:
     
     gallery=Gallery()
 
@@ -143,6 +143,7 @@ with gr.Blocks() as avery_gradio:
         fastapi_app, 
         avery_gradio, 
         path="/leaderboards",
+
     )
 
     async def select_leaderboard_fn(evt: gr.SelectData, leaderboards, request: gr.Request):

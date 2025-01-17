@@ -1,9 +1,5 @@
 import json
 from openai import OpenAI
-from dotenv import load_dotenv
-
-# .envファイルの内容を読み込見込む
-load_dotenv()
 
 client = OpenAI()
 

@@ -69,7 +69,7 @@ def convert_history(chat_mdl: models.Chat):
 
     return output
 
-with gr.Blocks() as avery_gradio:
+with gr.Blocks(title="AVERY") as avery_gradio:
 
     app = gr.mount_gradio_app(
         fastapi_app, 
