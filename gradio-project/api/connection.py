@@ -298,8 +298,12 @@ async def create_generation(new_generation: models.GenerationStart, request: Req
         auth=get_auth(request),
         timeout=120
     )
+    if response.status_code == 400:
+        return None
     response.raise_for_status()
+    
     output = models.GenerationCorrectSentence(**response.json())
+    
     return output
 
 async def get_interpretation(round_id: int, interpretation: models.GenerationCorrectSentence, request: Request, ):

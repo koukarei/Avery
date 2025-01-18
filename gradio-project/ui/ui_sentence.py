@@ -197,9 +197,9 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                     sentence=sentence,
                 )
                 output = await create_generation(generation, request)
-                generation_id = output.id
+                
                 if output:
-                    
+                    generation_id = output.id
                     show = gr.update(visible=True)
                     
                     await get_interpretation(

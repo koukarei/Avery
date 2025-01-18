@@ -134,6 +134,9 @@ Output: `{"status": 0, "message": "This is an example of bad grammar!", "spellin
 Input: "Esto es un ejemplo."
 Output: `{"status": 1, "message": "ブー！英語で答えてください。", "spelling_mistakes": [], "grammar_mistakes": []}`
 
+Input: "I love neko."
+Output: `{"status": 1, "message": "ブー！英語で答えてください。", "spelling_mistakes": [], "grammar_mistakes": []}`
+
 Input: "Fuck You!"
 Output: `{"status": 2, "message": "ブー！不適切な言葉が含まれています。", "spelling_mistakes": [], "grammar_mistakes": []}`
        

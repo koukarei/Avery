@@ -1,9 +1,10 @@
 import stanza
+from stanza.pipeline.core import DownloadMethod
 import requests
 import time
 
-stanza.download('en')
-en_nlp = stanza.Pipeline('en', processors='tokenize,mwt,pos,lemma', package='default_accurate')
+#stanza.download('en')
+en_nlp = stanza.Pipeline('en', processors='tokenize,mwt,pos,lemma', package='default_accurate', download_method=DownloadMethod.REUSE_RESOURCES)
 
 def get_pos_lemma(word: str, relevant_sentence: str):
     doc = en_nlp(relevant_sentence)

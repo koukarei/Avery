@@ -68,6 +68,7 @@ services:
       context: backend-project
       dockerfile: server.dockerfile
     volumes:
+      - stanza_resources:/root/stanza_resources
       - ./backend-project/backend:/backend
     command: "fastapi dev --host 0.0.0.0 --port 8000 /backend/main.py"
     ports:
@@ -97,6 +98,7 @@ services:
     depends_on:
       - redis
     volumes:
+      - stanza_resources:/root/stanza_resources
       - ./backend-project/backend:/backend
     command:
       - celery
@@ -162,6 +164,7 @@ services:
 volumes:
   db-store:
   node_modules:
+  stanza_resources:
 
 networks:
   avery-network:

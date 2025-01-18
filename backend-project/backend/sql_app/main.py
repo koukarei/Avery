@@ -37,8 +37,9 @@ def get_db():
 async def lifespan(app: FastAPI):
     await util.logger1.info("Starting up")
     try:
-        # # Download the English model for stanza
-        # stanza.download('en')
+        # Download the English model for stanza
+        import stanza
+        stanza.download('en')
         # nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = await model_load()
         # util.logger1.info("Models loaded successfully")
         util.logger1.info("Startup complete")
@@ -55,7 +56,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     debug=True,
     title="AVERY",
-    # lifespan=lifespan,
+    lifespan=lifespan,
 )
 
 @app.get("/")
@@ -889,7 +890,7 @@ def get_user_answer(
     generation: schemas.GenerationCreate,
     db: Session = Depends(get_db),
 ):
-    mem_track = util.memory_tracker(message="Get user answer: {}".format(generation.sentence))
+    mem_track = util.memory_tracker(message="Get user answer", id=round_id)
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to answer")
     db_round = crud.get_round(db, round_id)
@@ -936,7 +937,7 @@ def get_user_answer(
                 is_completed=False
             )
         )
-        mem_track.get_top_stats(message="Got user answer: {}".format(generation.sentence))
+        mem_track.get_top_stats()
         return crud.update_generation1(
             db=db,
             generation=schemas.GenerationCorrectSentence(
@@ -964,7 +965,7 @@ def get_user_answer(
             ),
             chat_id=db_round.chat_history
         )
-    mem_track.get_top_stats(message="Got user answer: {}".format(generation.sentence))
+    mem_track.get_top_stats()
     raise HTTPException(status_code=400, detail="Invalid sentence")
 
 @app.put("/round/{round_id}/interpretation", tags=["Round"], response_model=schemas.IdOnly)
@@ -974,7 +975,7 @@ async def get_interpretation(
     generation: schemas.GenerationCorrectSentence,
     db: Session = Depends(get_db),
 ):
-    mem_track = util.memory_tracker(message="Get interpretation: {}".format(generation.id))
+    mem_track = util.memory_tracker(message="Get interpretation", id=generation.id)
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to get interpretation")
     db_round = crud.get_round(db, round_id)
@@ -1080,7 +1081,7 @@ async def get_interpretation(
             chat_id=db_round.chat_history
         )
 
-        mem_track.get_top_stats(message="Got interpretation: {}".format(generation.id))
+        mem_track.get_top_stats()
         return db_generation
 
     except HTTPException:
@@ -1097,7 +1098,7 @@ def complete_generation(
     generation: schemas.GenerationCompleteCreate,
     db: Session = Depends(get_db),
 ):
-    mem_track = util.memory_tracker(message="Complete generation: {}".format(generation.id))
+    mem_track = util.memory_tracker(message="Complete generation",id=generation.id)
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to complete generation")
     
@@ -1274,7 +1275,7 @@ def complete_generation(
             ),
             generation_id=generation.id
         )
-    mem_track.get_top_stats("Completed generation: {}".format(generation.id))
+    mem_track.get_top_stats()
     return crud.get_generation(db, generation_id=generation.id)
 
 @app.post("/round/{round_id}/end",tags=["Round"], response_model=schemas.RoundOut)

@@ -1,10 +1,11 @@
 import torch
+import stanza
+from stanza.download import DownloadMethod
 
 # Stanza English model
 def en_nlp_load():
-    import stanza
-    stanza.download('en')
-    en_nlp = stanza.Pipeline('en', processors='tokenize,pos,constituency', package='default_accurate')
+    #stanza.download('en')
+    en_nlp = stanza.Pipeline('en', processors='tokenize,pos,constituency', package='default_accurate', download_method=DownloadMethod.REUSE_RESOURCES)
     try:
         yield en_nlp
     finally:

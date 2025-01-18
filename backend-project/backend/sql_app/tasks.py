@@ -9,6 +9,7 @@ from .dependencies.util import computing_time_tracker, encode_image
 from .database import SessionLocal, engine
 
 import torch, stanza
+from stanza.pipeline.core import DownloadMethod
 
 import os, time, json, io, requests
 from celery import Celery
@@ -21,7 +22,7 @@ app.conf.result_backend = os.environ.get('RESULT_BACKEND',
 nlp_models = {}
 
 def model_load():
-    en_nlp = stanza.Pipeline('en', processors='tokenize,pos,constituency', package='default_accurate')
+    en_nlp = stanza.Pipeline('en', processors='tokenize,pos,constituency', package='default_accurate', download_method=DownloadMethod.REUSE_RESOURCES)
     from transformers import GPT2Tokenizer, GPT2LMHeadModel
     tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
     perplexity_model = GPT2LMHeadModel.from_pretrained("gpt2")
@@ -48,7 +49,7 @@ class AlchemyEncoder(json.JSONEncoder):
             return fields
         return json.JSONEncoder.default(self, obj)
 
-@app.task(name='tasks.generateDescription')
+@app.task(name='tasks.generateDescription', ignore_result=True)
 def generateDescription(leaderboard_id: int, image: str, story: Optional[str], model_name: str="gpt-4o-mini"):
     
     try:
@@ -200,7 +201,7 @@ def calculate_score(
     except Exception as e:
         print(f"Calculate score error: {e}")
 
-@app.task(name='tasks.update_vocab_used_time')
+@app.task(name='tasks.update_vocab_used_time', ignore_result=True)
 def update_vocab_used_time(
         sentence: str,
         user_id: int,
@@ -243,7 +244,7 @@ def update_vocab_used_time(
     finally:
         db.close()
 
-@app.task(name='tasks.update_n_words')
+@app.task(name='tasks.update_n_words', ignore_result=True)
 def update_n_words(
     generation: dict,
 ):
@@ -287,7 +288,7 @@ def update_n_words(
     finally:
         db.close()
 
-@app.task(name='tasks.update_grammar_spelling')
+@app.task(name='tasks.update_grammar_spelling', ignore_result=True)
 def update_grammar_spelling(
     generation: dict,
 ):
@@ -324,7 +325,7 @@ def update_grammar_spelling(
     finally:
         db.close()
 
-@app.task(name='tasks.update_frequency_word')
+@app.task(name='tasks.update_frequency_word', ignore_result=True)
 def update_frequency_word(
     generation: dict,
 ):
@@ -361,7 +362,7 @@ def update_frequency_word(
     finally:
         db.close()
 
-@app.task(name='tasks.update_perplexity')
+@app.task(name='tasks.update_perplexity', ignore_result=True)
 def update_perplexity(
         generation: dict,
         descriptions: list[str]
@@ -411,7 +412,7 @@ def update_perplexity(
     finally:
         db.close()
 
-@app.task(name='tasks.update_content_score')
+@app.task(name='tasks.update_content_score', ignore_result=True)
 def update_content_score(
     generation: dict,
 ):
@@ -449,7 +450,7 @@ def update_content_score(
     finally:
         db.close()
 
-@app.task(name='tasks.generate_interpretation')
+@app.task(name='tasks.generate_interpretation', ignore_result=True)
 def generate_interpretation(
     generation_id: int,
     sentence: str,

@@ -143,3 +143,6 @@ cefr-venv/
 
 # media files
 media/
+
+# log files
+logs/

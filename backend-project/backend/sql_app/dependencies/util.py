@@ -1,6 +1,6 @@
-import base64, cv2, PIL, io, re
+import base64, cv2, PIL, io, re, csv, os
 import numpy as np
-import logging, time, os, tracemalloc
+import logging, time, os, tracemalloc, datetime
 
 def encode_image(image_file):
   return base64.b64encode(image_file.read()).decode('utf-8')
@@ -50,25 +50,35 @@ class computing_time_tracker:
         self.logger.info(message)
 
 class memory_tracker:
-    def __init__(self, message=None):
-        self.filehandler = logging.FileHandler("logs/memory_tracker.log", mode="a", encoding=None, delay=False)
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.WARNING)
-        self.logger.addHandler(self.filehandler)
-        self.filehandler.setFormatter(formatter)
-        self.logger.warning(f"{message} - Memory tracker started")
+    def __init__(self, message=None, id=None):
+        self.starttime = time.time()
+        self.start_date = datetime.datetime.now()
+        self.message = message
+        self.id = id
         tracemalloc.start()
         self.snapshot1 = tracemalloc.take_snapshot()
 
-    def get_top_stats(self, message=None):
+    def get_top_stats(self):
         snapshot2 = tracemalloc.take_snapshot()
+        duration = time.time() - self.starttime
+        stop_time = datetime.datetime.now()
+        
         top_stats = snapshot2.compare_to(self.snapshot1, 'lineno')
-        if message:
-            self.logger.warning(message)
-        self.logger.warning("[ Top 10 ]")
-        for stat in top_stats[:10]:
-            self.logger.warning(stat)
-        return top_stats
+        #top_stats = snapshot2.statistics('lineno')
+        tracemalloc.clear_traces()
+        
+        if not os.path.exists('logs/memory_tracker.csv'):
+            with open('logs/memory_tracker.csv','w') as f:
+                writer = csv.writer(f)
+                writer.writerow(["message", "id", "startdate", "stopdate", "duration", "traceback", "size", "count"])
+
+        with open('logs/memory_tracker.csv','a') as f:
+            writer = csv.writer(f)
+            for stat in top_stats[:10]:
+                writer.writerow(
+                    [self.message, self.id, self.start_date, stop_time, duration, stat.traceback, stat.size, stat.count]
+                )
+        return
 
 log_filename = "logs/backend.log"
 

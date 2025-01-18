@@ -169,7 +169,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         if round_generations:
             interpreted_images = []
             not_working = []
-            for round_generation in round_generations:
+            for round_generation in round_generations[:10]:
                 interpreted_img = await get_interpreted_image(generation_id=round_generation.generation.id, request=request)
                 if interpreted_img:
                     interpreted_images.append(interpreted_img)

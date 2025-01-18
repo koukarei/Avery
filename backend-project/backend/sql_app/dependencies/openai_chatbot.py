@@ -2,7 +2,7 @@ from openai import OpenAI
 from pydantic import BaseModel
 from typing import Optional
 
-import io
+import io, gc
 import requests
 import base64
 import PIL.Image
@@ -143,7 +143,12 @@ Avery、ロボット（ディズニーのベイマックスのように話すキ
         except Exception as e:
             print(f"Error: {e}")
             print(f"Messages: {self.messages}")
-            return {}
+            return {}        
+        finally:
+            del self.messages
+            del self.client
+            gc.collect()
+            
         
     def get_result(self, sentence, correct_sentence,scoring,rank,base64_image,chat_history,grammar_errors,spelling_errors):
         prompt = """
@@ -284,5 +289,10 @@ Every soldiers are exhausted and they are sleeping on the floor.
             print(f"Error: {e}")
             print(f"Messages: {self.messages}")
             return {}
+        
+        finally:
+            del self.messages
+            del self.client
+            gc.collect()
             
         
