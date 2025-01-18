@@ -148,7 +148,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         fastapi_app, 
         avery_gradio, 
         path="/leaderboards",
-
+        favicon_path="/static/favicon.ico",
     )
 
     async def select_leaderboard_fn(evt: gr.SelectData, leaderboards, request: gr.Request):

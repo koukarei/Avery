@@ -71,7 +71,13 @@ services:
       - stanza_resources:/root/stanza_resources
       - gpt2-cache:/root/.cache/huggingface
       - ./backend-project/backend:/backend
-    command: "fastapi dev --host 0.0.0.0 --port 8000 /backend/main.py"
+    #command: "fastapi dev --host 0.0.0.0 --port 8000 /backend/main.py"
+    # command:
+    #   - gunicorn
+    #   - main:app
+    #   - --workers 4
+    #   - --bind 0.0.0.0:8000
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
     ports:
       - "7871:8000"
     tty: true
@@ -85,6 +91,7 @@ services:
       - db
       - worker
       - dashboard
+      - blip2-project
     environment:
       APP_MODULE: backend.main:app
       PORT: 7871

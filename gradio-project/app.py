@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, Depends, status, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.routing import Mount
@@ -82,7 +83,7 @@ app = FastAPI(
     openapi_url=None,
     title="Avery",
 )
-
+app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.on_event("shutdown")
 async def shutdown_client():
     await http_client.aclose()

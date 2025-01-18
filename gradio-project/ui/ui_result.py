@@ -75,6 +75,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         fastapi_app, 
         avery_gradio, 
         path="/result",
+        favicon_path="/static/favicon.ico",
     )
 
     async def obtain_image(request: gr.Request):

@@ -68,6 +68,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         fastapi_app, 
         avery_gradio, 
         path="/answer",
+        favicon_path="/static/favicon.ico",
     )
 
     generation_id = gr.State()

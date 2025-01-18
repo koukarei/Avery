@@ -5,7 +5,8 @@ databases
 psycopg2-binary
 PyMySQL
 SQLAlchemy
-uvicorn
+uvicorn[standard]
+gunicorn
 alembic
 python-multipart
 pillow
