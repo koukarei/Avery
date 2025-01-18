@@ -265,6 +265,23 @@ async def read_my_rounds(request: Request, is_completed: bool = False, leaderboa
     output = [models.Round(**round) for round in response.json()]
     return output
 
+async def read_my_generations(request: Request, leaderboard_id: int = None):
+    if leaderboard_id is None:
+        url = f"{BACKEND_URL}my_generations"
+    else:
+        url = f"{BACKEND_URL}my_generations/?leaderboard_id={leaderboard_id}"
+
+    response = await http_client.get(
+        url,
+        auth=get_auth(request),
+    )
+    response.raise_for_status()
+    output = [models.GenerationRound(
+        generation=generation[0],
+        round=generation[1]
+    ) for generation in response.json()]
+    return output
+
 async def send_message(round_id: int, new_message:models.MessageSend, request: Request, ):
     json_data = convert_json(new_message)
     response = await http_client.put(

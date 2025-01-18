@@ -1724,6 +1724,22 @@ def read_generations(
     )
     return generations
 
+@app.get("/my_generations/", tags=["Generation"], response_model=list[Tuple[schemas.GenerationOut, schemas.RoundOut]])
+def read_my_generations(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    leaderboard_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        return []
+    player_id = current_user.id
+    generations = crud.get_generations(
+        db=db,
+        player_id=player_id,
+        leaderboard_id=leaderboard_id,
+    )
+    return generations
+
 @app.get("/generation/{generation_id}/score", tags=["Generation"], response_model=schemas.Score)
 def get_generation_score(
     current_user: Annotated[schemas.User, Depends(get_current_user)],

@@ -7,7 +7,7 @@ import datetime
 from starlette.applications import Starlette
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import RedirectResponse, Response
-from api.connection import read_leaderboard, get_original_images, get_interpreted_image, get_rounds, get_generation, check_playable, read_my_rounds, get_generations, delete_leaderboard, update_leaderboard, get_schools
+from api.connection import read_leaderboard, get_original_images, get_interpreted_image, get_rounds, get_generation, check_playable, read_my_rounds, read_my_generations, get_generations, delete_leaderboard, update_leaderboard, get_schools
 from api.connection import models
 
 from app import app as fastapi_app
@@ -33,8 +33,12 @@ class Gallery:
                 with gr.Column():
                     self.gallery = gr.Gallery(None, label="Original", interactive=False)
                 with gr.Column():
-                    self.info = gr.Markdown(None, line_breaks=True)
-                    self.generated_img = gr.Gallery(None, label="record")
+                    with gr.Tab("得点トップ10"):
+                        self.info = gr.Markdown(None, line_breaks=True)
+                        self.generated_img = gr.Gallery(None, label="得点トップ10")
+                    with gr.Tab("過去記録"):
+                        self.my_info = gr.Markdown(None, line_breaks=True)
+                        self.my_generated_img = gr.Gallery(None, label="過去記録")
             with gr.Row():
                 self.submit_btn = gr.Button("始める", scale=0, interactive=False, link="/avery/go_to_answer")
                 self.delete_btn = gr.Button("削除", scale=0, visible=False)
@@ -129,6 +133,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
     leaderboards = gr.State()
     selected_leaderboard = gr.State()
     related_generations = gr.State()
+    my_generations = gr.State()
 
     gallery.create_gallery()
 
@@ -166,6 +171,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
             school_name = None
             
         round_generations = await get_generations(leaderboard_id=select_leaderboard.id,school_name=school_name, request=request)
+
         if round_generations:
             interpreted_images = []
             not_working = []
@@ -180,6 +186,22 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         else:
             interpreted_images = None
             round_generations = None
+
+        my_generations = await read_my_generations(leaderboard_id=select_leaderboard.id, request=request)
+        if my_generations:
+            my_interpreted_images = []
+            not_working = []
+            for my_generation in my_generations:
+                interpreted_img = await get_interpreted_image(generation_id=my_generation.generation.id, request=request)
+                if interpreted_img:
+                    my_interpreted_images.append(interpreted_img)
+                else:
+                    not_working.append(my_generation)
+            if not_working:
+                my_generations = [generation for generation in my_generations if generation not in not_working]
+        else:
+            my_interpreted_images = None
+            my_generations = None
         
         # Check if the player played the game before
         playable = await check_playable(select_leaderboard.id, request=request)
@@ -200,7 +222,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
             start_btn = gr.update(value="再開", link=link,interactive=True)
             
         
-        return select_leaderboard, start_btn, is_admin, info, interpreted_images, round_generations, unfinished_rounds,is_admin,is_admin,is_admin,is_admin,is_admin,is_admin, is_admin, select_leaderboard.is_public, select_leaderboard.published_at, schools
+        return select_leaderboard, start_btn, is_admin, info, info, interpreted_images, round_generations, unfinished_rounds,is_admin,is_admin,is_admin,is_admin,is_admin,is_admin, is_admin, select_leaderboard.is_public, select_leaderboard.published_at, schools, my_interpreted_images, my_generations
 
     async def delete_selected_leaderboard(request: gr.Request, selected_leaderboard, published_at_start: Optional[datetime.datetime]=None, published_at_end: Optional[datetime.datetime]=None):
         request = request.request
@@ -313,6 +335,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
             gallery.submit_btn, 
             gallery.delete_btn, 
             gallery.info, 
+            gallery.my_info,
             gallery.generated_img, 
             related_generations, 
             unfinished, 
@@ -326,6 +349,8 @@ with gr.Blocks(title="AVERY") as avery_gradio:
             gallery.is_public,
             gallery.published_at,
             gallery.school_group,
+            gallery.my_generated_img,
+            my_generations,
         ],
     )
 
@@ -335,6 +360,14 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         fn=select_interpreted_image,
         inputs=[related_generations, selected_leaderboard],
         outputs=[gallery.info],
+    )
+
+    # Set the selected my interpreted image
+    gr.on(
+        triggers=[gallery.my_generated_img.select],
+        fn=select_interpreted_image,
+        inputs=[my_generations, selected_leaderboard],
+        outputs=[gallery.my_info],
     )
 
     # Delete the selected leaderboard

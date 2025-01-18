@@ -69,6 +69,7 @@ services:
       dockerfile: server.dockerfile
     volumes:
       - stanza_resources:/root/stanza_resources
+      - gpt2-cache:/root/.cache/huggingface
       - ./backend-project/backend:/backend
     command: "fastapi dev --host 0.0.0.0 --port 8000 /backend/main.py"
     ports:
@@ -99,6 +100,7 @@ services:
       - redis
     volumes:
       - stanza_resources:/root/stanza_resources
+      - gpt2-cache:/root/.cache/huggingface
       - ./backend-project/backend:/backend
     command:
       - celery
@@ -165,6 +167,7 @@ volumes:
   db-store:
   node_modules:
   stanza_resources:
+  gpt2-cache:
 
 networks:
   avery-network:
