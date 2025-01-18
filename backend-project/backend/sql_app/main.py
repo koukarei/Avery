@@ -2,17 +2,16 @@ import logging.config
 from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, responses, Security, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-import time, os, datetime, io, requests, shutil, tempfile, zipfile, zoneinfo
+import time, os, datetime, shutil, tempfile, zipfile, zoneinfo
 import pandas as pd
 from pathlib import Path
-from PIL import Image
 
 from . import crud, models, schemas
 from .tasks import app as celery_app
 from .tasks import check_factors_done, generateDescription, update_vocab_used_time, generate_interpretation, update_perplexity, update_content_score, update_frequency_word, update_n_words, update_grammar_spelling, calculate_score
 from .database import SessionLocal, engine
 
-from .dependencies import sentence, gen_image, score, dictionary, openai_chatbot, util
+from .dependencies import sentence, score, dictionary, openai_chatbot, util
 from .authentication import authenticate_user, authenticate_user_2, create_access_token, oauth2_scheme, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, REFRESH_TOKEN_EXPIRE_MINUTES, JWTError, jwt
 
 from typing import Tuple, List, Annotated, Optional
@@ -441,10 +440,10 @@ def create_leaderboard(
         story=db_story.content
 
     db_original_image = crud.get_original_image(db, image_id=leaderboard.original_image_id)
-
+    en_nlp = dictionary.Dictionary()
     # add leaderboard vocabularies
     if leaderboard.story_extract:
-        words = dictionary.get_sentence_nlp(leaderboard.story_extract)
+        words = en_nlp.get_sentence_nlp(leaderboard.story_extract)
         for word in words:
             vocab = crud.get_vocabulary(
                 db=db,
@@ -604,9 +603,11 @@ def create_leaderboards(
 
             added_vocabularies = []
 
+            en_nlp = dictionary.Dictionary()
+
             # Add vocabularies
             if story_extract:
-                words = dictionary.get_sentence_nlp(story_extract)
+                words = en_nlp.get_sentence_nlp(story_extract)
                 
                 for word in words:
                     vocab = crud.get_vocabulary(
@@ -1349,12 +1350,14 @@ def create_vocabularies(
         if not all(col in vocabularies.columns for col in col_names):
             raise HTTPException(status_code=400, detail="CSV file must have 'word' and 'pos' columns")
         
+        en_nlp = dictionary.Dictionary()
+
         for index, row in vocabularies.iterrows():
             pos = row['pos'].split(",")
             for p in pos:
                 p = p.strip()
 
-                meaning = dictionary.get_meaning(
+                meaning = en_nlp.get_meaning(
                     lemma=row['word'],
                     pos=p
                 )
@@ -1399,7 +1402,9 @@ def create_personal_dictionary(
 
     personal_dictionary.user_id = current_user.id
 
-    word_lemma = dictionary.get_pos_lemma(
+    en_nlp = dictionary.Dictionary()
+
+    word_lemma = en_nlp.get_pos_lemma(
         word=personal_dictionary.vocabulary,
         relevant_sentence=personal_dictionary.relevant_sentence
     )
@@ -1410,8 +1415,10 @@ def create_personal_dictionary(
         part_of_speech=word_lemma['pos']
     )
 
+    en_nlp = dictionary.Dictionary()
+
     if not vocab:
-        meanings=dictionary.get_meaning(
+        meanings=en_nlp.get_meaning(
             lemma=word_lemma['lemma'],
             pos=word_lemma['pos']
         )

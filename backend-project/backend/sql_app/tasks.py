@@ -8,8 +8,7 @@ from datetime import timezone
 from .dependencies.util import computing_time_tracker, encode_image
 from .database import SessionLocal, engine
 
-import torch, stanza
-from stanza.pipeline.core import DownloadMethod
+import torch
 
 import os, time, json, io, requests
 from celery import Celery
@@ -22,7 +21,7 @@ app.conf.result_backend = os.environ.get('RESULT_BACKEND',
 nlp_models = {}
 
 def model_load():
-    en_nlp = stanza.Pipeline('en', processors='tokenize,pos,constituency', package='default_accurate', download_method=DownloadMethod.REUSE_RESOURCES)
+    en_nlp = dictionary.Dictionary()
     from transformers import GPT2Tokenizer, GPT2LMHeadModel
     tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
     perplexity_model = GPT2LMHeadModel.from_pretrained("gpt2")
@@ -32,7 +31,6 @@ def model_load():
     return en_nlp, tokenizer, perplexity_model
 
 nlp_models['en_nlp'], nlp_models['tokenizer'], nlp_models['perplexity_model'] = model_load()
-
 
 class AlchemyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -209,7 +207,7 @@ def update_vocab_used_time(
     try:
         db=database.SessionLocal()
         updated_vocab = []
-        doc = dictionary.get_sentence_nlp(sentence)
+        doc = nlp_models['en_nlp'].get_sentence_nlp(sentence)
         for token in doc:
             db_vocab = crud.get_vocabulary(
                 db=db,
@@ -250,7 +248,7 @@ def update_n_words(
 ):
     try:
         generation = schemas.GenerationCompleteCreate(**generation)
-        en_nlp = nlp_models['en_nlp']
+        en_nlp = nlp_models['en_nlp'].en_nlp
         db=database.SessionLocal()
         db_generation = crud.get_generation(db, generation_id=generation.id)
         if db_generation.updated_n_words:
@@ -294,7 +292,7 @@ def update_grammar_spelling(
 ):
     try:
         generation = schemas.GenerationCompleteCreate(**generation)
-        en_nlp = nlp_models['en_nlp']
+        en_nlp = nlp_models['en_nlp'].en_nlp
         db=database.SessionLocal()
         db_generation = crud.get_generation(db, generation_id=generation.id)
         if db_generation.updated_grammar_errors:
@@ -331,7 +329,7 @@ def update_frequency_word(
 ):
     try:
         generation = schemas.GenerationCompleteCreate(**generation)
-        en_nlp = nlp_models['en_nlp']
+        en_nlp = nlp_models['en_nlp'].en_nlp
         db=database.SessionLocal()
         db_generation = crud.get_generation(db, generation_id=generation.id)
         if db_generation.updated_f_word:
@@ -374,7 +372,7 @@ def update_perplexity(
         db_generation = crud.get_generation(db, generation_id=generation.id)
         if db_generation.updated_perplexity:
             return json.dumps(db_generation, cls=AlchemyEncoder)
-        en_nlp = nlp_models['en_nlp']
+        en_nlp = nlp_models['en_nlp'].en_nlp
         perplexity_model = nlp_models['perplexity_model']
         tokenizer = nlp_models['tokenizer']
 
