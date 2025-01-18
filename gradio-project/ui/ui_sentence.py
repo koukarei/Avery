@@ -208,6 +208,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                         interpretation=output,
                         request=request,
                     )
+                    
                     ai_image = await get_interpreted_image(
                         generation_id=generation_id,
                         request=request

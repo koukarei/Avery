@@ -340,7 +340,7 @@ async def get_interpretation(round_id: int, interpretation: models.GenerationCor
     # wait for interpretation to finish
     timeout = time.time() + 120
     while True:
-        time.sleep(5)
+        time.sleep(10)
         if time.time() > timeout:
             raise HTTPException(status_code=500, detail="Interpretation took too long")
         response = await http_client.get(
@@ -360,14 +360,14 @@ async def get_interpreted_image(generation_id: int, request: Request, ):
         response = await http_client.get(
             f"{BACKEND_URL}interpreted_image/{generation_id}",
             auth=get_auth(request),
-            timeout=120
+            timeout=30
         )
         if response.status_code == 200:
             image = PILImage.open(io.BytesIO(response.content))
             return image
         time.sleep(3)
         if time.time() > timeout:
-            response.raise_for_status()
+            return None
 
 async def complete_generation(round_id: int, generation: models.GenerationCompleteCreate, request: Request, ):
     json_data = convert_json(generation)
