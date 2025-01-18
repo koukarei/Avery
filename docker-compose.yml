@@ -155,6 +155,7 @@ services:
       context: blip2-project
       dockerfile: Dockerfile
     volumes:
+      - blip2-cache:/root/.cache/huggingface
       - ./blip2-project:/blip2
     command: uvicorn blip2.app.main:app --host 0.0.0.0 --port 7874
     ports: 
@@ -168,6 +169,7 @@ volumes:
   node_modules:
   stanza_resources:
   gpt2-cache:
+  blip2-cache:
 
 networks:
   avery-network:
