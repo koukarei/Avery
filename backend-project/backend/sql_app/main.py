@@ -63,13 +63,13 @@ def hello_world():
     return {"message": "Hello World"}
 
 @app.get("/tasks", tags=["Task"], response_model=list[schemas.Task])
-def read_tasks(
+async def read_tasks(
     db: Session = Depends(get_db),
 ):
     return crud.get_all_tasks(db)
 
 @app.get("/tasks/{task_id}", tags=["Task"], response_model=schemas.TaskStatus)
-def check_status(
+async def check_status(
     task_id: str, 
     db: Session = Depends(get_db)
 ):
@@ -84,13 +84,13 @@ def check_status(
     return status
 
 @app.get("/tasks/generation/{generation_id}", tags=["Task"], response_model=schemas.TasksOut)
-def check_generation_task_status(
+async def check_generation_task_status(
     generation_id: int, 
 ):
     return check_factors_done(generation_id)
 
 @app.get("/tasks/leaderboard/{leaderboard_id}", tags=["Task"], response_model=list[schemas.TaskStatus])
-def check_leaderboard_task_status(
+async def check_leaderboard_task_status(
     leaderboard_id: int, 
     db: Session = Depends(get_db)
 ):
@@ -213,7 +213,7 @@ async def refresh_token(current_user: schemas.User = Security(get_current_user, 
         )
     
 @app.post("/users/", tags=["User"], response_model=schemas.User)
-def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+async def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = crud.get_user_by_email(db, email=user.email)
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -228,14 +228,14 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     return crud.create_user(db=db, user=user)
 
 @app.post("/users/lti", tags=["User"], response_model=schemas.User)
-def create_user_lti(user: schemas.UserLti, db: Session = Depends(get_db)):
+async def create_user_lti(user: schemas.UserLti, db: Session = Depends(get_db)):
     db_user = crud.get_user_by_lti(db, lti_user_id=user.user_id, school=user.school)
     if db_user:
         raise HTTPException(status_code=400, detail="This account already exists")
     return crud.create_user_lti(db=db, user=user)
 
 @app.delete("/users/{user_id}", tags=["User"], response_model=schemas.UserBase)
-def delete_user(current_user: Annotated[schemas.User, Depends(get_current_user)], user_id: int, db: Session = Depends(get_db), ):
+async def delete_user(current_user: Annotated[schemas.User, Depends(get_current_user)], user_id: int, db: Session = Depends(get_db), ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to delete user")
     if not current_user.is_admin:
@@ -246,7 +246,7 @@ def delete_user(current_user: Annotated[schemas.User, Depends(get_current_user)]
     return crud.delete_user(db=db, user_id=user_id)
 
 @app.put("/users/{user_id}", tags=["User"], response_model=schemas.User)
-def update_user(
+async def update_user(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     user: schemas.UserUpdateIn,
     db: Session = Depends(get_db),
@@ -278,7 +278,7 @@ def update_user(
 
 
 @app.get("/users/", tags=["User"], response_model=list[schemas.User])
-def read_users(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+async def read_users(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to delete user")
     if current_user.user_type == "student":
@@ -287,7 +287,7 @@ def read_users(current_user: Annotated[schemas.User, Depends(get_current_user)],
     return users
 
 @app.get("/users/{user_id}", tags=["User"], response_model=schemas.User)
-def read_user(current_user: Annotated[schemas.User, Depends(get_current_user)], user_id: int, db: Session = Depends(get_db)):
+async def read_user(current_user: Annotated[schemas.User, Depends(get_current_user)], user_id: int, db: Session = Depends(get_db)):
     if current_user.id != user_id and not current_user.is_admin:
             raise HTTPException(status_code=401, detail="You are not an admin")
     db_user = crud.get_user(db, user_id=user_id)
@@ -296,7 +296,7 @@ def read_user(current_user: Annotated[schemas.User, Depends(get_current_user)], 
     return db_user
 
 @app.get("/scenes/", tags=["Scene"], response_model=list[schemas.Scene])
-def read_scenes(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+async def read_scenes(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to read scenes")
     if not current_user.is_admin:
@@ -305,7 +305,7 @@ def read_scenes(current_user: Annotated[schemas.User, Depends(get_current_user)]
     return scenes
 
 @app.post("/scene/", tags=["Scene"], response_model=schemas.Scene)
-def create_scene(current_user: Annotated[schemas.User, Depends(get_current_user)], scene: schemas.SceneBase, db: Session = Depends(get_db)):
+async def create_scene(current_user: Annotated[schemas.User, Depends(get_current_user)], scene: schemas.SceneBase, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to create scene")
     if not current_user.is_admin:
@@ -313,7 +313,7 @@ def create_scene(current_user: Annotated[schemas.User, Depends(get_current_user)
     return crud.create_scene(db=db, scene=scene)
     
 @app.get("/stories/", tags=["Story"], response_model=list[schemas.StoryOut])
-def read_stories(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+async def read_stories(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to read stories")
     if not current_user.is_admin:
@@ -323,7 +323,7 @@ def read_stories(current_user: Annotated[schemas.User, Depends(get_current_user)
         
 
 @app.post("/story/", tags=["Story"], response_model=schemas.StoryOut)
-def create_story(
+async def create_story(
     current_user: Annotated[schemas.User, Depends(get_current_user)], 
     story_content_file: Annotated[UploadFile, File()],
     title: Annotated[str, Form()],
@@ -357,7 +357,7 @@ def create_story(
 
 
 @app.get("/leaderboards/", tags=["Leaderboard"], response_model=list[Tuple[schemas.LeaderboardOut, schemas.SchoolOut]])
-def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_current_user)],skip: int = 0, limit: int = 100, published_at_start: str=None, published_at_end: str=None, db: Session = Depends(get_db)):
+async def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_current_user)],skip: int = 0, limit: int = 100, published_at_start: str=None, published_at_end: str=None, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view leaderboards")
     school_name = current_user.school
@@ -382,7 +382,7 @@ def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_current_
     return leaderboards
 
 @app.get("/leaderboards/admin/", tags=["Leaderboard"], response_model=list[schemas.LeaderboardOut])
-def read_leaderboards_admin(
+async def read_leaderboards_admin(
         current_user: Annotated[schemas.User, Depends(get_current_user)],
         skip: int = 0,
         limit: int = 100,
@@ -410,7 +410,7 @@ def read_leaderboards_admin(
     return leaderboards
 
 @app.post("/leaderboards/", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
-def create_leaderboard(
+async def create_leaderboard(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard: schemas.LeaderboardCreateIn,
     db: Session = Depends(get_db),
@@ -475,7 +475,7 @@ def create_leaderboard(
     return result
 
 @app.post("/leaderboards/bulk_create", tags=["Leaderboard"], response_model=list[schemas.LeaderboardOut])
-def create_leaderboards(
+async def create_leaderboards(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     zipped_image_files: Annotated[UploadFile, File()],
     csv_file: Annotated[UploadFile, File()],
@@ -704,7 +704,7 @@ def create_leaderboards(
     return leaderboard_list
 
 @app.post("/leaderboards/image", tags=["Leaderboard"], response_model=schemas.IdOnly)
-def create_leaderboard_image(
+async def create_leaderboard_image(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     original_image: Annotated[UploadFile, File()],
     db: Session = Depends(get_db),
@@ -732,7 +732,7 @@ def create_leaderboard_image(
     return db_original_image
 
 @app.get("/leaderboards/{leaderboard_id}", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
-def read_leaderboard(current_user: Annotated[schemas.User, Depends(get_current_user)],leaderboard_id: int, db: Session = Depends(get_db)):
+async def read_leaderboard(current_user: Annotated[schemas.User, Depends(get_current_user)],leaderboard_id: int, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view leaderboards")
     db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
@@ -742,7 +742,7 @@ def read_leaderboard(current_user: Annotated[schemas.User, Depends(get_current_u
     return db_leaderboard
 
 @app.get("/leaderboards/{leaderboard_id}/schools/", tags=["Leaderboard"], response_model=list[schemas.SchoolOut])
-def read_schools(current_user: Annotated[schemas.User, Depends(get_current_user)], leaderboard_id: int, db: Session = Depends(get_db)):
+async def read_schools(current_user: Annotated[schemas.User, Depends(get_current_user)], leaderboard_id: int, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view schools")
     if not current_user.is_admin:
@@ -751,7 +751,7 @@ def read_schools(current_user: Annotated[schemas.User, Depends(get_current_user)
     return schools
 
 @app.put("/leaderboards/{leaderboard_id}", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
-def update_leaderboard(
+async def update_leaderboard(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: int,
     leaderboard: schemas.LeaderboardUpdate,
@@ -767,7 +767,7 @@ def update_leaderboard(
     return crud.update_leaderboard(db=db, leaderboard=leaderboard)
 
 @app.delete("/leaderboards/{leaderboard_id}", tags=["Leaderboard"], response_model=schemas.IdOnly)
-def delete_leaderboard(
+async def delete_leaderboard(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: int,
     db: Session = Depends(get_db),
@@ -782,7 +782,7 @@ def delete_leaderboard(
     return crud.delete_leaderboard(db=db, leaderboard_id=leaderboard_id)
 
 @app.post("/program", tags=["Program"], response_model=schemas.Program)
-def create_program(
+async def create_program(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     program: schemas.ProgramBase,
     db: Session = Depends(get_db),
@@ -794,7 +794,7 @@ def create_program(
     return crud.create_program(db=db, program=program)
 
 @app.get("/programs/", tags=["Program"], response_model=list[schemas.Program])
-def read_programs(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+async def read_programs(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to read programs")
     if not current_user.is_admin:
@@ -803,7 +803,7 @@ def read_programs(current_user: Annotated[schemas.User, Depends(get_current_user
     return programs
 
 @app.get("/leaderboards/{leaderboard_id}/rounds/", tags=["Leaderboard", "Round"], response_model=list[schemas.RoundOut])
-def get_rounds_by_leaderboard(
+async def get_rounds_by_leaderboard(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: int,
     program: Optional[str] = "none",
@@ -827,7 +827,7 @@ def get_rounds_by_leaderboard(
     )
 
 @app.get("/my_rounds/", tags=["Round"], response_model=list[schemas.RoundOut])
-def get_my_rounds(
+async def get_my_rounds(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: Optional[int] = None,
     is_completed: Optional[bool] = True,
@@ -844,7 +844,7 @@ def get_my_rounds(
     )
 
 @app.post("/round/", tags=["Round"], response_model=schemas.Round)
-def create_round(
+async def create_round(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     thisround: schemas.RoundCreate,
     db: Session = Depends(get_db),
@@ -885,7 +885,7 @@ def create_round(
     return db_round
 
 @app.put("/round/{round_id}", tags=["Round"], response_model=schemas.GenerationCorrectSentence)
-def get_user_answer(
+async def get_user_answer(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     round_id: int,
     generation: schemas.GenerationCreate,
@@ -1280,7 +1280,7 @@ async def complete_generation(
     return crud.get_generation(db, generation_id=generation.id)
 
 @app.post("/round/{round_id}/end",tags=["Round"], response_model=schemas.RoundOut)
-def end_round(
+async def end_round(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     round_id: int,
     db: Session = Depends(get_db),
@@ -1311,7 +1311,7 @@ def end_round(
     return db_round
 
 @app.get("/vocabulary/{vocabulary}", tags=["Vocabulary"], response_model=list[schemas.Vocabulary])
-def read_vocabulary(current_user: Annotated[schemas.User, Depends(get_current_user)], vocabulary: str, pos: str=None, db: Session = Depends(get_db)):
+async def read_vocabulary(current_user: Annotated[schemas.User, Depends(get_current_user)], vocabulary: str, pos: str=None, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view vocabulary")
     if pos:
@@ -1323,7 +1323,7 @@ def read_vocabulary(current_user: Annotated[schemas.User, Depends(get_current_us
     return vocabularies
 
 @app.get("/vocabularies/", tags=["Vocabulary"], response_model=list[schemas.Vocabulary])
-def read_vocabularies(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+async def read_vocabularies(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view vocabularies")
     vocabularies = crud.get_vocabularies(db, skip=skip, limit=limit)
@@ -1384,7 +1384,7 @@ async def create_vocabularies(
 
 
 @app.get("/personal_dictionaries/", tags=["Personal Dictionary"], response_model=list[schemas.PersonalDictionary])
-def read_personal_dictionaries(current_user: Annotated[schemas.User, Depends(get_current_user)], db: Session = Depends(get_db)):
+async def read_personal_dictionaries(current_user: Annotated[schemas.User, Depends(get_current_user)], db: Session = Depends(get_db)):
     if not current_user:
         return []
     player_id = current_user.id
@@ -1445,7 +1445,7 @@ async def create_personal_dictionary(
     )
 
 @app.put("/personal_dictionary/{personal_dictionary_id}", tags=["Personal Dictionary"], response_model=schemas.PersonalDictionary)
-def update_personal_dictionary(
+async def update_personal_dictionary(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     personal_dictionary: schemas.PersonalDictionaryUpdate,
     personal_dictionary_id: int,
@@ -1460,7 +1460,7 @@ def update_personal_dictionary(
     )
 
 @app.delete("/personal_dictionary/{personal_dictionary_id}", tags=["Personal Dictionary"], response_model=schemas.PersonalDictionary)
-def delete_personal_dictionary(
+async def delete_personal_dictionary(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     personal_dictionary_id: int,
     db: Session = Depends(get_db),
@@ -1472,7 +1472,7 @@ def delete_personal_dictionary(
     )
 
 @app.get("/chat/{round_id}", tags=["Chat"], response_model=schemas.Chat)
-def read_chat(
+async def read_chat(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     round_id: int, 
     db: Session = Depends(get_db),
@@ -1492,7 +1492,7 @@ def read_chat(
     return chat
 
 @app.put("/round/{round_id}/chat", tags=["Chat"], response_model=schemas.Chat)
-def update_chat(
+async def update_chat(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     round_id: int,
     message: schemas.MessageReceive,
@@ -1675,7 +1675,7 @@ async def get_image_similarity(
     return image_similarity
 
 @app.get("/generation/{generation_id}", tags=["Generation"], response_model=schemas.GenerationOut)
-def read_generation(
+async def read_generation(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     generation_id: int, 
     db: Session = Depends(get_db)
@@ -1691,7 +1691,7 @@ def read_generation(
     return db_generation
 
 @app.get("/generations/", tags=["Generation"], response_model=list[Tuple[schemas.GenerationOut, schemas.RoundOut]])
-def read_generations(
+async def read_generations(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     player_id: Optional[int] = None,
     leaderboard_id: Optional[int] = None,
@@ -1732,7 +1732,7 @@ def read_generations(
     return generations
 
 @app.get("/my_generations/", tags=["Generation"], response_model=list[Tuple[schemas.GenerationOut, schemas.RoundOut]])
-def read_my_generations(
+async def read_my_generations(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: Optional[int] = None,
     db: Session = Depends(get_db),
@@ -1748,7 +1748,7 @@ def read_my_generations(
     return generations
 
 @app.get("/generation/{generation_id}/score", tags=["Generation"], response_model=schemas.Score)
-def get_generation_score(
+async def get_generation_score(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     generation_id: int, 
     db: Session = Depends(get_db)
@@ -1769,7 +1769,7 @@ def get_generation_score(
     return score
 
 @app.get("/leaderboards/{leaderboard_id}/playable", tags=["Leaderboard"], response_model=schemas.LeaderboardPlayable)
-def check_leaderboard_playable(
+async def check_leaderboard_playable(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: int, 
     db: Session = Depends(get_db)

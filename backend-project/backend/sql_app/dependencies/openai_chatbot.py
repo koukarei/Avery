@@ -192,8 +192,12 @@ Avery、ロボット（ディズニーのベイマックスのように話すキ
 1. 
 ユーザーの英作文: 
 The muse is play  on the table and drop the ham on the floor.
+検出された文法の誤り:
+[GrammarMistake(extracted_text=\'is play\', explanation=\"The present continuous tense is used to describe an ongoing action and requires the \'ing\' form of the verb.\", correction=\'is playing\'), GrammarMistake(extracted_text=\'drop\', explanation=\'The present simple tense is used here, so the verb should match the subject form, which is singular.\', correction=\'drops\')]
+
+
 文法評価: 
-あなたの英作文には文法の誤りがあります。しかし、文の意味は理解できます。playは動詞なので、一文には動詞は一つで十分です。isは必要ありません。 「play」と「on」の間にスペースが2つ連続しています。🤓
+あなたの英作文には文法の誤りがあります。しかし、文の意味は理解できます。現在進行形は、進行中の動作を表すために使用され、動詞の「～ing」形を必要とします。 ここでは現在形が使われているため、動詞は主語の形に一致する必要があります。この場合、主語は単数形です。🤓
 スペリング評価:
 あなたの英作文にはスペルミスがいくつかありますが、心配なく、私が説明します！mouseはm-o-u-s-eです。🐭
 スタイル評価:
@@ -206,11 +210,14 @@ The muse is play  on the table and drop the ham on the floor.
 2. 
 ユーザーの英作文: 
 cat is pray arund in the katcen.
+検出された文法の誤り:
+[GrammarMistake(extracted_text=\'cat is pray arund\', explanation=\"The word \'pray\' is incorrect in context and should be the verb \'playing.\' The sentence also needs the definite article \'The\' at the beginning.\", correction=\'The cat is playing around\')]
+
 
 文法評価: 
-あなたの英作文には文法の誤りが多いです。文の意味が理解に苦しむかもしれません。🤪prayは動詞なので、一文には動詞は一つで十分です。isは必要ありません。arundも不要です。
+「pray」という単語は文脈上不適切であり、正しくは動詞「playing」を使うべきです。また、文の冒頭には定冠詞「The」を追加する必要があります。
 スペリング評価:
-スペルには苦手ですか？😧A cat plays in the kitchenではないですか？
+スペルには苦手ですか？😧prayは祈りの意味です。playの方が正しいです。arundではなくaroundです。
 スタイル評価:
 もっと表現を工夫してください。😭catの色は？種類は？
 内容評価:
@@ -221,19 +228,17 @@ cat is pray arund in the katcen.
 3. 
 ユーザーの英作文:
 Every soldiers are exhausted and they are sleeping on the floor.
+検出された文法の誤り:
+[GrammarMistake(extracted_text=\'Every soldier are\', explanation=\"The subject \'Every soldier\' is singular and requires the singular form of the verb \'is.\'\", correction=\'Every soldier is\')]
 
 文法評価:
 文法の誤りがあります。🤔「every」の後には単数形の名詞が必要ですが、「soldiers（複数形）」が使われています。
-
 スペリング評価:
 スペルミスはありません。😇
-
 スタイル評価:
 「and」の後には、「they are」を使うのは正しいですが、省略した方が自然になります。
-
 内容評価:
 画像には兵士がいません。😅
-
 総合評価:
 文法の誤りを修正して、画像に合った内容に変更してください。😇
         """.format(
