@@ -354,20 +354,62 @@ async def get_interpretation(round_id: int, interpretation: models.GenerationCor
     
     return True
 
-async def get_interpreted_image(generation_id: int, request: Request, ):
-    timeout = time.time() + 120
-    while True:
-        response = await http_client.get(
-            f"{BACKEND_URL}interpreted_image/{generation_id}",
-            auth=get_auth(request),
-            timeout=30
-        )
-        if response.status_code == 200:
-            image = PILImage.open(io.BytesIO(response.content))
-            return image
-        time.sleep(3)
-        if time.time() > timeout:
+# async def get_interpreted_image(generation_id: int, request: Request, ):
+#     timeout = time.time() + 120
+#     while True:
+#         response = await http_client.get(
+#             f"{BACKEND_URL}interpreted_image/{generation_id}",
+#             auth=get_auth(request),
+#             timeout=30
+#         )
+#         if response.status_code == 200:
+#             image = PILImage.open(io.BytesIO(response.content))
+#             return image
+#         time.sleep(3)
+#         if time.time() > timeout:
+#             return None
+
+async def get_interpreted_image(generation_id: int, request: Request):
+    """
+    Get the interpreted image with improved error handling and retry logic
+    
+    Args:
+        generation_id (int): ID of the generation
+        request (Request): Request object
+        
+    Returns:
+        PIL.Image or None: The interpreted image if successful, None if failed after retries
+    """
+    max_retries = 4
+    retry_delay = 3  # seconds
+    timeout = 30  # seconds per request
+    
+    for attempt in range(max_retries):
+        try:
+            response = await http_client.get(
+                f"{BACKEND_URL}interpreted_image/{generation_id}",
+                auth=get_auth(request),
+                timeout=timeout
+            )
+            
+            if response.status_code == 200:
+                return PILImage.open(io.BytesIO(response.content))
+                
+            # If status code is not 200, wait before retrying
+            if attempt < max_retries - 1:  # Don't sleep on last attempt
+                await asyncio.sleep(retry_delay)
+                
+        except (httpx.TimeoutException, httpx.RemoteProtocolError) as e:
+            # Log error if needed
+            if attempt < max_retries - 1:  # Don't sleep on last attempt
+                await asyncio.sleep(retry_delay)
+            continue
+            
+        except Exception as e:
+            # For any other unexpected errors, return None
             return None
+            
+    return None
 
 async def complete_generation(round_id: int, generation: models.GenerationCompleteCreate, request: Request, ):
     json_data = convert_json(generation)
