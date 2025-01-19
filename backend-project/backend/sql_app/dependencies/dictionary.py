@@ -1,7 +1,7 @@
 import stanza
 from stanza.pipeline.core import DownloadMethod
 import requests
-import time
+import time, asyncio
 
 #stanza.download('en')
 class Dictionary:
@@ -17,11 +17,11 @@ class Dictionary:
                     part_of_speech = token.pos
                     return {'pos':part_of_speech, 'lemma':lemma}
 
-    def get_meaning(self, lemma: str, pos: str):
+    async def get_meaning(self, lemma: str, pos: str):
         dict_api="https://api.dictionaryapi.dev/api/v2/entries/en/"
         response = requests.get(dict_api+lemma, timeout=5)
         while response.status_code == 429:
-            time.sleep(3)
+            await asyncio.sleep(3)
             response = requests.get(dict_api+lemma, timeout=5)
         if response.status_code == 200:
             data = response.json()

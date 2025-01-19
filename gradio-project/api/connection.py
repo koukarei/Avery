@@ -324,6 +324,9 @@ async def create_generation(new_generation: models.GenerationStart, request: Req
     return output
 
 async def get_interpretation(round_id: int, interpretation: models.GenerationCorrectSentence, request: Request, ):
+    retry_delay = 10
+    timeout = time.time() + 120
+    
     # get interpretation
     response = await http_client.put(
         f"{BACKEND_URL}round/{round_id}/interpretation",
@@ -338,9 +341,8 @@ async def get_interpretation(round_id: int, interpretation: models.GenerationCor
     generation_id = interpretation.id
 
     # wait for interpretation to finish
-    timeout = time.time() + 120
     while True:
-        time.sleep(10)
+        await asyncio.sleep(retry_delay)
         if time.time() > timeout:
             raise HTTPException(status_code=500, detail="Interpretation took too long")
         response = await http_client.get(
@@ -353,21 +355,6 @@ async def get_interpretation(round_id: int, interpretation: models.GenerationCor
             break
     
     return True
-
-# async def get_interpreted_image(generation_id: int, request: Request, ):
-#     timeout = time.time() + 120
-#     while True:
-#         response = await http_client.get(
-#             f"{BACKEND_URL}interpreted_image/{generation_id}",
-#             auth=get_auth(request),
-#             timeout=30
-#         )
-#         if response.status_code == 200:
-#             image = PILImage.open(io.BytesIO(response.content))
-#             return image
-#         time.sleep(3)
-#         if time.time() > timeout:
-#             return None
 
 async def get_interpreted_image(generation_id: int, request: Request):
     """

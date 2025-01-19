@@ -2,7 +2,7 @@ import logging.config
 from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, responses, Security, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-import time, os, datetime, shutil, tempfile, zipfile, zoneinfo
+import time, os, datetime, shutil, tempfile, zipfile, zoneinfo, asyncio
 import pandas as pd
 from pathlib import Path
 
@@ -1009,7 +1009,7 @@ async def get_interpretation(
         
         if leaderboard_tasks:
             while not all([t.status == "SUCCESS" for t in celery_tasks]):
-                time.sleep(1)
+                await asyncio.sleep(1)
                 leaderboard_tasks = check_leaderboard_task_status(
                     db=db,
                     leaderboard_id=db_round.leaderboard_id,
@@ -1094,7 +1094,7 @@ async def get_interpretation(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.put("/round/{round_id}/complete", tags=["Round"], response_model=schemas.GenerationComplete)
-def complete_generation(
+async def complete_generation(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     generation: schemas.GenerationCompleteCreate,
     db: Session = Depends(get_db),
@@ -1127,7 +1127,7 @@ def complete_generation(
     if factors["status"] != "FINISHED":
         while True:
             counter+=1
-            time.sleep(10)
+            await asyncio.sleep(10)
             if time.time() > timeout:
                 factors = check_factors_done(
                     generation_id=generation.id,
@@ -1171,7 +1171,7 @@ def complete_generation(
 
                 util.logger1.info(f"Retried. Generation {generation.id} has tasks: {factors['tasks']}")
                 
-            time.sleep(1)
+            await asyncio.sleep(1)
 
     factors, scores_dict = calculate_score(
         db=db,

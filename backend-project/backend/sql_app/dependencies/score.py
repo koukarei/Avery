@@ -3,7 +3,7 @@ from fastapi import HTTPException
 from enum import Enum
 
 import PIL.Image, cv2
-import io, os
+import io, os, asyncio
 import requests
 from . import util
 
@@ -110,7 +110,7 @@ def grammar_spelling_errors(sentence: str, en_nlp):
        'n_spelling_errors':len(spellings),
     }
 
-def frequency_word_ngram(words,n_gram=2):
+async def frequency_word_ngram(words,n_gram=2):
   google_ngram="https://books.google.com/ngrams/json?year_start=2000&content="
   
   words = [w.text for w in words if w.pos != 'PUNCT']
@@ -132,7 +132,7 @@ def frequency_word_ngram(words,n_gram=2):
                          'type':'ngram' if '%20' in ngram else 'word',
                          'freq':freq})
           if i != len(ngrams)-1:
-            time.sleep(3)
+            await asyncio.sleep(3)
       else:
         print(f"Error: {response.status_code}")
   if not output:
@@ -161,7 +161,7 @@ def perplexity(perplexity_model, tokenizer,sentence, cut_points, descriptions):
      'perplexity':perplexity_value
   }
 
-def calculate_content_score(
+async def calculate_content_score(
       image: str, 
       sentence: str
       ):
@@ -174,7 +174,7 @@ def calculate_content_score(
       counter = 0
       while status_code == 503:
         if counter >0:
-          time.sleep(2)
+          await asyncio.sleep(2)
         response = requests.post(
             url=BLIP2_URL, data={"sentence":sentence, "image": image}, timeout=30
         )
