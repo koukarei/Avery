@@ -1002,7 +1002,7 @@ async def get_interpretation(
         )
 
         # Check if description generation is done
-        leaderboard_tasks = check_leaderboard_task_status(
+        leaderboard_tasks = await check_leaderboard_task_status(
             db=db,
             leaderboard_id=db_round.leaderboard_id,
         )
@@ -1010,7 +1010,7 @@ async def get_interpretation(
         if leaderboard_tasks:
             while not all([t.status == "SUCCESS" for t in celery_tasks]):
                 await asyncio.sleep(1)
-                leaderboard_tasks = check_leaderboard_task_status(
+                leaderboard_tasks = await check_leaderboard_task_status(
                     db=db,
                     leaderboard_id=db_round.leaderboard_id,
                 )
