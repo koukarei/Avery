@@ -164,26 +164,12 @@ Avery、ロボット（ディズニーのベイマックスのように話すキ
 ## 情報
 ### 記述語
 あなたは以下の英作文とスコアを使って、ユーザーに日本語でフィードバックを提供する必要があります。
-文法得点: 文の文法の正確さに基づいています。
-スペリング得点: スペルミスを基づいています。
-鮮明さ: 文の生き生きとした表現に基づいています。
-自然さ: 文の自然さと通用性に基づいています。
-構造性: 文の複雑さに基づいています。
-内容得点: 画像に合っているかどうかに基づいています。
-
-### 現状
-1. ユーザーの英作文（評価対象）：{user_sentence}
-2. 修正された英作文: {correct_sentence}
-3. 文法得点: {grammar_score}/5
-検出された文法の誤り: {grammar_errors}
-4. スペリング得点: {spelling_score}/5
-検出されたスペルミス: {spelling_errors}
-5. 鮮明さ: {vividness_score}/5
-6. 自然さ: {convention}/1
-7. 構造性: {structure_score}/3
-8. 内容得点: {content_score}/100
-9. 合計点: {total_score}/100
-10. ランク: {rank} (A-最高, B-上手, C-良い, D-普通, E-もう少し, F-頑張ろう)
+文法得点: 文の文法の正確さに基づいています。満点は5点です。
+スペリング得点: スペルミスを基づいています。満点は5点です。
+鮮明さ: 文の生き生きとした表現に基づいています。満点は5点です。
+自然さ: 文の自然さと通用性に基づいています。満点は1点です。
+構造性: 文の複雑さに基づいています。満点は3点です。
+内容得点: 画像に合っているかどうかに基づいています。満点は100点です。
 
 ## 評価の例文
 あなたのミッションは、ユーザーにフィードバックを提供して、ユーザーの英作文が元の画像に合うようにすることです。
@@ -242,18 +228,18 @@ Every soldiers are exhausted and they are sleeping on the floor.
 総合評価:
 文法の誤りを修正して、画像に合った内容に変更してください。😇
         """.format(
-            user_sentence=sentence,
-            correct_sentence=correct_sentence,
-            grammar_score=scoring['grammar_score'],
-            spelling_score=scoring['spelling_score'],
-            vividness_score=scoring['vividness_score'],
-            convention=scoring['convention'],
-            structure_score=scoring['structure_score'],
-            content_score=scoring['content_score'],
-            total_score=scoring['total_score'],
-            rank=rank,
-            grammar_errors=grammar_errors,
-            spelling_errors=spelling_errors
+            # user_sentence=sentence,
+            # correct_sentence=correct_sentence,
+            # grammar_score=scoring['grammar_score'],
+            # spelling_score=scoring['spelling_score'],
+            # vividness_score=scoring['vividness_score'],
+            # convention=scoring['convention'],
+            # structure_score=scoring['structure_score'],
+            # content_score=scoring['content_score'],
+            # total_score=scoring['total_score'],
+            # rank=rank,
+            # grammar_errors=grammar_errors,
+            # spelling_errors=spelling_errors
         )
 
 
@@ -265,6 +251,33 @@ Every soldiers are exhausted and they are sleeping on the floor.
         #         ]}
         #     )
 
+        user_prompt = """### 現状
+1. ユーザーの英作文（評価対象）：{user_sentence}
+2. 修正された英作文: {correct_sentence}
+3. 文法得点: {grammar_score}
+検出された文法の誤り: {grammar_errors}
+4. スペリング得点: {spelling_score}
+検出されたスペルミス: {spelling_errors}
+5. 鮮明さ: {vividness_score}
+6. 自然さ: {convention}
+7. 構造性: {structure_score}
+8. 内容得点: {content_score}
+9. 合計点: {total_score}
+10. ランク: {rank}""".format(
+    user_sentence=sentence,
+    correct_sentence=correct_sentence,
+    grammar_score=scoring['grammar_score'],
+    spelling_score=scoring['spelling_score'],
+    vividness_score=scoring['vividness_score'],
+    convention=scoring['convention'],
+    structure_score=scoring['structure_score'],
+    content_score=scoring['content_score'],
+    total_score=scoring['total_score'],
+    rank=rank,
+    grammar_errors=grammar_errors,
+    spelling_errors=spelling_errors
+)
+
         self.messages.append(
             {"role": "user", "content": [
                 {
@@ -273,9 +286,9 @@ Every soldiers are exhausted and they are sleeping on the floor.
                     "url": f"data:image/jpeg;base64,{base64_image}"
                 },
                 },
-                # {
-                # "type": "text", "text": prompt
-                # }
+                {
+                "type": "text", "text": user_prompt
+                }
             ]
             }
         )
