@@ -1330,7 +1330,7 @@ def read_vocabularies(current_user: Annotated[schemas.User, Depends(get_current_
     return vocabularies
 
 @app.post("/vocabularies", tags=["Vocabulary"], response_model=List[schemas.Vocabulary])
-def create_vocabularies(
+async def create_vocabularies(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     vocabularies_csv: Annotated[UploadFile, File()],
     db: Session = Depends(get_db),
@@ -1357,7 +1357,7 @@ def create_vocabularies(
             for p in pos:
                 p = p.strip()
 
-                meaning = en_nlp.get_meaning(
+                meaning = await en_nlp.get_meaning(
                     lemma=row['word'],
                     pos=p
                 )
@@ -1392,7 +1392,7 @@ def read_personal_dictionaries(current_user: Annotated[schemas.User, Depends(get
     return personal_dictionaries
 
 @app.post("/personal_dictionary/", tags=["Personal Dictionary"], response_model=schemas.PersonalDictionary)
-def create_personal_dictionary(
+async def create_personal_dictionary(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     personal_dictionary: schemas.PersonalDictionaryCreate,
     db: Session = Depends(get_db),
@@ -1418,7 +1418,7 @@ def create_personal_dictionary(
     en_nlp = dictionary.Dictionary()
 
     if not vocab:
-        meanings=en_nlp.get_meaning(
+        meanings=await en_nlp.get_meaning(
             lemma=word_lemma['lemma'],
             pos=word_lemma['pos']
         )
@@ -1603,7 +1603,7 @@ async def get_interpreted_image(
     )
     
 @app.get("/image_similarity/{generation_id}", tags=["Image"], response_model=schemas.ImageSimilarity)
-def get_image_similarity(
+async def get_image_similarity(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     generation_id: int, 
     db: Session = Depends(get_db)
@@ -1629,12 +1629,12 @@ def get_image_similarity(
         leaderboard_id=db_round.leaderboard_id
     )
 
-    semantic1 = score.calculate_content_score(
+    semantic1 = await score.calculate_content_score(
         image=db_leaderboard.original_image.image,
         sentence=db_generation.sentence
     )
 
-    semantic2 = score.calculate_content_score(
+    semantic2 = await score.calculate_content_score(
         image=db_generation.interpreted_image.image,
         sentence=db_generation.sentence
     )

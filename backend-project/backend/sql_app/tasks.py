@@ -324,7 +324,7 @@ def update_grammar_spelling(
         db.close()
 
 @app.task(name='tasks.update_frequency_word', ignore_result=True)
-def update_frequency_word(
+async def update_frequency_word(
     generation: dict,
 ):
     try:
@@ -338,7 +338,7 @@ def update_frequency_word(
         t = computing_time_tracker("Update frequency word")
         doc = en_nlp(db_generation.sentence)
         words=[w for s in doc.sentences for w in s.words]
-        factors = score.frequency_score(words=words)
+        factors = await score.frequency_score(words=words)
 
         db_generation = crud.update_generation3(
             db=db,
@@ -411,7 +411,7 @@ def update_perplexity(
         db.close()
 
 @app.task(name='tasks.update_content_score', ignore_result=True)
-def update_content_score(
+async def update_content_score(
     generation: dict,
 ):
     try:
@@ -425,7 +425,7 @@ def update_content_score(
 
         db_round = crud.get_round(db, round_id=db_generation.round_id)
 
-        factors = score.calculate_content_score(
+        factors = await score.calculate_content_score(
             image=db_round.leaderboard.original_image.image,
             sentence=db_generation.sentence
         )

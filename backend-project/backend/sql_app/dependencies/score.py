@@ -139,8 +139,8 @@ async def frequency_word_ngram(words,n_gram=2):
     raise ValueError("No data found")
   return output
 
-def frequency_score(words):
-   freq=frequency_word_ngram(words)
+async def frequency_score(words):
+   freq=await frequency_word_ngram(words)
    f_word=np.mean([i['freq'] for i in freq if i['type']=='word'])
    f_bigram=np.mean([i['freq'] for i in freq if i['type']=='ngram'])
    return {
@@ -221,7 +221,7 @@ def calculate_score(
 
     return output
 
-def calculate_score_init(
+async def calculate_score_init(
       en_nlp,
       perplexity_model,
       tokenizer,
@@ -247,9 +247,9 @@ def calculate_score_init(
       descriptions=descriptions
    ))
 
-   # factors.update(frequency_score(words=words))
+   # await factors.update(frequency_score(words=words))
 
-   factors.update(calculate_content_score(
+   factors.update(await calculate_content_score(
       image=image,
       sentence=sentence
    ))
