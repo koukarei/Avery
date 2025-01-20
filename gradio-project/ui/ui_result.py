@@ -101,7 +101,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                 emoji = "🤔"
             else:
                 emoji = "😢"
-        similarity_md = "# 類似度: {:^10.2f} {}".format(similarity, emoji)
+        similarity_md = "# 類似度: {:^10.2f}％ {}".format(similarity, emoji)
         return original_img, ai_img, similarity_md
     
     async def load_chat_content(request: gr.Request):

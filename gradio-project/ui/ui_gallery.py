@@ -33,12 +33,13 @@ class Gallery:
                 with gr.Column():
                     self.gallery = gr.Gallery(None, label="Original", interactive=False)
                 with gr.Column():
-                    with gr.Tab("得点トップ10"):
+                    with gr.Tab("トップ10英作文"):
                         self.info = gr.Markdown(None, line_breaks=True)
-                        self.generated_img = gr.Gallery(None, label="得点トップ10")
+                        self.generated_img = gr.Gallery(None, label="トップ10")
                     with gr.Tab("過去記録"):
                         self.my_info = gr.Markdown(None, line_breaks=True)
                         self.my_generated_img = gr.Gallery(None, label="過去記録")
+
             with gr.Row():
                 self.submit_btn = gr.Button("始める", scale=0, interactive=False, link="/avery/go_to_answer")
                 self.delete_btn = gr.Button("削除", scale=0, visible=False)

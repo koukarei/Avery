@@ -150,7 +150,7 @@ Avery、ロボット（ディズニーのベイマックスのように話すキ
             gc.collect()
             
         
-    def get_result(self, sentence, correct_sentence,scoring,rank,base64_image,chat_history,grammar_errors,spelling_errors):
+    def get_result(self, sentence, correct_sentence,scoring,rank,base64_image,chat_history,grammar_errors,spelling_errors, descriptions):
         prompt = """
 # 役割
 あなたの名前は Avery、ロボットです。
@@ -260,6 +260,7 @@ Every soldiers are exhausted and they are sleeping on the floor.
 検出されたスペルミス: {spelling_errors}
 5. 鮮明さ: {vividness_score}
 6. 自然さ: {convention}
+自然さについて参考された内容: {descriptions}
 7. 構造性: {structure_score}
 8. 内容得点: {content_score}
 9. 合計点: {total_score}
@@ -275,7 +276,8 @@ Every soldiers are exhausted and they are sleeping on the floor.
     total_score=scoring['total_score'],
     rank=rank,
     grammar_errors=grammar_errors,
-    spelling_errors=spelling_errors
+    spelling_errors=spelling_errors, 
+    descriptions=descriptions
 )
 
         self.messages.append(

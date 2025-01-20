@@ -1180,6 +1180,8 @@ async def complete_generation(
     )
 
     db_generation = crud.get_generation(db, generation_id=generation.id)
+    descriptions = crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
+    descriptions = [des.content for des in descriptions]
 
     evaluation = cb.get_result(
         sentence=db_generation.sentence,
@@ -1190,30 +1192,30 @@ async def complete_generation(
         chat_history=db_chat.messages,
         grammar_errors=db_generation.grammar_errors,
         spelling_errors=db_generation.spelling_errors,
+        descriptions=descriptions
     )
 
     if evaluation:
         score_message = """あなたの回答（評価対象）：{user_sentence}
 修正された回答：{correct_sentence}
-文法得点: {grammar_score} (満点5)
-スペリング得点: {spelling_score} (満点5)
-鮮明さ: {vividness_score} (満点5)
-自然さ: {convention} (満点1)
-構造性: {structure_score} (満点3)
-内容得点: {content_score} (満点100)
-合計点: {total_score} (満点100)
-ランク: {rank}　(A-最高, B-上手, C-良い, D-普通, E-もう少し, F-頑張ろう)""". \
-    format(
+{}：{:>5} (満点5)
+{}：{:>5} (満点5)
+{}：{:>5} (満点5)
+{}：{:>5} (満点1)
+{}：{:>5} (満点3)
+{}：{:>5} (満点100)
+{}：{:>5} (満点100)
+{}：{:>5}　(A-最高, B-上手, C-良い, D-普通, E-もう少し, F-頑張ろう)""".format(
+            "文法得点".ljust(10), round(scores_dict['grammar_score'],2),
+            "スペリング得点".ljust(10), round(scores_dict['spelling_score'],2),
+            "鮮明さ".ljust(10), round(scores_dict['vividness_score'],2),
+            "自然さ".ljust(10), scores_dict['convention'],
+            "構造性".ljust(10), scores_dict['structure_score'],
+            "内容得点".ljust(10), scores_dict['content_score'],
+            "合計点".ljust(10), scores_dict['total_score'],
+            "ランク".ljust(10), db_generation.rank,
             user_sentence=db_generation.sentence,
             correct_sentence=db_generation.correct_sentence,
-            grammar_score=round(scores_dict['grammar_score'],2),
-            spelling_score=round(scores_dict['spelling_score'],2),
-            vividness_score=round(scores_dict['vividness_score'],2),
-            convention=scores_dict['convention'],
-            structure_score=scores_dict['structure_score'],
-            content_score=scores_dict['content_score'],
-            total_score=scores_dict['total_score'],
-            rank=db_generation.rank,
         )
 
         if len(db_round.generations) > 2:
@@ -1227,12 +1229,12 @@ async def complete_generation(
 {grammar_feedback}
 **スペル**
 {spelling_feedback}
-**スタオル**
+**スタイル**
 {style_feedback}
 **内容**
 {content_feedback}
 
-**整体的なコメント**
+**総合評価**
 {overall_feedback}{recommended_vocab}""". \
         format(
             grammar_feedback=evaluation.grammar_evaluation,

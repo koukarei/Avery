@@ -26,26 +26,32 @@ class Sentence:
         self.ai_image=None
         self.next_btn=None
 
-    def create_sentence(self):
+    def create_original_image(self):
         self.image=gr.Image(
             None,
             label="英作文を入力してください",
             interactive=False,
         )
-        self.sentence=gr.Textbox(label='英作文',interactive=True, max_length=1000)
 
-        with gr.Row():
-            self.submit_btn=gr.Button("送信",scale=0)
-            self.back_btn=gr.Button("戻る",scale=0, link="/avery/")
+    def create_sentence(self):
+        with gr.Column():
+            with gr.Row():
+                self.sentence=gr.Textbox(label='英作文',interactive=True, max_length=1000)
 
-        self.ai_image=gr.Image(
-            None,
-            label="AIが生成した画像",
-            interactive=False,
-            visible=False,
-        )
+            with gr.Row():
+                self.submit_btn=gr.Button("送信",scale=0)
+                self.back_btn=gr.Button("戻る",scale=0, link="/avery/")
 
-        self.next_btn=gr.Button("評価",scale=0,visible=False, link="")
+            with gr.Row():
+                self.ai_image=gr.Image(
+                    None,
+                    label="AIが生成した画像",
+                    interactive=False,
+                    visible=False,
+                )
+
+            with gr.Row():
+                self.next_btn=gr.Button("評価",scale=0,visible=False, link="")
         
 
 def convert_history(chat_mdl: models.Chat):
@@ -155,7 +161,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
     """
     )
 
-    with gr.Row(equal_height=True,show_progress=True,elem_classes='whole'):
+    with gr.Row(equal_height=True,show_progress=True,elem_classes='top'):
         with gr.Column(min_width=200,elem_classes='bot'):
             guidance=Guidance()
             guidance.create_guidance()
@@ -176,8 +182,11 @@ with gr.Blocks(title="AVERY") as avery_gradio:
             #     inputs=[guidance.msg]
             # )
 
-        with gr.Column(min_width=300,elem_classes='interactive'):
+        with gr.Column(min_width=300,elem_classes='image'):
             sentence=Sentence()
+            sentence.create_original_image()
+
+    with gr.Row(equal_height=True,show_progress=True,elem_classes='bottom'):
             sentence.create_sentence()
 
             async def submit_answer(chat_history: list,sentence: str, generated_time: int, generation_id: int, request: gr.Request):
