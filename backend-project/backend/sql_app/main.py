@@ -1197,23 +1197,23 @@ async def complete_generation(
 
     if evaluation:
         score_message = """あなたの回答（評価対象）：{user_sentence}
-修正された回答：{correct_sentence}
-{}：{:>5} (満点5)
-{}：{:>5} (満点5)
-{}：{:>5} (満点5)
-{}：{:>5} (満点1)
-{}：{:>5} (満点3)
-{}：{:>5} (満点100)
-{}：{:>5} (満点100)
-{}：{:>5}　(A-最高, B-上手, C-良い, D-普通, E-もう少し, F-頑張ろう)""".format(
-            "文法得点".ljust(10), round(scores_dict['grammar_score'],2),
-            "スペリング得点".ljust(10), round(scores_dict['spelling_score'],2),
-            "鮮明さ".ljust(10), round(scores_dict['vividness_score'],2),
-            "自然さ".ljust(10), scores_dict['convention'],
-            "構造性".ljust(10), scores_dict['structure_score'],
-            "内容得点".ljust(10), scores_dict['content_score'],
-            "合計点".ljust(10), scores_dict['total_score'],
-            "ランク".ljust(10), db_generation.rank,
+修正された回答　　　　 ：{correct_sentence}
+文法得点　　　：{:>5} (満点5)
+スペリング得点：{:>5} (満点5)
+鮮明さ　　　　：{:>5} (満点5)
+自然さ　　　　：{:>5} (満点1)
+構造性　　　　：{:>5} (満点3)
+内容得点　　　：{:>5} (満点100)
+合計点　　　　：{:>5} (満点100)
+ランク　　　　：{:>5} (A-最高, B-上手, C-良い, D-普通, E-もう少し, F-頑張ろう)""".format(
+            round(scores_dict['grammar_score'],2),
+            round(scores_dict['spelling_score'],2),
+            round(scores_dict['vividness_score'],2),
+            scores_dict['convention'],
+            scores_dict['structure_score'],
+            scores_dict['content_score'],
+            scores_dict['total_score'],
+            db_generation.rank,
             user_sentence=db_generation.sentence,
             correct_sentence=db_generation.correct_sentence,
         )
