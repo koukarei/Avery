@@ -18,7 +18,27 @@ from api.connection import *
 from functools import wraps
 from typing import Dict, Optional
 import asyncio
-import time
+import time, pytz
+
+def convert_to_japan_time(dt):
+    """
+    Converts a given datetime object to Japan time zone (Asia/Tokyo).
+
+    Parameters:
+        dt (datetime): The datetime object to be converted.
+
+    Returns:
+        datetime: The converted datetime in Japan time zone.
+    """
+    # Define the Japan time zone
+    japan_tz = pytz.timezone('Asia/Tokyo')
+    
+    # If the datetime is naive, assume it is in UTC and localize it
+    if dt.tzinfo is None:
+        dt = pytz.utc.localize(dt)
+    
+    # Convert to Japan time zone
+    return dt.astimezone(japan_tz)
 
 class EndpointConcurrencyControl:
     def __init__(self):
@@ -329,11 +349,13 @@ async def redirect_to_answer(request: Request, leaderboard_id: Optional[int]=Non
     if not leaderboard_id:
         return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
     request.session["leaderboard_id"] = leaderboard_id
+    utc_time = datetime.datetime.now(datetime.timezone.utc)
+    japan_time = convert_to_japan_time(utc_time)
     output = await create_round(
         new_round=models.RoundStart(
             leaderboard_id=leaderboard_id,
             program=request.session["program"],
-            created_at=datetime.datetime.now(datetime.timezone.utc),
+            created_at=utc_time,
         ),
         request=request,
     )
@@ -369,11 +391,13 @@ async def redirect_to_result(request: Request, generation_id: Optional[int]=None
     request.session["generated_time"] = generated_time
     request.session["generation_id"] = latest_gen.id
 
+    utc_time = datetime.datetime.now(datetime.timezone.utc)
+    japan_time = convert_to_japan_time(utc_time)
     output = await complete_generation(
         round_id=request.session.get('round')['id'],
         generation=models.GenerationCompleteCreate(
             id=latest_gen.id,
-            at=datetime.datetime.now(datetime.timezone.utc),
+            at=utc_time,
         ),
         request=request,
     )

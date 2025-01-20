@@ -16,6 +16,28 @@ MAX_GENERATION = int(os.getenv("MAX_GENERATION", 5))
 
 import gradio as gr
 
+import pytz
+
+def convert_to_japan_time(dt):
+    """
+    Converts a given datetime object to Japan time zone (Asia/Tokyo).
+
+    Parameters:
+        dt (datetime): The datetime object to be converted.
+
+    Returns:
+        datetime: The converted datetime in Japan time zone.
+    """
+    # Define the Japan time zone
+    japan_tz = pytz.timezone('Asia/Tokyo')
+    
+    # If the datetime is naive, assume it is in UTC and localize it
+    if dt.tzinfo is None:
+        dt = pytz.utc.localize(dt)
+    
+    # Convert to Japan time zone
+    return dt.astimezone(japan_tz)
+
 class Result:
     def __init__(self):
         self.image=None
@@ -75,7 +97,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         fastapi_app, 
         avery_gradio, 
         path="/result",
-        favicon_path="/static/favicon.ico",
+        favicon_path="/static/avery.ico",
     )
 
     async def obtain_image(request: gr.Request):
@@ -149,9 +171,11 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         if 'id' not in request.session.get('round', None):
             raise Exception("Round not found")
         round_id = request.session.get('round', None)['id']
+        utc_time = datetime.datetime.now(datetime.timezone.utc)
+        japan_time = convert_to_japan_time(utc_time)
         new_message = models.MessageSend(
             content=message,
-            created_at=datetime.datetime.now(datetime.timezone.utc),
+            created_at=utc_time,
         )
         chat_mdl = await send_message(round_id, new_message, request)
         return None, convert_history(chat_mdl)

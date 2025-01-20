@@ -6,6 +6,9 @@ from fastapi import FastAPI, Request, Depends, status, HTTPException
 from typing import Annotated, Optional
 from PIL import Image as PILImage
 import io, datetime, time
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 from api import models
 
@@ -158,13 +161,9 @@ async def read_leaderboard(
         url = f"{BACKEND_URL}leaderboards"
 
     if published_at_start:
-        # convert to utczone
-        published_at_start = published_at_start.astimezone(datetime.timezone.utc)
         url += f"?published_at_start={published_at_start.strftime('%d%m%Y')}"
 
     if published_at_end:
-        # convert to utczone
-        published_at_end = published_at_end.astimezone(datetime.timezone.utc)
         if published_at_start:
             url += f"&published_at_end={published_at_end.strftime('%d%m%Y')}"
         else:
@@ -316,6 +315,7 @@ async def create_generation(new_generation: models.GenerationStart, request: Req
         timeout=120
     )
     if response.status_code == 400:
+        logger.debug(f"create_generation: {response.json()}")
         return None
     response.raise_for_status()
     
@@ -367,9 +367,9 @@ async def get_interpreted_image(generation_id: int, request: Request):
     Returns:
         PIL.Image or None: The interpreted image if successful, None if failed after retries
     """
-    max_retries = 4
-    retry_delay = 3  # seconds
-    timeout = 30  # seconds per request
+    max_retries = 7
+    retry_delay = 5  # seconds
+    timeout = 120  # seconds per request
     
     for attempt in range(max_retries):
         try:
@@ -394,8 +394,9 @@ async def get_interpreted_image(generation_id: int, request: Request):
             
         except Exception as e:
             # For any other unexpected errors, return None
-            return None
-            
+            logger.debug(f"get_interpreted_image: {e}")
+            continue
+    logger.debug(f"get_interpreted_image: Failed after {max_retries} attempts")
     return None
 
 async def complete_generation(round_id: int, generation: models.GenerationCompleteCreate, request: Request, ):

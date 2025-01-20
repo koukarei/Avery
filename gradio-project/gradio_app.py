@@ -54,7 +54,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         fastapi_app, 
         avery_gradio, 
         path="/dashboard",
-        favicon_path="/static/favicon.ico",
+        favicon_path="/static/avery.ico",
     )
 
     leaderboards = gr.State()

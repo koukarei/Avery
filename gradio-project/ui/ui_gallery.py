@@ -15,6 +15,28 @@ from app import get_root_url
 import gradio.route_utils 
 gradio.route_utils.get_root_url = get_root_url
 
+import pytz
+
+def convert_to_japan_time(dt):
+    """
+    Converts a given datetime object to Japan time zone (Asia/Tokyo).
+
+    Parameters:
+        dt (datetime): The datetime object to be converted.
+
+    Returns:
+        datetime: The converted datetime in Japan time zone.
+    """
+    # Define the Japan time zone
+    japan_tz = pytz.timezone('Asia/Tokyo')
+    
+    # If the datetime is naive, assume it is in UTC and localize it
+    if dt.tzinfo is None:
+        dt = pytz.utc.localize(dt)
+    
+    # Convert to Japan time zone
+    return dt.astimezone(japan_tz)
+
 class Gallery:
     """Create a gallery object for the user interface."""
 
@@ -33,7 +55,7 @@ class Gallery:
                 with gr.Column():
                     self.gallery = gr.Gallery(None, label="Original", interactive=False)
                 with gr.Column():
-                    with gr.Tab("トップ10英作文"):
+                    with gr.Tab("英作文トップ10"):
                         self.info = gr.Markdown(None, line_breaks=True)
                         self.generated_img = gr.Gallery(None, label="トップ10")
                     with gr.Tab("過去記録"):
@@ -84,8 +106,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
             published_at_end = datetime.datetime.fromtimestamp(published_at_end)
             leaderboards = await read_leaderboard(request, published_at_end=published_at_end, is_admin=is_admin)
         else:
-            #published_at_start = datetime.datetime.now()
-            published_at_start = datetime.datetime(2025,1,9)
+            published_at_start = datetime.datetime.now()
             published_at_end = datetime.datetime.now()
             leaderboards = await read_leaderboard(request, published_at_start, published_at_end, is_admin=is_admin)
         return [
@@ -128,8 +149,10 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                     link="/avery/logout",
                 )
             with gr.Row():
-                published_at_start_dropdown = gr.DateTime(include_time=False, label="公開日")
-                published_at_end_dropdown = gr.DateTime(include_time=False, label="〜")
+                current_time = datetime.datetime.now().astimezone(datetime.timezone.utc)
+                today_str = convert_to_japan_time(current_time).strftime("%Y-%m-%d")
+                published_at_start_dropdown = gr.DateTime(today_str, include_time=False, label="公開日")
+                published_at_end_dropdown = gr.DateTime(today_str, include_time=False, label="〜")
 
     leaderboards = gr.State()
     selected_leaderboard = gr.State()
@@ -149,7 +172,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         fastapi_app, 
         avery_gradio, 
         path="/leaderboards",
-        favicon_path="/static/favicon.ico",
+        favicon_path="static/avery.ico",
     )
 
     async def select_leaderboard_fn(evt: gr.SelectData, leaderboards, request: gr.Request):
@@ -272,13 +295,15 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                 else:
                     player_name = ""
 
+                create_time = convert_to_japan_time(selected_round.created_at)
+
                 md = f"""## {select_leaderboard.title}{leaderboard_vocabularies}
 
 ---
 
 英作文：{selected.correct_sentence}
 
-{player_name}作成時間：{selected_round.created_at}
+{player_name}作成時間：{create_time.strftime("%Y-%m-%d %H:%M:%S")}
 
 文法得点：{score.grammar_score}　スペル得点：{score.spelling_score}
 

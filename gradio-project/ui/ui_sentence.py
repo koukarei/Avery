@@ -13,6 +13,27 @@ from api.connection import models
 
 from ui.ui_gallery import app as fastapi_app
 
+import pytz
+
+def convert_to_japan_time(dt):
+    """
+    Converts a given datetime object to Japan time zone (Asia/Tokyo).
+
+    Parameters:
+        dt (datetime): The datetime object to be converted.
+
+    Returns:
+        datetime: The converted datetime in Japan time zone.
+    """
+    # Define the Japan time zone
+    japan_tz = pytz.timezone('Asia/Tokyo')
+    
+    # If the datetime is naive, assume it is in UTC and localize it
+    if dt.tzinfo is None:
+        dt = pytz.utc.localize(dt)
+    
+    # Convert to Japan time zone
+    return dt.astimezone(japan_tz)
 
 class Sentence:
     """Combine keywords into a sentence.
@@ -74,7 +95,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         fastapi_app, 
         avery_gradio, 
         path="/answer",
-        favicon_path="/static/favicon.ico",
+        favicon_path="/static/avery.ico",
     )
 
     generation_id = gr.State()
@@ -143,9 +164,11 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         if message == "":
             message = "ヒントをちょうだい。"
         round_id = cur_round['id']
+        utc_time = datetime.datetime.now(datetime.timezone.utc)
+        japan_time = convert_to_japan_time(utc_time)
         new_message = models.MessageSend(
             content=message,
-            created_at=datetime.datetime.now(datetime.timezone.utc),
+            created_at=utc_time,
         )
         chat_mdl = await send_message(round_id, new_message, request)
         new_msg = convert_history(chat_mdl)
@@ -200,9 +223,11 @@ with gr.Blocks(title="AVERY") as avery_gradio:
 
                 cur_round = request.session.get('round', None)
 
+                utc_time = datetime.datetime.now(datetime.timezone.utc)
+                japan_time = convert_to_japan_time(utc_time)
                 generation = models.GenerationStart(
                     round_id=cur_round['id'],
-                    created_at=datetime.datetime.now(datetime.timezone.utc),
+                    created_at=utc_time,
                     generated_time=generated_time,
                     sentence=sentence,
                 )
