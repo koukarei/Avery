@@ -10,7 +10,7 @@ from .database import SessionLocal, engine
 
 import torch
 
-import os, time, json, io, requests
+import os, time, json, io, requests, asyncio
 from celery import Celery
 
 app = Celery(__name__)
@@ -324,7 +324,7 @@ def update_grammar_spelling(
         db.close()
 
 @app.task(name='tasks.update_frequency_word', ignore_result=True)
-async def update_frequency_word(
+def update_frequency_word(
     generation: dict,
 ):
     try:
@@ -338,7 +338,10 @@ async def update_frequency_word(
         t = computing_time_tracker("Update frequency word")
         doc = en_nlp(db_generation.sentence)
         words=[w for s in doc.sentences for w in s.words]
-        factors = await score.frequency_score(words=words)
+
+        async_task = score.frequency_score(words=words)
+
+        factors = asyncio.run(async_task)
 
         db_generation = crud.update_generation3(
             db=db,
@@ -411,7 +414,7 @@ def update_perplexity(
         db.close()
 
 @app.task(name='tasks.update_content_score', ignore_result=True)
-async def update_content_score(
+def update_content_score(
     generation: dict,
 ):
     try:
@@ -425,10 +428,12 @@ async def update_content_score(
 
         db_round = crud.get_round(db, round_id=db_generation.round_id)
 
-        factors = await score.calculate_content_score(
+        async_task = score.calculate_content_score(
             image=db_round.leaderboard.original_image.image,
             sentence=db_generation.sentence
         )
+
+        factors = asyncio.run(async_task)
 
         db_generation = crud.update_generation3(
             db=db,
