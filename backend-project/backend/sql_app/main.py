@@ -1197,6 +1197,7 @@ async def complete_generation(
 
     if evaluation:
         score_message = """あなたの回答（評価対象）：{user_sentence}
+
 修正された回答　　　　 ：{correct_sentence}
 
 
