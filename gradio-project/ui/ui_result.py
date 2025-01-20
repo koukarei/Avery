@@ -132,7 +132,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                     restart_value = "もう一回！"
                 send_msg = gr.update(visible=False)
                 md = ""
-                md += chat.messages[-2].content.replace("\n", "\n\n")
+                md += chat.messages[-2].content
                 md += "\n\n"
                 md += chat.messages[-1].content.replace("\n", "\n\n")
                 yield convert_history(chat), show_restart, show_end, restart_value,send_msg,send_msg,md
