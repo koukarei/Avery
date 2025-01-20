@@ -54,11 +54,8 @@ class EndpointConcurrencyControl:
                 # Check if client already has an active request for this endpoint
                 if per_client and client_id in self.active_requests[endpoint_key]:
                     last_request_time = self.active_requests[endpoint_key][client_id]
-                    if time.time() - last_request_time < 1:  # 1 second cooldown
-                        raise HTTPException(
-                            status_code=429,
-                            detail="Too many requests. Please wait before making another request."
-                        )
+                    while time.time() - last_request_time < 1:  # 1 second cooldown
+                        asyncio.sleep(1)
                 
                 try:
                     async with self.endpoint_semaphores[endpoint_key]:
