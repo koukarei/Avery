@@ -40,7 +40,7 @@ class Guidance:
 
         with gr.Row():
             with gr.Column(scale=2,min_width=200):
-                self.msg=gr.Textbox(placeholder="メッセージを入力します！",label="Your message to Avery 🤖")
+                self.msg=gr.Textbox(placeholder="メッセージを入力します！",label="Averyへのメッセージ 🤖")
                 
             with gr.Column(scale=1,min_width=80):
                 self.submit=gr.Button("ヒント！")
