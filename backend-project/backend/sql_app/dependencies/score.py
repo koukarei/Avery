@@ -110,7 +110,7 @@ def grammar_spelling_errors(sentence: str, en_nlp):
        'n_spelling_errors':len(spellings),
     }
 
-async def frequency_word_ngram(words,n_gram=2):
+def frequency_word_ngram(words,n_gram=2):
   google_ngram="https://books.google.com/ngrams/json?year_start=2000&content="
   
   words = [w.text for w in words if w.pos != 'PUNCT']
@@ -132,15 +132,15 @@ async def frequency_word_ngram(words,n_gram=2):
                          'type':'ngram' if '%20' in ngram else 'word',
                          'freq':freq})
           if i != len(ngrams)-1:
-            await asyncio.sleep(3)
+            time.sleep(3)
       else:
         print(f"Error: {response.status_code}")
   if not output:
     raise ValueError("No data found")
   return output
 
-async def frequency_score(words):
-   freq=await frequency_word_ngram(words)
+def frequency_score(words):
+   freq=frequency_word_ngram(words)
    f_word=np.mean([i['freq'] for i in freq if i['type']=='word'])
    f_bigram=np.mean([i['freq'] for i in freq if i['type']=='ngram'])
    return {
@@ -175,6 +175,30 @@ async def calculate_content_score(
       while status_code == 503:
         if counter >0:
           await asyncio.sleep(2)
+        response = requests.post(
+            url=BLIP2_URL, data={"sentence":sentence, "image": image}, timeout=30
+        )
+        status_code = response.status_code
+        counter += 1
+      response.raise_for_status()
+      return response.json()
+    except requests.exceptions.RequestException as e:
+      raise HTTPException(status_code=500, detail="BLIP2 server error")
+
+def calculate_content_score_celery(
+      image: str,
+      sentence: str
+):
+    
+    BLIP2_URL = os.getenv("BLIP2_URL")
+    # BLIP2_URL = "http://blip2:7874/fake_content_score"
+
+    try:
+      status_code = 503
+      counter = 0
+      while status_code == 503:
+        if counter >0:
+          time.sleep(2)
         response = requests.post(
             url=BLIP2_URL, data={"sentence":sentence, "image": image}, timeout=30
         )
