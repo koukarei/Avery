@@ -8,7 +8,7 @@ from pathlib import Path
 
 from . import crud, models, schemas
 from .tasks import app as celery_app
-from .tasks import check_factors_done, check_factors_done_by_dict, generateDescription, update_vocab_used_time, generate_interpretation, update_perplexity, update_content_score, update_frequency_word, update_n_words, update_grammar_spelling, image_similarity, calculate_score
+from .tasks import check_factors_done, check_factors_done_by_dict, generateDescription, update_vocab_used_time, generate_interpretation, pass_generation_dict, update_perplexity, update_content_score, update_frequency_word, update_n_words, update_grammar_spelling, cal_image_similarity, calculate_score
 from .database import SessionLocal, engine
 
 from .dependencies import sentence, score, dictionary, openai_chatbot, util
@@ -61,7 +61,7 @@ app = FastAPI(
 
 @app.get("/")
 def hello_world():
-    return {"message": "Hello World"}
+    return {"Hello": "World"}
 
 @app.get("/tasks", tags=["Task"], response_model=list[schemas.Task])
 async def read_tasks(
@@ -1000,13 +1000,6 @@ async def get_interpretation(
     db_generation = crud.get_generation(db, generation_id=generation.id)
 
     try:
-
-        if db_generation.interpreted_image_id is None:
-            generate_interpretation.delay(
-                generation_id=generation.id,
-                sentence=db_generation.sentence,
-            )
-
         # Check if description generation is done
         leaderboard_tasks = await check_leaderboard_task_status(
             db=db,
@@ -1030,19 +1023,33 @@ async def get_interpretation(
                 if factors_done["status"] == "FINISHED":
                     return db_generation
                 
-                chain_interpretation = chain(
+            generation_dict = {
+                "id": generation.id,
+                "at": db_generation.created_at,
+            }
+
+            chain_interpretation = chain(
+                group(
                     generate_interpretation.s(generation_id=generation.id, sentence=db_generation.sentence, at=db_generation.created_at),
-                    group(
-                        update_content_score.s(),
-                        update_n_words.s(),
-                        update_grammar_spelling.s(),
-                        #update_frequency_word.s(),
-                        update_perplexity.s(),
-                        image_similarity.s()
-                    ),
+                    update_content_score.s(generation=generation_dict),
+                    update_n_words.s(generation=generation_dict),
+                    update_grammar_spelling.s(generation=generation_dict),
+                    #update_frequency_word.s(generation=generation_dict),
+                    update_perplexity.s(generation=generation_dict),
+                ),
+                group(
+                    pass_generation_dict.s(),
+                ),
+                group(
                     check_factors_done_by_dict.s()
-                )
-                chain_interpretation.apply_async()
+                ),
+                group(
+                    pass_generation_dict.s(),
+                    calculate_score.s()
+                ),
+                cal_image_similarity.s(),
+            )
+            chain_interpretation.apply_async()
 
         except Exception as e:
             # Log the background task error without raising
@@ -1107,57 +1114,20 @@ async def complete_generation(
     )
 
     if factors["status"] != "FINISHED":
-        while True:
-            counter+=1
-            await asyncio.sleep(10)
-            if time.time() > timeout:
-                factors = check_factors_done(
-                    generation_id=generation.id,
-                    delete_tasks=True
-                )
-                raise HTTPException(status_code=500, detail="The calculation took time. Please try again.")
-
+        while time.time() < timeout:
             factors = check_factors_done(
                 generation_id=generation.id
             )
             if factors["status"] == "FINISHED":
                 break
-
-            if factors['status'] == "PENDING" and (factors['tasks'] is None or len(factors['tasks']) == 0):
-                util.logger1.info(f"Generation {generation.id} has no tasks. Retrying evaluation.")
-                if not db_generation.updated_n_words:
-                    update_n_words.delay(
-                        generation=generation.model_dump(),
-                    )
-                if not db_generation.updated_grammar_errors:
-                    update_grammar_spelling.delay(
-                        generation=generation.model_dump(),
-                    )
-                if not db_generation.updated_perplexity:
-                    update_perplexity.delay(
-                        generation=generation.model_dump(),
-                        descriptions=[
-                            des.content 
-                            for des 
-                            in crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
-                        ]
-                    )
-                if not db_generation.updated_content_score:
-                    update_content_score.delay(
-                        generation=generation.model_dump(),
-                    )
-
-                factors = check_factors_done(
-                    generation_id=generation.id
-                )
-
-                util.logger1.info(f"Retried. Generation {generation.id} has tasks: {factors['tasks']}")
-                
-            await asyncio.sleep(1)
-
+            await asyncio.sleep(3)
+            counter+=1
+            if counter>30:
+                raise HTTPException(status_code=400, detail="Timeout error")
+            raise HTTPException(status_code=400, detail="Error in score calculation")
+        
     factors, scores_dict = calculate_score(
-        db=db,
-        generation=generation,
+        generation=generation.model_dump(),
         is_completed=True,
     )
 
@@ -1252,19 +1222,6 @@ async def complete_generation(
             chat_id=db_round.chat_history
         )
 
-        crud.create_score(
-            db=db,
-            score=schemas.ScoreCreate(
-                generation_id=generation.id,
-                grammar_score=scores_dict['grammar_score'],
-                spelling_score=scores_dict['spelling_score'],
-                vividness_score=scores_dict['vividness_score'],
-                convention=scores_dict['convention'],
-                structure_score=scores_dict['structure_score'],
-                content_score=scores_dict['content_score'],
-            ),
-            generation_id=generation.id
-        )
     mem_track.get_top_stats()
     return crud.get_generation(db, generation_id=generation.id)
 
@@ -1591,7 +1548,7 @@ async def get_interpreted_image(
         media_type="image/jpeg"  # Adjust this based on your image type (jpeg, png, etc.)
     )
     
-@app.get("/image_similarity/{generation_id}", tags=["Image"], response_model=schemas.ImageSimilarity)
+@app.get("/image_similarity/{generation_id}", tags=["Image"])
 async def get_image_similarity(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     generation_id: int, 
@@ -1605,7 +1562,14 @@ async def get_image_similarity(
         generation_id=generation_id
     )
     if db_generation:
-        return db_generation.score.image_similarity
+        if db_generation.score_id:
+            if db_generation.score.image_similarity:
+                return db_generation.score.image_similarity
+            return cal_image_similarity(
+                generation=[{
+                    'id': generation_id,
+                }]
+            )
     return None
 
 @app.get("/generation/{generation_id}", tags=["Generation"], response_model=schemas.GenerationOut)

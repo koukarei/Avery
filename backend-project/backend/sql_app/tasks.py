@@ -86,7 +86,8 @@ def generateDescription(leaderboard_id: int, image: str, story: Optional[str], m
     except Exception as e:
         print(f"Generate description error: {e}")
     finally:
-        db.close()
+        if db:
+            db.close()
 
 def check_factors_done(
     generation_id: int,
@@ -135,13 +136,14 @@ def check_factors_done(
         }
     except Exception as e:
         print(f"Check factors done error: {e}")
-    finally:
-        db.close()
 
 @app.task(name="tasks.check_factors_done_by_dict")
 def check_factors_done_by_dict(
-    generation: dict,
+    items: tuple,
 ):
+    if items is None:
+        raise HTTPException(status_code=400, detail="Invalid items")
+    generation = items[0]
     try:
         db=database.SessionLocal()
         generation_id = generation['id']
@@ -158,6 +160,7 @@ def check_factors_done_by_dict(
             for t in celery_tasks:
                 crud.delete_task(db, t.id)
             return {
+                "id": generation_id,
                 "status": "FINISHED",
                 "tasks": []
             }
@@ -177,27 +180,41 @@ def check_factors_done_by_dict(
                 crud.delete_task(db, t.id)
         
         return {
+            "id": generation_id,
             "status": "PENDING",
             "tasks": output
         }
     except Exception as e:
         print(f"Check factors done error: {e}")
     finally:
-        db.close()
+        if db:
+            db.close()
 
+@app.task(name='tasks.pass_generation_dict')
+def pass_generation_dict(
+    generation: tuple,
+):
+    if generation is None:
+        raise HTTPException(status_code=400, detail="Invalid generation: None type")
+    if 'id' in generation:
+        return generation
+    return generation[0]
+
+@app.task(name='tasks.calculate_score', ignore_result=True)
 def calculate_score(
-    db: Session,
-    generation: schemas.GenerationCompleteCreate,
+    generation: dict,
     is_completed: bool=False, 
 ):
     try:
-        db_generation = crud.get_generation(db, generation_id=generation.id)
+        db=database.SessionLocal()
+        generation_id = generation['id']
+        db_generation = crud.get_generation(db, generation_id=generation_id)
         if db_generation is None:
             raise HTTPException(status_code=404, detail="Generation not found")
         db_round = crud.get_round(db, round_id=db_generation.round_id)
 
         if is_completed:
-            generation_aware = generation.at.replace(tzinfo=timezone.utc)
+            generation_aware = generation['at'].replace(tzinfo=timezone.utc)
             db_generation_aware = db_round.created_at.replace(tzinfo=timezone.utc)
             duration = (generation_aware - db_generation_aware).seconds
         else: 
@@ -221,12 +238,43 @@ def calculate_score(
             'content_score': db_generation.content_score
         }
 
+        if db_generation.score_id is not None:
+            db_scores = crud.get_score(db, score_id=db_generation.score_id)
+            scores = json.dumps(db_scores, cls=AlchemyEncoder)
+            scores = json.loads(scores)
+            if is_completed and not db_generation.is_completed:
+                scores['total_score'] = db_generation.total_score
+                generation_com = schemas.GenerationComplete(
+                    id=db_generation.id,
+                    duration=duration,
+                    is_completed=is_completed
+                )
+                crud.update_generation3(
+                    db=db,
+                    generation=generation_com
+                )
+            return factors, scores
+
         try:
             scores = score.calculate_score(**factors)
         except Exception as e:
             print(f"Calculate score error: {e}")
             print(f"Factors: {factors}")
             raise HTTPException(status_code=500, detail="Error calculating score")
+
+        crud.create_score(
+            db=db,
+            score=schemas.ScoreCreate(
+                generation_id=generation_id,
+                grammar_score=scores['grammar_score'],
+                spelling_score=scores['spelling_score'],
+                vividness_score=scores['vividness_score'],
+                convention=scores['convention'],
+                structure_score=scores['structure_score'],
+                content_score=scores['content_score'],
+            ),
+            generation_id=generation_id
+        )
 
         generation_com = schemas.GenerationComplete(
             id=db_generation.id,
@@ -244,6 +292,9 @@ def calculate_score(
         return factors, scores
     except Exception as e:
         print(f"Calculate score error: {e}")
+    finally:
+        if db:
+            db.close()
 
 @app.task(name='tasks.update_vocab_used_time', ignore_result=True)
 def update_vocab_used_time(
@@ -286,7 +337,8 @@ def update_vocab_used_time(
     except Exception as e:
         print(f"Update vocab used time error: {e}")
     finally:
-        db.close()
+        if db:
+            db.close()
 
 @app.task(name='tasks.update_n_words', ignore_result=True)
 def update_n_words(
@@ -330,7 +382,8 @@ def update_n_words(
     except Exception as e:
         print(f"Update n_words error: {e}")
     finally:
-        db.close()
+        if db:
+            db.close()
 
 @app.task(name='tasks.update_grammar_spelling', ignore_result=True)
 def update_grammar_spelling(
@@ -367,7 +420,8 @@ def update_grammar_spelling(
     except Exception as e:
         print(f"Update grammar spelling error: {e}")
     finally:
-        db.close()
+        if db:
+            db.close()
 
 @app.task(name='tasks.update_frequency_word', ignore_result=True)
 def update_frequency_word(
@@ -405,13 +459,14 @@ def update_frequency_word(
     except Exception as e:
         print(f"Update frequency word error: {e}")
     finally:
-        db.close()
+        if db:
+            db.close()
 
 @app.task(name='tasks.update_perplexity', ignore_result=True)
 def update_perplexity(
-        generation: dict,
-        descriptions: list[str]
+        generation: dict
 ):
+    db=None
     try:
         generation = schemas.GenerationCompleteCreate(**generation)
         db=database.SessionLocal()
@@ -461,13 +516,15 @@ def update_perplexity(
     except Exception as e:
         print(f"Update perplexity error: {e}")
     finally:
-        db.close()
+        if db:
+            db.close()
 
 @app.task(name='tasks.update_content_score', ignore_result=True)
 def update_content_score(
     generation: dict,
 ):
     try:
+        print("update content score", generation)
         generation = schemas.GenerationCompleteCreate(**generation)
         db=database.SessionLocal()
         db_generation = crud.get_generation(db, generation_id=generation.id)
@@ -499,14 +556,16 @@ def update_content_score(
     except Exception as e:
         print(f"Update content score error: {e}")
     finally:
-        db.close()
+        if db:
+            db.close()
 
-@app.task(name='tasks.generate_interpretation')
+@app.task(name='tasks.generate_interpretation', ignore_result=False)
 def generate_interpretation(
     generation_id: int,
     sentence: str,
-    at: str
+    at: datetime
 ):
+    db=None
     try:
         db=database.SessionLocal()
         t = computing_time_tracker("Generate interpretation")
@@ -536,23 +595,23 @@ def generate_interpretation(
             )
         )
 
-        at = datetime.strptime(at, "%Y-%m-%d %H:%M:%S")
-
-        generation_complete = schemas.GenerationCompleteCreate(
-            id=db_generation.id,
-            at=at
-        )
-
-        return generation_complete.model_dump()
+        return {
+            'id': db_generation.id,
+            'at': at,
+        }
     except Exception as e:
         print(f"Generate interpretation error: {e}")
     finally:
-        db.close()
+        if db:
+            db.close()
 
 @app.task(name='tasks.image_similarity', ignore_result=True)
-def image_similarity(
-    generation: dict
+def cal_image_similarity(
+    generation: tuple
 ):
+    if generation is None:
+        raise HTTPException(status_code=400, detail="Invalid generation: None type")
+    generation = generation[0]        
     try:
         generation_id = generation['id']
         db=database.SessionLocal()
@@ -576,21 +635,18 @@ def image_similarity(
             leaderboard_id=db_round.leaderboard_id
         )
 
-        semantic1 = score.calculate_content_score_celery(
-            image=db_leaderboard.original_image.image,
-            sentence=db_generation.sentence
-        )
+        semantic1 = db_generation.content_score
 
         semantic2 = score.calculate_content_score_celery(
             image=db_generation.interpreted_image.image,
             sentence=db_generation.sentence
         )
 
-        denominator = semantic1['content_score']+semantic2['content_score']
+        denominator = semantic1+semantic2['content_score']
         if denominator == 0:
             blip2_score = 0
         else:
-            blip2_score = abs(semantic1['content_score'] - semantic2['content_score'])/(semantic1['content_score']+semantic2['content_score'])
+            blip2_score = abs(semantic1 - semantic2['content_score'])/(semantic1+semantic2['content_score'])
             blip2_score = 1 - blip2_score
 
         ssim = score.image_similarity(
@@ -601,7 +657,7 @@ def image_similarity(
         similarity = blip2_score*0.8 + ssim*0.2
 
         image_similarity = schemas.ImageSimilarity(
-            semantic_score_original=semantic1['content_score'],
+            semantic_score_original=semantic1,
             semantic_score_interpreted=semantic2['content_score'],
             blip2_score=blip2_score,
             ssim=ssim,
@@ -610,18 +666,20 @@ def image_similarity(
         )
 
         score_id = db_generation.score_id
-        if score_id is not None:
-            crud.update_score(
-                db=db,
-                score=schemas.ScoreUpdate(
-                    id=score_id,
-                    image_similarity=similarity
-                )
+        if score_id is None:
+            raise HTTPException(status_code=404, detail="Score not found")
+        crud.update_score(
+            db=db,
+            score=schemas.ScoreUpdate(
+                id=score_id,
+                image_similarity=similarity
             )
+        )
 
         t.stop_timer()
-        return image_similarity
+        return image_similarity.model_dump()
     except Exception as e:
         print(f"Image similarity error: {e}")
     finally:
-        db.close()
+        if db:
+            db.close()

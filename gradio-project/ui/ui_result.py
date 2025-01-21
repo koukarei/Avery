@@ -112,8 +112,8 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         original_img = await get_original_images(int(leaderboard_id), request)
         ai_img = await get_interpreted_image(int(generation_id), request)
         score = await get_score(int(generation_id), request)
-        
-        if similarity:
+
+        if score:
             similarity = float(score.image_similarity)*100
             if similarity > 80:
                 emoji = "🎉"

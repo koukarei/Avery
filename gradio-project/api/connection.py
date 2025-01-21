@@ -429,7 +429,8 @@ async def get_score(generation_id: int, request: Request, ):
     response = await http_client.get(
         f"{BACKEND_URL}generation/{generation_id}/score/",
         auth=get_auth(request),
-        timeout=120
+        timeout=120,
+        follow_redirects=True
     )
     response.raise_for_status()
     output = models.Score(**response.json())
