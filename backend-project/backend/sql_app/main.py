@@ -831,11 +831,24 @@ async def get_my_rounds(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: Optional[int] = None,
     is_completed: Optional[bool] = True,
+    program: Optional[str] = "none",
     db: Session = Depends(get_db),
 ):
     if not current_user:
         return []
     player_id = current_user.id
+
+    if program != "none" and program != "overview":
+        db_program = crud.get_program_by_name(db, program)
+        if db_program:
+            return crud.get_rounds(
+                db=db,
+                is_completed=is_completed,
+                player_id=player_id,
+                leaderboard_id=leaderboard_id,
+                program_id=db_program.id
+            )
+
     return crud.get_rounds(
         db=db,
         is_completed=is_completed,
@@ -1779,11 +1792,27 @@ async def get_generation_score(
 async def check_leaderboard_playable(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: int, 
+    program: Optional[str] = "none",
     db: Session = Depends(get_db)
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to check leaderboard")
     
+    if program != "none" or program != "overview":
+        db_program = crud.get_program_by_name(db, program)
+        if db_program:
+            program_id = db_program.id
+            db_rounds = crud.get_rounds(
+                db=db,
+                leaderboard_id=leaderboard_id,
+                program_id=program_id
+            )
+            if db_rounds:
+                return schemas.LeaderboardPlayable(
+                    id=leaderboard_id,
+                    is_playable=False
+                )
+
     if not current_user.is_admin:
         db_rounds = crud.get_rounds(
             db=db,
@@ -1796,7 +1825,7 @@ async def check_leaderboard_playable(
                 id=leaderboard_id,
                 is_playable=False
             )
-    
+        
     return schemas.LeaderboardPlayable(
         id=leaderboard_id,
         is_playable=True

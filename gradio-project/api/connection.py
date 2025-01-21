@@ -250,11 +250,11 @@ async def create_round(new_round: models.RoundStart, request: Request, ):
     output = models.RoundStartOut(**response.json())
     return output
     
-async def read_my_rounds(request: Request, is_completed: bool = False, leaderboard_id: int = None):
+async def read_my_rounds(request: Request, is_completed: bool = False, leaderboard_id: int = None, program: str = "none"):
     if leaderboard_id is None:
-        url = f"{BACKEND_URL}my_rounds/?is_completed={is_completed}"
+        url = f"{BACKEND_URL}my_rounds/?is_completed={is_completed}&program={program}"
     else:
-        url = f"{BACKEND_URL}my_rounds/?is_completed={is_completed}&leaderboard_id={leaderboard_id}"
+        url = f"{BACKEND_URL}my_rounds/?is_completed={is_completed}&leaderboard_id={leaderboard_id}&program={program}"
 
     response = await http_client.get(
         url,
@@ -466,8 +466,9 @@ async def check_playable(
         leaderboard_id: int, 
         request: Request,
 ):
+    program = request.session.get("program", 'none')
     response = await http_client.get(
-        f"{BACKEND_URL}leaderboards/{leaderboard_id}/playable",
+        f"{BACKEND_URL}leaderboards/{leaderboard_id}/playable/?program={program}",
         auth=get_auth(request),
     )
     

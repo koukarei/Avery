@@ -114,11 +114,12 @@ with gr.Blocks(title="AVERY") as avery_gradio:
             for leaderboard in leaderboards
         ], leaderboards
     
-    async def get_unfinished_rounds_from_backend(request: gr.Request, leaderboard_id: int):
+    async def get_unfinished_rounds_from_backend(request: gr.Request, leaderboard_id: int, program: str):
         rounds = await read_my_rounds(
             request=request,
             is_completed=False,
             leaderboard_id=leaderboard_id,
+            program=program
         )
         
         return rounds
@@ -240,7 +241,8 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                 is_admin = gr.update(visible=True)
                 schools = await get_schools(request=request, leaderboard_id=select_leaderboard.id)
 
-        unfinished_rounds = await get_unfinished_rounds_from_backend(request, select_leaderboard.id)
+        program = request.session.get("program", 'none')
+        unfinished_rounds = await get_unfinished_rounds_from_backend(request, select_leaderboard.id, program)
         if unfinished_rounds:
             link = "/avery/resume_game/{}".format(select_leaderboard.id)
             start_btn = gr.update(value="再開", link=link,interactive=True)
