@@ -8,7 +8,7 @@ from pathlib import Path
 
 from . import crud, models, schemas
 from .tasks import app as celery_app
-from .tasks import check_factors_done, generateDescription, update_vocab_used_time, generate_interpretation, update_perplexity, update_content_score, update_frequency_word, update_n_words, update_grammar_spelling, calculate_score
+from .tasks import check_factors_done, check_factors_done_by_dict, generateDescription, update_vocab_used_time, generate_interpretation, update_perplexity, update_content_score, update_frequency_word, update_n_words, update_grammar_spelling, image_similarity, calculate_score
 from .database import SessionLocal, engine
 
 from .dependencies import sentence, score, dictionary, openai_chatbot, util
@@ -17,6 +17,7 @@ from .authentication import authenticate_user, authenticate_user_2, create_acces
 from typing import Tuple, List, Annotated, Optional
 from datetime import timezone, timedelta
 from contextlib import asynccontextmanager
+from celery import chain, group
 import logging
 
 models.Base.metadata.create_all(bind=engine)
@@ -576,7 +577,7 @@ async def create_leaderboards(
                 story_extract = ''
 
             if 'id' in leaderboards.columns:
-                img_title = row['id'] + ' ' + index
+                img_title = str(row['id']) + ' ' + index
             else:
                 img_title = index
             img = images.get(util.remove_special_chars(img_title), None)
@@ -999,20 +1000,12 @@ async def get_interpretation(
     db_generation = crud.get_generation(db, generation_id=generation.id)
 
     try:
-        celery_tasks = []
 
         if db_generation.interpreted_image_id is None:
-            celery_tasks.append(
-                generate_interpretation.delay(
-                    generation_id=generation.id,
-                    sentence=db_generation.sentence,
-                )
+            generate_interpretation.delay(
+                generation_id=generation.id,
+                sentence=db_generation.sentence,
             )
-
-        generation_complete = schemas.GenerationCompleteCreate(
-            id=generation.id,
-            at=db_generation.created_at
-        )
 
         # Check if description generation is done
         leaderboard_tasks = await check_leaderboard_task_status(
@@ -1021,63 +1014,39 @@ async def get_interpretation(
         )
         
         if leaderboard_tasks:
-            while not all([t.status == "SUCCESS" for t in celery_tasks]):
+            while not all([t.status == "SUCCESS" for t in leaderboard_tasks]):
                 await asyncio.sleep(1)
                 leaderboard_tasks = await check_leaderboard_task_status(
                     db=db,
                     leaderboard_id=db_round.leaderboard_id,
-                )
-
-        # Get descriptions
-        descriptions =  crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
-        descriptions = [des.content for des in descriptions]        
+                )    
 
         # Safe background task addition with error handling
         try:
-            # Update scores in background
-            celery_tasks.append(
-                update_perplexity.delay(
-                generation=generation_complete.model_dump(),
-                descriptions=descriptions
+            if db_generation.interpreted_image_id is None:
+                factors_done = check_factors_done(
+                    generation_id=generation.id
                 )
-            )
-            
-            celery_tasks.append(
-                update_content_score.delay(
-                    generation=generation_complete.model_dump(),
+                if factors_done["status"] == "FINISHED":
+                    return db_generation
+                
+                chain_interpretation = chain(
+                    generate_interpretation.s(generation_id=generation.id, sentence=db_generation.sentence, at=db_generation.created_at),
+                    group(
+                        update_content_score.s(),
+                        update_n_words.s(),
+                        update_grammar_spelling.s(),
+                        #update_frequency_word.s(),
+                        update_perplexity.s(),
+                        image_similarity.s()
+                    ),
+                    check_factors_done_by_dict.s()
                 )
-            )
-
-            # celery_tasks.append(
-            #     update_frequency_word.delay(
-            #         generation=generation_complete.model_dump(),
-            #     )
-            # )
-
-            celery_tasks.append(
-                update_n_words.delay(
-                    generation=generation_complete.model_dump(),
-                )
-            )
-
-            celery_tasks.append(
-                update_grammar_spelling.delay(
-                    generation=generation_complete.model_dump(),
-                )
-            )
+                chain_interpretation.apply_async()
 
         except Exception as e:
             # Log the background task error without raising
             util.logger1.error(f"Error in background task addition: {str(e)}")
-
-        for t in celery_tasks:
-            crud.create_task(
-                db=db,
-                task=schemas.Task(
-                    id=t.id,
-                    generation_id=db_generation.id,
-                )
-            )
 
         # Get round and create message
         db_round = crud.get_round(db, round_id)
@@ -1635,64 +1604,9 @@ async def get_image_similarity(
         db=db,
         generation_id=generation_id
     )
-
-    db_round = crud.get_round(
-        db=db,
-        round_id=db_generation.round_id
-    )
-
-    # if current_user.id != db_round.player_id and not current_user.is_admin:
-    #     raise HTTPException(status_code=401, detail="You are not authorized to view images")
-
-    db_leaderboard = crud.get_leaderboard(
-        db=db,
-        leaderboard_id=db_round.leaderboard_id
-    )
-
-    semantic1 = await score.calculate_content_score(
-        image=db_leaderboard.original_image.image,
-        sentence=db_generation.sentence
-    )
-
-    semantic2 = await score.calculate_content_score(
-        image=db_generation.interpreted_image.image,
-        sentence=db_generation.sentence
-    )
-
-    denominator = semantic1['content_score']+semantic2['content_score']
-    if denominator == 0:
-        blip2_score = 0
-    else:
-        blip2_score = abs(semantic1['content_score'] - semantic2['content_score'])/(semantic1['content_score']+semantic2['content_score'])
-        blip2_score = 1 - blip2_score
-
-    ssim = score.image_similarity(
-        image1=db_leaderboard.original_image.image,
-        image2=db_generation.interpreted_image.image
-    )["ssim_score"]
-
-    similarity = blip2_score*0.8 + ssim*0.2
-
-    image_similarity = schemas.ImageSimilarity(
-        semantic_score_original=semantic1['content_score'],
-        semantic_score_interpreted=semantic2['content_score'],
-        blip2_score=blip2_score,
-        ssim=ssim,
-        similarity=similarity
-
-    )
-
-    score_id = db_generation.score_id
-    if score_id is not None:
-        crud.update_score(
-            db=db,
-            score=schemas.ScoreUpdate(
-                id=score_id,
-                image_similarity=similarity
-            )
-        )
-
-    return image_similarity
+    if db_generation:
+        return db_generation.score.image_similarity
+    return None
 
 @app.get("/generation/{generation_id}", tags=["Generation"], response_model=schemas.GenerationOut)
 async def read_generation(

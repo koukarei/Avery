@@ -7,7 +7,7 @@ import datetime
 
 from starlette.applications import Starlette
 from starlette.middleware.sessions import SessionMiddleware
-from api.connection import get_original_images, get_image_similarity, get_chat, send_message, get_interpreted_image
+from api.connection import get_original_images, get_score, get_chat, send_message, get_interpreted_image
 from api.connection import models
 
 from ui.ui_sentence import app as fastapi_app
@@ -111,10 +111,10 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         
         original_img = await get_original_images(int(leaderboard_id), request)
         ai_img = await get_interpreted_image(int(generation_id), request)
-        similarity = await get_image_similarity(int(generation_id), request)
+        score = await get_score(int(generation_id), request)
         
         if similarity:
-            similarity = float(similarity.similarity)*100
+            similarity = float(score.image_similarity)*100
             if similarity > 80:
                 emoji = "🎉"
             elif similarity > 60:

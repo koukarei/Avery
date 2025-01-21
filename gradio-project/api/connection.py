@@ -289,7 +289,7 @@ async def send_message(round_id: int, new_message:models.MessageSend, request: R
         headers={"Content-Type": "application/json",
         },
         auth=get_auth(request),
-        timeout=20
+        timeout=40
     )
     response.raise_for_status()
     output = models.Chat(**response.json())
@@ -425,14 +425,14 @@ async def end_round(round_id: int, request: Request, ):
     output = models.Round(**response.json())
     return output
 
-async def get_image_similarity(generation_id: int, request: Request, ):
+async def get_score(generation_id: int, request: Request, ):
     response = await http_client.get(
-        f"{BACKEND_URL}image_similarity/{generation_id}",
+        f"{BACKEND_URL}generation/{generation_id}/score/",
         auth=get_auth(request),
         timeout=120
     )
     response.raise_for_status()
-    output = models.ImageSimilarity(**response.json())
+    output = models.Score(**response.json())
     return output
 
 async def get_rounds(leaderboard_id: int, request: Request):
@@ -470,6 +470,7 @@ async def check_playable(
     response = await http_client.get(
         f"{BACKEND_URL}leaderboards/{leaderboard_id}/playable/?program={program}",
         auth=get_auth(request),
+        follow_redirects=True
     )
     
     response.raise_for_status()

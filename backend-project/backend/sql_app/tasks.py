@@ -4,14 +4,14 @@ from .dependencies import sentence, score, dictionary, gen_image
 from . import crud, schemas, database
 from typing import Union, List, Annotated, Optional
 from fastapi import HTTPException
-from datetime import timezone
+from datetime import timezone, datetime
 from .dependencies.util import computing_time_tracker, encode_image
 from .database import SessionLocal, engine
 
 import torch
 
 import os, time, json, io, requests, asyncio
-from celery import Celery
+from celery import Celery, chain, group
 
 app = Celery(__name__)
 app.conf.broker_url = os.environ.get('BROKER_URL',
@@ -138,6 +138,52 @@ def check_factors_done(
     finally:
         db.close()
 
+@app.task(name="tasks.check_factors_done_by_dict")
+def check_factors_done_by_dict(
+    generation: dict,
+):
+    try:
+        db=database.SessionLocal()
+        generation_id = generation['id']
+        db_generation = crud.get_generation(db, generation_id=generation_id)
+        if db_generation is None:
+            raise HTTPException(status_code=404, detail="Generation not found")
+        if all([
+            db_generation.updated_n_words,
+            db_generation.updated_grammar_errors,
+            db_generation.updated_perplexity,
+            db_generation.updated_content_score
+        ]):
+            celery_tasks = crud.get_tasks(db, generation_id=generation_id)
+            for t in celery_tasks:
+                crud.delete_task(db, t.id)
+            return {
+                "status": "FINISHED",
+                "tasks": []
+            }
+
+        celery_tasks = crud.get_tasks(db, generation_id=generation_id)
+        output = []
+        for t in celery_tasks:
+            result = app.AsyncResult(t.id)
+            output.append(
+                schemas.TaskStatus(
+                    id=t.id,
+                    status=result.status,
+                    result=result.result
+                )
+            )
+            if result.status == "SUCCESS":
+                crud.delete_task(db, t.id)
+        
+        return {
+            "status": "PENDING",
+            "tasks": output
+        }
+    except Exception as e:
+        print(f"Check factors done error: {e}")
+    finally:
+        db.close()
 
 def calculate_score(
     db: Session,
@@ -373,6 +419,12 @@ def update_perplexity(
         db_generation = crud.get_generation(db, generation_id=generation.id)
         if db_generation.updated_perplexity:
             return json.dumps(db_generation, cls=AlchemyEncoder)
+        
+        db_round = crud.get_round(db, round_id=db_generation.round_id)
+
+        descriptions =  crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
+        descriptions = [des.content for des in descriptions]   
+
         en_nlp = nlp_models['en_nlp'].en_nlp
         perplexity_model = nlp_models['perplexity_model']
         tokenizer = nlp_models['tokenizer']
@@ -449,10 +501,11 @@ def update_content_score(
     finally:
         db.close()
 
-@app.task(name='tasks.generate_interpretation', ignore_result=True)
+@app.task(name='tasks.generate_interpretation')
 def generate_interpretation(
     generation_id: int,
     sentence: str,
+    at: str
 ):
     try:
         db=database.SessionLocal()
@@ -483,8 +536,92 @@ def generate_interpretation(
             )
         )
 
-        return db_generation.id
+        at = datetime.strptime(at, "%Y-%m-%d %H:%M:%S")
+
+        generation_complete = schemas.GenerationCompleteCreate(
+            id=db_generation.id,
+            at=at
+        )
+
+        return generation_complete.model_dump()
     except Exception as e:
         print(f"Generate interpretation error: {e}")
+    finally:
+        db.close()
+
+@app.task(name='tasks.image_similarity', ignore_result=True)
+def image_similarity(
+    generation: dict
+):
+    try:
+        generation_id = generation['id']
+        db=database.SessionLocal()
+        t = computing_time_tracker("Image similarity")
+        
+        db_generation = crud.get_generation(
+            db=db,
+            generation_id=generation_id
+        )
+
+        db_round = crud.get_round(
+            db=db,
+            round_id=db_generation.round_id
+        )
+
+        # if current_user.id != db_round.player_id and not current_user.is_admin:
+        #     raise HTTPException(status_code=401, detail="You are not authorized to view images")
+
+        db_leaderboard = crud.get_leaderboard(
+            db=db,
+            leaderboard_id=db_round.leaderboard_id
+        )
+
+        semantic1 = score.calculate_content_score_celery(
+            image=db_leaderboard.original_image.image,
+            sentence=db_generation.sentence
+        )
+
+        semantic2 = score.calculate_content_score_celery(
+            image=db_generation.interpreted_image.image,
+            sentence=db_generation.sentence
+        )
+
+        denominator = semantic1['content_score']+semantic2['content_score']
+        if denominator == 0:
+            blip2_score = 0
+        else:
+            blip2_score = abs(semantic1['content_score'] - semantic2['content_score'])/(semantic1['content_score']+semantic2['content_score'])
+            blip2_score = 1 - blip2_score
+
+        ssim = score.image_similarity(
+            image1=db_leaderboard.original_image.image,
+            image2=db_generation.interpreted_image.image
+        )["ssim_score"]
+
+        similarity = blip2_score*0.8 + ssim*0.2
+
+        image_similarity = schemas.ImageSimilarity(
+            semantic_score_original=semantic1['content_score'],
+            semantic_score_interpreted=semantic2['content_score'],
+            blip2_score=blip2_score,
+            ssim=ssim,
+            similarity=similarity
+
+        )
+
+        score_id = db_generation.score_id
+        if score_id is not None:
+            crud.update_score(
+                db=db,
+                score=schemas.ScoreUpdate(
+                    id=score_id,
+                    image_similarity=similarity
+                )
+            )
+
+        t.stop_timer()
+        return image_similarity
+    except Exception as e:
+        print(f"Image similarity error: {e}")
     finally:
         db.close()
