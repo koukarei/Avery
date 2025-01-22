@@ -458,15 +458,43 @@ async def end_round(round_id: int, request: Request, ):
     return output
 
 async def get_score(generation_id: int, request: Request, ):
-    response = await http_client.get(
-        f"{BACKEND_URL}generation/{generation_id}/score/",
-        auth=get_auth(request),
-        timeout=120,
-        follow_redirects=True
-    )
-    response.raise_for_status()
-    output = models.Score(**response.json())
-    return output
+    """
+    Check whether the generation is complete and return the details
+    """
+    max_retries = 10
+    retry_delay = 5  # seconds
+    timeout = 120  # seconds per request
+    
+    for attempt in range(max_retries):
+        try:
+            response = await http_client.get(
+                f"{BACKEND_URL}generation/{generation_id}/score/",
+                auth=get_auth(request),
+                timeout=timeout,
+                follow_redirects=True
+            )
+            
+            if response.status_code == 200:
+                output = models.Score(**response.json())
+                if output.image_similarity is not None:
+                    return output
+                
+            # If status code is not 200, wait before retrying
+            if attempt < max_retries - 1:  # Don't sleep on last attempt
+                await asyncio.sleep(retry_delay)
+                
+        except (httpx.TimeoutException, httpx.RemoteProtocolError) as e:
+            # Log error if needed
+            if attempt < max_retries - 1:  # Don't sleep on last attempt
+                await asyncio.sleep(retry_delay)
+            continue
+            
+        except Exception as e:
+            # For any other unexpected errors, return None
+            logger.debug(f"get_score: {e}")
+            continue
+    logger.debug(f"get_score: Failed after {max_retries} attempts")
+    return None
 
 async def get_rounds(leaderboard_id: int, request: Request):
     response = await http_client.get(

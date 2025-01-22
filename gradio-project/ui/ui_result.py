@@ -118,11 +118,11 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         request = request.request
         cur_round = request.session.get('round', None)
         generation_id = request.session.get('generation_id', None)
-        complete_gen = await complete_generation(
-            round_id=cur_round['id'],
-            generation_id=generation_id,
-            request=request,
-        )
+        # complete_gen = await complete_generation(
+        #     round_id=cur_round['id'],
+        #     generation_id=generation_id,
+        #     request=request,
+        # )
         score = await get_score(int(generation_id), request)
 
         if score:
