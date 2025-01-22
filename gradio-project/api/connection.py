@@ -399,13 +399,17 @@ async def get_interpreted_image(generation_id: int, request: Request):
     logger.debug(f"get_interpreted_image: Failed after {max_retries} attempts")
     return None
 
-async def complete_generation(round_id: int, generation: models.GenerationCompleteCreate, request: Request, ):
+async def complete_generation(round_id: int, generation_id: int, request: Request, ):
     """
     Check whether the generation is complete and return the details
     """
     max_retries = 10
     retry_delay = 5  # seconds
     timeout = 120  # seconds per request
+    generation= models.GenerationCompleteCreate(
+        id=generation_id,
+        at=datetime.datetime.now()
+    )
     
     for attempt in range(max_retries):
         try:

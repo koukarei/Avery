@@ -389,21 +389,7 @@ async def redirect_to_result(request: Request, generation_id: Optional[int]=None
         return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
     request.session["generated_time"] = generated_time
     request.session["generation_id"] = latest_gen.id
-
-    utc_time = datetime.datetime.now(datetime.timezone.utc)
-    japan_time = convert_to_japan_time(utc_time)
-    output = await complete_generation(
-        round_id=request.session.get('round')['id'],
-        generation=models.GenerationCompleteCreate(
-            id=latest_gen.id,
-            at=utc_time,
-        ),
-        request=request,
-    )
-    if not output:
-        raise HTTPException(status_code=500, detail="Generation not completed")
-
-
+    
     if generated_time > (MAX_GENERATION-1):
         output = await end_round(
             round_id=request.session.get('round')['id'], 

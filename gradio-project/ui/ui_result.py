@@ -7,7 +7,7 @@ import datetime
 
 from starlette.applications import Starlette
 from starlette.middleware.sessions import SessionMiddleware
-from api.connection import get_original_images, get_score, get_chat, send_message, get_interpreted_image
+from api.connection import get_original_images, get_score, get_chat, send_message, get_interpreted_image, complete_generation
 from api.connection import models
 
 from ui.ui_sentence import app as fastapi_app
@@ -111,6 +111,18 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         
         original_img = await get_original_images(int(leaderboard_id), request)
         ai_img = await get_interpreted_image(int(generation_id), request)
+
+        return original_img, ai_img
+    
+    async def load_score(request: gr.Request):
+        request = request.request
+        cur_round = request.session.get('round', None)
+        generation_id = request.session.get('generation_id', None)
+        complete_gen = await complete_generation(
+            round_id=cur_round['id'],
+            generation_id=generation_id,
+            request=request,
+        )
         score = await get_score(int(generation_id), request)
 
         if score:
@@ -124,18 +136,25 @@ with gr.Blocks(title="AVERY") as avery_gradio:
             else:
                 emoji = "😢"
         similarity_md = "# 類似度: {:^10.2f}％ {}".format(similarity, emoji)
-        return original_img, ai_img, similarity_md
-    
+        return similarity_md
+
     async def load_chat_content(request: gr.Request):
         request = request.request
         generation_id = request.session.get('generation_id', None)
         cur_round = request.session.get('round', None)
+        
         # complete the generation and get the chat
         if generation_id is None:
             raise Exception("Generation not found")
         
         if cur_round is None:
             raise Exception("Round not found")
+
+        complete_gen = await complete_generation(
+            round_id=cur_round['id'],
+            generation_id=generation_id,
+            request=request,
+        )
 
         if cur_round:
             chat = await get_chat(
@@ -207,7 +226,8 @@ with gr.Blocks(title="AVERY") as avery_gradio:
             result.create_result()
 
 
-    avery_gradio.load(obtain_image, inputs=[], outputs=[result.image, result.ai_image, result.similarity])
+    avery_gradio.load(obtain_image, inputs=[], outputs=[result.image, result.ai_image])
+    avery_gradio.load(load_score, inputs=[], outputs=[result.similarity])
     avery_gradio.load(load_chat_content, inputs=[], outputs=[guidance.chat, result.restart_btn, result.end_btn, result.restart_btn,guidance.msg,guidance.submit,md])
     avery_gradio.queue(max_size=128, default_concurrency_limit=50)
 
