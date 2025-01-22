@@ -367,9 +367,9 @@ async def get_interpreted_image(generation_id: int, request: Request):
     Returns:
         PIL.Image or None: The interpreted image if successful, None if failed after retries
     """
-    max_retries = 10
+    max_retries = 30
     retry_delay = 5  # seconds
-    timeout = 120  # seconds per request
+    timeout = 300  # seconds per request
     
     for attempt in range(max_retries):
         try:
