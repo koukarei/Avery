@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.declarative import DeclarativeMeta
-from .dependencies import sentence, score, dictionary, gen_image
+from .dependencies import sentence, score, dictionary, gen_image, openai_chatbot
 from . import crud, schemas, database
 from typing import Union, List, Annotated, Optional
 from fastapi import HTTPException
@@ -10,14 +10,25 @@ from .database import SessionLocal, engine
 
 import torch
 
-import os, time, json, io, requests, asyncio
-from celery import Celery, chain, group
+import os, time, json, io, requests
+from celery import Celery
+from celery.schedules import crontab
 
 app = Celery(__name__)
 app.conf.broker_url = os.environ.get('BROKER_URL',
                                         'redis://localhost:7876')
 app.conf.result_backend = os.environ.get('RESULT_BACKEND',
                                             'redis://localhost:7876')
+
+app.conf.timezone = 'Asia/Tokyo'
+
+app.conf.beat_schedule = {
+    'check_error_task': {
+        'task': 'tasks.check_error_task',
+        'schedule': crontab(minute=0, hour=5),
+    }
+}
+
 nlp_models = {}
 
 def model_load():
@@ -242,8 +253,8 @@ def calculate_score(
             db_scores = crud.get_score(db, score_id=db_generation.score_id)
             scores = json.dumps(db_scores, cls=AlchemyEncoder)
             scores = json.loads(scores)
+            scores['total_score'] = db_generation.total_score
             if is_completed and not db_generation.is_completed:
-                scores['total_score'] = db_generation.total_score
                 generation_com = schemas.GenerationComplete(
                     id=db_generation.id,
                     duration=duration,
@@ -568,6 +579,12 @@ def generate_interpretation(
     db=None
     try:
         db=database.SessionLocal()
+        db_generation = crud.get_generation(db, generation_id=generation_id)
+        if db_generation.interpreted_image_id is not None:
+            return {
+                'id': db_generation.id,
+                'at': at,
+            }
         t = computing_time_tracker("Generate interpretation")
         url = gen_image.generate_interpretion(sentence)
         t.stop_timer()
@@ -621,6 +638,10 @@ def cal_image_similarity(
             db=db,
             generation_id=generation_id
         )
+
+        if db_generation.score_id is not None:
+            if db_generation.score.image_similarity:
+                return db_generation.score.image_similarity
 
         db_round = crud.get_round(
             db=db,
@@ -680,6 +701,264 @@ def cal_image_similarity(
         return image_similarity.model_dump()
     except Exception as e:
         print(f"Image similarity error: {e}")
+    finally:
+        if db:
+            db.close()
+
+@app.task(name="tasks.complete_generation_backend", ignore_result=True)
+def complete_generation_backend(
+    items: tuple,
+):
+    if items is None:
+        raise HTTPException(status_code=400, detail="Invalid generation: None type")
+    generation = items[0]        
+    
+    try:
+        generation_id = generation['id']
+        db=database.SessionLocal()
+        t = computing_time_tracker("Complete generation")
+
+        db_generation = crud.get_generation(
+            db=db,
+            generation_id=generation_id
+        )
+
+        if db_generation.is_completed:
+            return generation
+
+        db_round = crud.get_round(
+            db=db,
+            round_id=db_generation.round_id
+        )
+
+        db_chat = crud.get_chat(db=db,chat_id=db_round.chat_history)
+        
+        cb=openai_chatbot.Hint_Chatbot()
+        
+        factors, scores_dict = items[1]
+
+        descriptions = crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
+        descriptions = [des.content for des in descriptions]
+
+        evaluation = cb.get_result(
+            sentence=db_generation.sentence,
+            correct_sentence=db_generation.correct_sentence,
+            scoring=scores_dict,
+            rank=db_generation.rank,
+            base64_image=db_round.leaderboard.original_image.image,
+            chat_history=db_chat.messages,
+            grammar_errors=db_generation.grammar_errors,
+            spelling_errors=db_generation.spelling_errors,
+            descriptions=descriptions
+        )
+
+        if evaluation:
+            score_message = """あなたの回答（評価対象）：{user_sentence}
+
+修正された回答　　　　 ：{correct_sentence}
+
+
+| 　　          | 得点   | 満点       |
+|---------------|--------|------|
+| 文法得点      |{:>5}|  5  |
+| スペリング得点|{:>5}|  5  |
+| 鮮明さ        |{:>5}|  5  |
+| 自然さ        |{:>5}|  1  |
+| 構造性        |{:>5}|  3  |
+| 内容得点      |{:>5}| 100 |
+| 合計点        |{:>5}| 100 |
+| ランク        |{:>5}|(A-最高, B-上手, C-良い, D-普通, E-もう少し, F-頑張ろう)|""".format(
+                round(scores_dict['grammar_score'],2),
+                round(scores_dict['spelling_score'],2),
+                round(scores_dict['vividness_score'],2),
+                scores_dict['convention'],
+                scores_dict['structure_score'],
+                scores_dict['content_score'],
+                scores_dict['total_score'],
+                db_generation.rank,
+                user_sentence=db_generation.sentence,
+                correct_sentence=db_generation.correct_sentence,
+            )
+
+            if len(db_round.generations) > 2:
+                recommended_vocabs = db_round.leaderboard.vocabularies
+                recommended_vocabs = [vocab.word for vocab in recommended_vocabs]
+                recommended_vocab = "\n\n**おすすめの単語**\n" + ", ".join(recommended_vocabs)
+            else:
+                recommended_vocab = ""
+
+            evaluation_message = """**文法**
+{grammar_feedback}
+**スペル**
+{spelling_feedback}
+**スタイル**
+{style_feedback}
+**内容**
+{content_feedback}
+
+**総合評価**
+{overall_feedback}{recommended_vocab}""". \
+            format(
+                grammar_feedback=evaluation.grammar_evaluation,
+                spelling_feedback=evaluation.spelling_evaluation,
+                style_feedback=evaluation.style_evaluation,
+                content_feedback=evaluation.content_evaluation,
+                overall_feedback=evaluation.overall_evaluation,
+                recommended_vocab=recommended_vocab
+            )
+
+            crud.create_message(
+                db=db,
+                message=schemas.MessageBase(
+                    content=score_message,
+                    sender="assistant",
+                    created_at=datetime.now(tz=timezone.utc)
+                ),
+                chat_id=db_round.chat_history
+            )
+
+            crud.create_message(
+                db=db,
+                message=schemas.MessageBase(
+                    content=evaluation_message,
+                    sender="assistant",
+                    created_at=datetime.now(tz=timezone.utc)
+                ),
+                chat_id=db_round.chat_history
+            )
+
+            generation_com = schemas.GenerationComplete(
+                id=db_generation.id,
+                is_completed=True
+            )
+
+            crud.update_generation3(
+                db=db,
+                generation=generation_com
+            )
+            return generation_com.model_dump()
+        raise HTTPException(status_code=500, detail="Error completing generation")
+    except Exception as e:
+        print(f"Complete generation error: {e}")
+    finally:
+        if db:
+            db.close()
+
+@app.task(name='tasks.check_error_task', ignore_result=True)
+def check_error_task():
+    try:
+        db=database.SessionLocal()
+        # stop at generating images
+        generations = crud.get_error_task(
+            db=db,
+            group_type='no_image'
+        )
+        if generations:
+            for generation in generations:
+                generate_interpretation(
+                    generation_id=generation.id,
+                    sentence=generation.sentence,
+                    at=generation.at
+                )
+
+        # stop at content score
+        generations = crud.get_error_task(
+            db=db,
+            group_type = 'no_content_score'
+        )
+        if generations:
+            for generation in generations:
+                update_content_score(
+                    generation={
+                        "id": generation.id,
+                        "at": datetime.now()
+                    }
+                )
+         
+        # stop at word num
+        generations = crud.get_error_task(
+            db=db,
+            group_type='no_word_num'
+        )
+        if generations:
+            for generation in generations:
+                update_n_words(
+                    generation={
+                        "id": generation.id,
+                        "at": datetime.now()
+                    }
+                )
+        
+        # stop at grammar and spelling
+        generations = crud.get_error_task(
+            db=db,
+            group_type='no_grammar'
+        )
+        if generations:
+            for generation in generations:
+                update_grammar_spelling(
+                    generation={
+                        "id": generation.id,
+                        "at": datetime.now()
+                    }
+                )
+
+        # stop at perplexity
+        generations = crud.get_error_task(
+            db=db,
+            group_type='no_perplexity'
+        )
+        if generations:
+            for generation in generations:
+                update_perplexity(
+                    generation={
+                        "id": generation.id,
+                        "at": datetime.now()
+                    }
+                )
+
+        # stop at calculate total score
+        generations = crud.get_error_task(
+            db=db,
+            group_type='no_score'
+        )
+        if generations:
+            for generation in generations:
+                info={
+                        "id": generation.id,
+                        "at": datetime.now()
+                }
+                factor_score = calculate_score(
+                    generation=info
+                )
+                complete_generation_backend(
+                    items=(
+                        info,
+                        factor_score
+                    )
+                )
+
+        # stop at image similarity
+        score = crud.get_error_task(
+            db=db,
+            group_type='no_similarity'
+        )
+        if score:
+            for s in score:
+                cal_image_similarity(
+                    generation=[{
+                        "id": s.generation_id,
+                    }]
+                )
+
+        # generation complete
+        generations = crud.get_error_task(
+            db=db,
+            group_type='no_complete'
+        )
+
+    except Exception as e:
+        print(f"Check error task error: {e}")
     finally:
         if db:
             db.close()

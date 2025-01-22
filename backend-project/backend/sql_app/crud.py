@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, and_
 
 from . import models, schemas
 
@@ -335,6 +336,13 @@ def create_interpreted_image(db: Session, image: schemas.ImageBase):
     db.add(db_image)
     db.commit()
     db.refresh(db_image)
+    return db_image
+
+def delete_interpreted_image(db: Session, image_id: int):
+    db_image = db.query(models.InterpretedImage).filter(models.InterpretedImage.id == image_id).first()
+    if db_image:
+        db.delete(db_image)
+        db.commit()
     return db_image
 
 def get_story(db: Session, story_id: int):
@@ -679,6 +687,13 @@ def update_score(db: Session, score: schemas.ScoreUpdate):
     db.refresh(db_score)
     return db_score
 
+def delete_score(db: Session, score_id: int):
+    db_score = db.query(models.Score).filter(models.Score.id == score_id).first()
+    if db_score:
+        db.delete(db_score)
+        db.commit()
+    return db_score
+
 def get_score(db: Session, score_id: Optional[int] = None, generation_id: Optional[int] = None):
     if score_id:
         return db.query(models.Score).filter(models.Score.id == score_id).first()
@@ -879,3 +894,87 @@ def delete_all_tasks(db: Session):
 
 def get_all_tasks(db: Session):
     return db.query(models.Task).all()
+
+def get_error_task(db: Session, group_type: str):
+
+    answer_input_generation = db.query(models.Generation).\
+        filter(models.Generation.correct_sentence != None)
+
+    if group_type == 'no_interpretation':
+        image_group = db.query(models.InterpretedImage).\
+            filter(or_(models.InterpretedImage.image == None,
+                       models.InterpretedImage.generation == None)).\
+                all()
+        return image_group
+
+    if group_type == 'no_image':
+        # correct_sentence is set but interpreted_image_id is not set
+        generation_group = answer_input_generation.\
+            filter(models.Generation.interpreted_image == None).\
+                all()
+        return generation_group
+
+    if group_type == 'no_score':
+        # the score are not calculated
+        generation_group = answer_input_generation.\
+            filter(models.Generation.score_id == None).\
+                all()
+        return generation_group
+    if group_type == 'no_content_score':
+        # content_score is not calculated
+        generation_group = answer_input_generation.\
+            filter(
+                models.Generation.updated_content_score != True,
+            ).\
+                all()
+        return generation_group
+    if group_type == 'no_word_num':
+        # word_num is not calculated
+        generation_group = answer_input_generation.\
+            filter(
+                or_(
+                    models.Generation.updated_n_words != True,
+                    models.Generation.n_words == 0,
+                )
+            ).\
+                all()
+        return generation_group
+    if group_type == 'no_grammar':
+        # grammar_score is not calculated
+        generation_group = answer_input_generation.\
+            filter(
+                models.Generation.updated_grammar_errors != True
+            ).\
+                all()
+        return generation_group
+    if group_type == 'no_perplexity':
+        # perplexity is not calculated
+        generation_group = answer_input_generation.\
+            filter(
+                models.Generation.updated_perplexity != True
+            ).\
+                all()
+        return generation_group
+    
+    if group_type == 'no_similarity':
+        # image_similarity is not set
+        score_group = db.query(models.Score).\
+            filter(or_(
+                models.Score.image_similarity == None,
+                models.Score.image_similarity == 0
+            )).\
+            filter(
+                models.Score.generation_id.in_(
+                    db.query(models.Generation.id).\
+                        filter(models.Generation.content_score > 0, models.Generation.interpreted_image_id != None)
+            )).\
+                all()
+        return score_group
+    
+    if group_type == 'no_complete':
+        # the generation is not completed
+        generation_group = answer_input_generation.\
+            filter(models.Generation.is_completed != True).\
+                all()
+        return generation_group
+    

@@ -367,7 +367,7 @@ async def get_interpreted_image(generation_id: int, request: Request):
     Returns:
         PIL.Image or None: The interpreted image if successful, None if failed after retries
     """
-    max_retries = 7
+    max_retries = 10
     retry_delay = 5  # seconds
     timeout = 120  # seconds per request
     
@@ -400,18 +400,46 @@ async def get_interpreted_image(generation_id: int, request: Request):
     return None
 
 async def complete_generation(round_id: int, generation: models.GenerationCompleteCreate, request: Request, ):
-    json_data = convert_json(generation)
-    response = await http_client.put(
-        f"{BACKEND_URL}round/{round_id}/complete",
-        json=json_data,
-        headers={"Content-Type": "application/json",
-        },
-        auth=get_auth(request),
-        timeout=120
-    )
-    response.raise_for_status()
-    output = models.GenerationComplete(**response.json())
-    return output
+    """
+    Check whether the generation is complete and return the details
+    """
+    max_retries = 10
+    retry_delay = 5  # seconds
+    timeout = 120  # seconds per request
+    
+    for attempt in range(max_retries):
+        try:
+            json_data = convert_json(generation)
+            response = await http_client.put(
+                f"{BACKEND_URL}round/{round_id}/complete",
+                json=json_data,
+                headers={"Content-Type": "application/json",
+                },
+                auth=get_auth(request),
+                timeout=timeout
+            )
+            
+            if response.status_code == 200:
+                output = models.GenerationComplete(**response.json())
+                if output.is_completed == True:
+                    return output
+                
+            # If status code is not 200, wait before retrying
+            if attempt < max_retries - 1:  # Don't sleep on last attempt
+                await asyncio.sleep(retry_delay)
+                
+        except (httpx.TimeoutException, httpx.RemoteProtocolError) as e:
+            # Log error if needed
+            if attempt < max_retries - 1:  # Don't sleep on last attempt
+                await asyncio.sleep(retry_delay)
+            continue
+            
+        except Exception as e:
+            # For any other unexpected errors, return None
+            logger.debug(f"complete_generation: {e}")
+            continue
+    logger.debug(f"complete_generation: Failed after {max_retries} attempts")
+    return None
 
 async def end_round(round_id: int, request: Request, ):
     # Test complete round

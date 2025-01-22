@@ -8,13 +8,13 @@ from pathlib import Path
 
 from . import crud, models, schemas
 from .tasks import app as celery_app
-from .tasks import check_factors_done, check_factors_done_by_dict, generateDescription, update_vocab_used_time, generate_interpretation, pass_generation_dict, update_perplexity, update_content_score, update_frequency_word, update_n_words, update_grammar_spelling, cal_image_similarity, calculate_score
+from .tasks import check_factors_done, check_factors_done_by_dict, generateDescription, update_vocab_used_time, generate_interpretation, pass_generation_dict, update_perplexity, update_content_score, update_frequency_word, update_n_words, update_grammar_spelling, cal_image_similarity, complete_generation_backend, calculate_score, check_error_task
 from .database import SessionLocal, engine
 
 from .dependencies import sentence, score, dictionary, openai_chatbot, util
 from .authentication import authenticate_user, authenticate_user_2, create_access_token, oauth2_scheme, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, REFRESH_TOKEN_EXPIRE_MINUTES, JWTError, jwt
 
-from typing import Tuple, List, Annotated, Optional
+from typing import Tuple, List, Annotated, Optional, Union, Literal
 from datetime import timezone, timedelta
 from contextlib import asynccontextmanager
 from celery import chain, group
@@ -1047,7 +1047,10 @@ async def get_interpretation(
                     pass_generation_dict.s(),
                     calculate_score.s()
                 ),
-                cal_image_similarity.s(),
+                group(
+                    cal_image_similarity.s(),
+                    complete_generation_backend.s()
+                ),
             )
             chain_interpretation.apply_async()
 
@@ -1088,7 +1091,6 @@ async def complete_generation(
     generation: schemas.GenerationCompleteCreate,
     db: Session = Depends(get_db),
 ):
-    mem_track = util.memory_tracker(message="Complete generation",id=generation.id)
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to complete generation")
     
@@ -1101,129 +1103,7 @@ async def complete_generation(
     
     if current_user.id != db_round.player_id:
         raise HTTPException(status_code=401, detail="You are not authorized to complete generation")
-    
-    db_chat = crud.get_chat(db=db,chat_id=db_round.chat_history)
-    cb=openai_chatbot.Hint_Chatbot()
-
-    # Check if the score calculation is done
-    timeout = time.time() + 60
-    counter=0
-
-    factors = check_factors_done(
-        generation_id=generation.id
-    )
-
-    if factors["status"] != "FINISHED":
-        while time.time() < timeout:
-            factors = check_factors_done(
-                generation_id=generation.id
-            )
-            if factors["status"] == "FINISHED":
-                break
-            await asyncio.sleep(3)
-            counter+=1
-            if counter>30:
-                raise HTTPException(status_code=400, detail="Timeout error")
-            raise HTTPException(status_code=400, detail="Error in score calculation")
-        
-    factors, scores_dict = calculate_score(
-        generation=generation.model_dump(),
-        is_completed=True,
-    )
-
-    db_generation = crud.get_generation(db, generation_id=generation.id)
-    descriptions = crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
-    descriptions = [des.content for des in descriptions]
-
-    evaluation = cb.get_result(
-        sentence=db_generation.sentence,
-        correct_sentence=db_generation.correct_sentence,
-        scoring=scores_dict,
-        rank=db_generation.rank,
-        base64_image=db_round.leaderboard.original_image.image,
-        chat_history=db_chat.messages,
-        grammar_errors=db_generation.grammar_errors,
-        spelling_errors=db_generation.spelling_errors,
-        descriptions=descriptions
-    )
-
-    if evaluation:
-        score_message = """あなたの回答（評価対象）：{user_sentence}
-
-修正された回答　　　　 ：{correct_sentence}
-
-
-| 　　          | 得点   | 満点       |
-|---------------|--------|------|
-| 文法得点      |{:>5}|  5  |
-| スペリング得点|{:>5}|  5  |
-| 鮮明さ        |{:>5}|  5  |
-| 自然さ        |{:>5}|  1  |
-| 構造性        |{:>5}|  3  |
-| 内容得点      |{:>5}| 100 |
-| 合計点        |{:>5}| 100 |
-| ランク        |{:>5}|(A-最高, B-上手, C-良い, D-普通, E-もう少し, F-頑張ろう)|""".format(
-            round(scores_dict['grammar_score'],2),
-            round(scores_dict['spelling_score'],2),
-            round(scores_dict['vividness_score'],2),
-            scores_dict['convention'],
-            scores_dict['structure_score'],
-            scores_dict['content_score'],
-            scores_dict['total_score'],
-            db_generation.rank,
-            user_sentence=db_generation.sentence,
-            correct_sentence=db_generation.correct_sentence,
-        )
-
-        if len(db_round.generations) > 2:
-            recommended_vocabs = db_round.leaderboard.vocabularies
-            recommended_vocabs = [vocab.word for vocab in recommended_vocabs]
-            recommended_vocab = "\n\n**おすすめの単語**\n" + ", ".join(recommended_vocabs)
-        else:
-            recommended_vocab = ""
-
-        evaluation_message = """**文法**
-{grammar_feedback}
-**スペル**
-{spelling_feedback}
-**スタイル**
-{style_feedback}
-**内容**
-{content_feedback}
-
-**総合評価**
-{overall_feedback}{recommended_vocab}""". \
-        format(
-            grammar_feedback=evaluation.grammar_evaluation,
-            spelling_feedback=evaluation.spelling_evaluation,
-            style_feedback=evaluation.style_evaluation,
-            content_feedback=evaluation.content_evaluation,
-            overall_feedback=evaluation.overall_evaluation,
-            recommended_vocab=recommended_vocab
-        )
-
-        crud.create_message(
-            db=db,
-            message=schemas.MessageBase(
-                content=score_message,
-                sender="assistant",
-                created_at=datetime.datetime.now(tz=timezone.utc)
-            ),
-            chat_id=db_round.chat_history
-        )
-
-        crud.create_message(
-            db=db,
-            message=schemas.MessageBase(
-                content=evaluation_message,
-                sender="assistant",
-                created_at=datetime.datetime.now(tz=timezone.utc)
-            ),
-            chat_id=db_round.chat_history
-        )
-
-    mem_track.get_top_stats()
-    return crud.get_generation(db, generation_id=generation.id)
+    return db_generation
 
 @app.post("/round/{round_id}/end",tags=["Round"], response_model=schemas.RoundOut)
 async def end_round(
@@ -1708,3 +1588,141 @@ async def check_leaderboard_playable(
         id=leaderboard_id,
         is_playable=True
     )
+
+@app.get("/generations/fix_error", tags=["Task"], response_model=list[Union[schemas.GenerationOut, schemas.Score, schemas.InterpretedImage]])
+async def read_error(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    group_type: Literal["no_image", "no_interpretation", "no_score", "no_content_score","no_word_num","no_grammar","no_perplexity","no_similarity","no_complete"],
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view error")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    return crud.get_error_task(db, group_type=str(group_type))
+
+@app.post("/tasks/fix_error", tags=["Task"])
+async def fix_error_task(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to fix error")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    
+    try:
+
+        db_images = crud.get_error_task(
+            db=db,
+            group_type='no_interpretation'
+        )
+
+        if db_images:
+            for db_image in db_images:
+                crud.delete_interpreted_image(
+                    db=db,
+                    image_id=db_image.id
+                )
+
+        chain_interpretations = []
+        # stop at generating images
+        db_generations = crud.get_error_task(
+            db=db,
+            group_type='no_complete'
+        )
+        if db_generations:
+            for db_generation in db_generations:
+                generation_dict = {
+                    "id": db_generation.id,
+                    "at": db_generation.created_at,
+                }
+                chain_interpretation = chain(
+                    group(
+                        generate_interpretation.s(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at),
+                        update_content_score.s(generation=generation_dict),
+                        update_n_words.s(generation=generation_dict),
+                        update_grammar_spelling.s(generation=generation_dict),
+                        #update_frequency_word.s(generation=generation_dict),
+                        update_perplexity.s(generation=generation_dict),
+                    ),
+                    group(
+                        pass_generation_dict.s(),
+                    ),
+                    group(
+                        check_factors_done_by_dict.s()
+                    ),
+                    group(
+                        pass_generation_dict.s(),
+                        calculate_score.s()
+                    ),
+                    group(
+                        cal_image_similarity.s(),
+                        complete_generation_backend.s()
+                    ),
+                )
+                chain_interpretation.apply_async()
+                chain_interpretations.append(chain_interpretation)
+
+        db_generations = crud.get_error_task(
+            db=db,
+            group_type='no_score'
+        )
+
+        if db_generations:
+            for db_generation in db_generations:
+                generation_dict = {
+                    "id": db_generation.id,
+                    "at": db_generation.created_at,
+                }
+                check = check_factors_done(
+                    generation_id=db_generation.id
+                )
+                if check["status"] == "FINISHED":
+                    chain_interpretation = chain(
+                        group(
+                            pass_generation_dict.s(generation=[{
+                            'id': db_generation.id}]),
+                            calculate_score.s(
+                                generation={
+                                    'id': db_generation.id,
+                                    'at': db_generation.created_at,
+                                }
+                            )
+                        ),
+                        group(
+                            cal_image_similarity.s(),
+                            complete_generation_backend.s()
+                        ),
+                    )
+                    chain_interpretation.apply_async()
+                    chain_interpretations.append(chain_interpretation)
+
+        db_scores = crud.get_error_task(
+            db=db,
+            group_type='no_similarity'
+        )
+
+        if db_scores:
+            for db_score in db_scores:
+                db_generation = crud.get_generation(
+                    db=db,
+                    generation_id=db_score.generation_id
+                )
+                if db_generation.score_id == db_score.id:
+                    chain_interpretation = chain(
+                        cal_image_similarity.s(generation=[{
+                            'id': db_score.generation_id,
+                        }]),
+                    )
+                    chain_interpretation.apply_async()
+                    chain_interpretations.append(chain_interpretation)
+                else:
+                    crud.delete_score(
+                        db=db,
+                        score_id=db_score.id
+                    )
+
+        return chain_interpretations
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
