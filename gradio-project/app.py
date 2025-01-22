@@ -271,6 +271,7 @@ async def resume_game(request: Request, leaderboard_id: Optional[int]=None):
         request=request,
         is_completed=False,
         leaderboard_id=leaderboard_id,
+        program=request.session["program"],
     )
 
     if not res:
