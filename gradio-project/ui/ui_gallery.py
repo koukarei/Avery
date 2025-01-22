@@ -87,6 +87,11 @@ with gr.Blocks(title="AVERY") as avery_gradio:
 
     unfinished = gr.State()
     
+    async def set_image_date():
+        current_time = datetime.datetime.now().astimezone(datetime.timezone.utc)
+        today_str = convert_to_japan_time(current_time).strftime("%Y-%m-%d")
+        return today_str, today_str
+
     async def initialize_game(request: gr.Request, published_at_start: Optional[datetime.datetime]=None, published_at_end: Optional[datetime.datetime]=None):
         is_admin = False
         request = request.request
@@ -150,10 +155,8 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                     link="/avery/logout",
                 )
             with gr.Row():
-                current_time = datetime.datetime.now().astimezone(datetime.timezone.utc)
-                today_str = convert_to_japan_time(current_time).strftime("%Y-%m-%d")
-                published_at_start_dropdown = gr.DateTime(today_str, include_time=False, label="公開日")
-                published_at_end_dropdown = gr.DateTime(today_str, include_time=False, label="〜")
+                published_at_start_dropdown = gr.DateTime(None, include_time=False, label="公開日")
+                published_at_end_dropdown = gr.DateTime(None, include_time=False, label="〜")
 
     leaderboards = gr.State()
     selected_leaderboard = gr.State()
@@ -163,6 +166,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
     gallery.create_gallery()
 
     try: 
+        avery_gradio.load(set_image_date, outputs=[published_at_start_dropdown, published_at_end_dropdown])
         avery_gradio.load(initialize_game, inputs=[published_at_start_dropdown, published_at_end_dropdown], outputs=[gallery.gallery,leaderboards])
     except Exception as e:
         RedirectResponse(url="/avery/")
