@@ -912,7 +912,7 @@ async def get_user_answer(
     if current_user.id != db_round.player_id:
         raise HTTPException(status_code=401, detail="You are not authorized to answer")
     db_generation = crud.get_generation(db, generation_id=db_round.last_generation_id)
-    if db_generation and not db_generation.is_completed:
+    if db_generation and db_generation.correct_sentence is not None:
         db_generation = crud.update_generation0(
             db=db,
             generation=generation,
