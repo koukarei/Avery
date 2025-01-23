@@ -207,7 +207,7 @@ def calculate_content_score_celery(
       response.raise_for_status()
       return response.json()
     except requests.exceptions.RequestException as e:
-      raise HTTPException(status_code=500, detail="BLIP2 server error")
+      raise HTTPException(status_code=500, detail="BLIP2 server error: {e}")
 
 def calculate_score(
       n_grammar_errors: int,
