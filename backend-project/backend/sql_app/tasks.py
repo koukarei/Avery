@@ -835,13 +835,13 @@ def complete_generation_backend(
 
             generation_com = schemas.GenerationComplete(
                 id=db_generation.id,
-                is_completed=True
+                is_completed=True,
+                duration=duration
             )
 
             crud.update_generation3(
                 db=db,
                 generation=generation_com,
-                duration=duration
             )
             return generation_com.model_dump()
         raise HTTPException(status_code=500, detail="Error completing generation")
