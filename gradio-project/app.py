@@ -375,6 +375,7 @@ async def redirect_to_result(request: Request, generation_id: Optional[int]=None
         request=request,
         is_completed=False,
         leaderboard_id=request.session.get('leaderboard_id'),
+        program=request.session["program"],
     )
 
     if cur_round is None:
