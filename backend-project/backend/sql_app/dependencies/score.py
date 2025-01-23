@@ -169,19 +169,20 @@ async def calculate_content_score(
     BLIP2_URL = os.getenv("BLIP2_URL")
     # BLIP2_URL = "http://blip2:7874/fake_content_score"
 
+    retry_delay = 3
+    max_retries = 5
+
     try:
-      status_code = 503
-      counter = 0
-      while status_code == 503:
-        if counter >0:
-          await asyncio.sleep(2)
+      for i in range(max_retries):
         response = requests.post(
             url=BLIP2_URL, data={"sentence":sentence, "image": image}, timeout=30
         )
-        status_code = response.status_code
-        counter += 1
-      response.raise_for_status()
-      return response.json()
+        if response.status_code == 503:
+          await asyncio.sleep(retry_delay)
+          continue
+        response.raise_for_status()
+        return response.json()
+      return {"info": "no response from BLIP2", "content_score": 0}
     except requests.exceptions.RequestException as e:
       raise HTTPException(status_code=500, detail="BLIP2 server error")
 
