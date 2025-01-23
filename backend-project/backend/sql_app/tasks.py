@@ -727,12 +727,16 @@ def complete_generation_backend(
 
         if db_generation.is_completed:
             return generation
-
+        
         db_round = crud.get_round(
             db=db,
             round_id=db_generation.round_id
         )
 
+        generation_aware = db_generation.created_at.replace(tzinfo=timezone.utc)
+        db_generation_aware = db_round.created_at.replace(tzinfo=timezone.utc)
+        duration = (generation_aware - db_generation_aware).seconds
+        
         db_chat = crud.get_chat(db=db,chat_id=db_round.chat_history)
         
         cb=openai_chatbot.Hint_Chatbot()
@@ -836,7 +840,8 @@ def complete_generation_backend(
 
             crud.update_generation3(
                 db=db,
-                generation=generation_com
+                generation=generation_com,
+                duration=duration
             )
             return generation_com.model_dump()
         raise HTTPException(status_code=500, detail="Error completing generation")

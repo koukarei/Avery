@@ -1681,13 +1681,9 @@ async def fix_error_task(
                 if check["status"] == "FINISHED":
                     chain_interpretation = chain(
                         group(
-                            pass_generation_dict.s(generation=[{
-                            'id': db_generation.id}]),
+                            pass_generation_dict.s(generation=[generation_dict]),
                             calculate_score.s(
-                                generation={
-                                    'id': db_generation.id,
-                                    'at': db_generation.created_at,
-                                }
+                                generation=generation_dict
                             )
                         ),
                         group(
