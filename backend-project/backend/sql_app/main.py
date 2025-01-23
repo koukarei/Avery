@@ -912,7 +912,7 @@ async def get_user_answer(
     if current_user.id != db_round.player_id:
         raise HTTPException(status_code=401, detail="You are not authorized to answer")
     db_generation = crud.get_generation(db, generation_id=db_round.last_generation_id)
-    if db_generation and not db_generation.is_completed:
+    if db_generation and db_generation.correct_sentence is None:
         db_generation = crud.update_generation0(
             db=db,
             generation=generation,
@@ -1681,13 +1681,9 @@ async def fix_error_task(
                 if check["status"] == "FINISHED":
                     chain_interpretation = chain(
                         group(
-                            pass_generation_dict.s(generation=[{
-                            'id': db_generation.id}]),
+                            pass_generation_dict.s(generation=[generation_dict]),
                             calculate_score.s(
-                                generation={
-                                    'id': db_generation.id,
-                                    'at': db_generation.created_at,
-                                }
+                                generation=generation_dict
                             )
                         ),
                         group(

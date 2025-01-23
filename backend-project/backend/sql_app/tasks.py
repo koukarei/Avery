@@ -647,6 +647,8 @@ def cal_image_similarity(
             db=db,
             round_id=db_generation.round_id
         )
+        if db_round is None:
+            raise HTTPException(status_code=404, detail="Round not found")
 
         # if current_user.id != db_round.player_id and not current_user.is_admin:
         #     raise HTTPException(status_code=401, detail="You are not authorized to view images")
@@ -725,12 +727,16 @@ def complete_generation_backend(
 
         if db_generation.is_completed:
             return generation
-
+        
         db_round = crud.get_round(
             db=db,
             round_id=db_generation.round_id
         )
 
+        generation_aware = db_generation.created_at.replace(tzinfo=timezone.utc)
+        db_generation_aware = db_round.created_at.replace(tzinfo=timezone.utc)
+        duration = (generation_aware - db_generation_aware).seconds
+        
         db_chat = crud.get_chat(db=db,chat_id=db_round.chat_history)
         
         cb=openai_chatbot.Hint_Chatbot()
@@ -829,12 +835,13 @@ def complete_generation_backend(
 
             generation_com = schemas.GenerationComplete(
                 id=db_generation.id,
-                is_completed=True
+                is_completed=True,
+                duration=duration
             )
 
             crud.update_generation3(
                 db=db,
-                generation=generation_com
+                generation=generation_com,
             )
             return generation_com.model_dump()
         raise HTTPException(status_code=500, detail="Error completing generation")

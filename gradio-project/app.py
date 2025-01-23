@@ -253,6 +253,7 @@ async def retry(request: Request):
         request=request,
         is_completed=False,
         leaderboard_id=leaderboard_id,
+        program=request.session["program"],
     )
     if not the_round:
         return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
@@ -271,6 +272,7 @@ async def resume_game(request: Request, leaderboard_id: Optional[int]=None):
         request=request,
         is_completed=False,
         leaderboard_id=leaderboard_id,
+        program=request.session["program"],
     )
 
     if not res:
@@ -373,6 +375,7 @@ async def redirect_to_result(request: Request, generation_id: Optional[int]=None
         request=request,
         is_completed=False,
         leaderboard_id=request.session.get('leaderboard_id'),
+        program=request.session["program"],
     )
 
     if cur_round is None:

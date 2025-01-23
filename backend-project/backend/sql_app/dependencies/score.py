@@ -201,14 +201,14 @@ def calculate_content_score_celery(
         if counter >0:
           time.sleep(2)
         response = requests.post(
-            url=BLIP2_URL, data={"sentence":sentence, "image": image}, timeout=30
+            url=BLIP2_URL, data={"sentence":sentence, "image": image}, timeout=120
         )
         status_code = response.status_code
         counter += 1
       response.raise_for_status()
       return response.json()
     except requests.exceptions.RequestException as e:
-      raise HTTPException(status_code=500, detail="BLIP2 server error")
+      raise HTTPException(status_code=500, detail="BLIP2 server error: {e}")
 
 def calculate_score(
       n_grammar_errors: int,
@@ -238,7 +238,8 @@ def calculate_score(
     output['structure_score']= n_clauses if n_clauses < 3 else 3
 
     lang_quality = sum(output.values())
-    total_score = int(round(lang_quality*content_score)/19)
+    full_score = 19*100
+    total_score = int(round(lang_quality*content_score)/full_score * 100)
     output['total_score'] = total_score
 
     output['lang_quality']=lang_quality
