@@ -235,7 +235,7 @@ def calculate_score(
 
     lang_quality = sum(output.values())
     full_score = 19*80
-    total_score = int(round(lang_quality*content_score)/full_score)
+    total_score = int(round(lang_quality*content_score)/full_score * 100)
     output['total_score'] = total_score
 
     output['lang_quality']=lang_quality
