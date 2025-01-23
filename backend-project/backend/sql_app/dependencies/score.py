@@ -234,7 +234,7 @@ def calculate_score(
     output['structure_score']= n_clauses if n_clauses < 3 else 3
 
     lang_quality = sum(output.values())
-    full_score = 19*80
+    full_score = 19*100
     total_score = int(round(lang_quality*content_score)/full_score * 100)
     output['total_score'] = total_score
 
