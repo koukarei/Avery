@@ -253,6 +253,7 @@ async def retry(request: Request):
         request=request,
         is_completed=False,
         leaderboard_id=leaderboard_id,
+        program=request.session["program"],
     )
     if not the_round:
         return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
