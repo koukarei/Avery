@@ -647,6 +647,8 @@ def cal_image_similarity(
             db=db,
             round_id=db_generation.round_id
         )
+        if db_round is None:
+            raise HTTPException(status_code=404, detail="Round not found")
 
         # if current_user.id != db_round.player_id and not current_user.is_admin:
         #     raise HTTPException(status_code=401, detail="You are not authorized to view images")
