@@ -172,19 +172,16 @@ async def calculate_content_score(
     retry_delay = 3
     max_retries = 5
 
-    try:
-      for i in range(max_retries):
-        response = requests.post(
-            url=BLIP2_URL, data={"sentence":sentence, "image": image}, timeout=30
-        )
-        if response.status_code == 503:
-          await asyncio.sleep(retry_delay)
-          continue
-        response.raise_for_status()
-        return response.json()
-      return {"info": "no response from BLIP2", "content_score": 0}
-    except requests.exceptions.RequestException as e:
-      raise HTTPException(status_code=500, detail="BLIP2 server error")
+    for i in range(max_retries):
+      response = requests.post(
+          url=BLIP2_URL, data={"sentence":sentence, "image": image}, timeout=30
+      )
+      if response.status_code == 503:
+        await asyncio.sleep(retry_delay)
+        continue
+      response.raise_for_status()
+      return response.json()
+    return {"info": "no response from BLIP2", "content_score": 0}
 
 def calculate_content_score_celery(
       image: str,
@@ -194,21 +191,18 @@ def calculate_content_score_celery(
     BLIP2_URL = os.getenv("BLIP2_URL")
     # BLIP2_URL = "http://blip2:7874/fake_content_score"
 
-    try:
-      status_code = 503
-      counter = 0
-      while status_code == 503:
-        if counter >0:
-          time.sleep(2)
-        response = requests.post(
-            url=BLIP2_URL, data={"sentence":sentence, "image": image}, timeout=120
-        )
-        status_code = response.status_code
-        counter += 1
-      response.raise_for_status()
-      return response.json()
-    except requests.exceptions.RequestException as e:
-      raise HTTPException(status_code=500, detail="BLIP2 server error: {e}")
+    status_code = 503
+    counter = 0
+    while status_code == 503:
+      if counter >0:
+        time.sleep(2)
+      response = requests.post(
+          url=BLIP2_URL, data={"sentence":sentence, "image": image}, timeout=120
+      )
+      status_code = response.status_code
+      counter += 1
+    response.raise_for_status()
+    return response.json()
 
 def calculate_score(
       n_grammar_errors: int,
