@@ -200,7 +200,7 @@ def calculate_content_score_celery(
         if counter >0:
           time.sleep(2)
         response = requests.post(
-            url=BLIP2_URL, data={"sentence":sentence, "image": image}, timeout=30
+            url=BLIP2_URL, data={"sentence":sentence, "image": image}, timeout=120
         )
         status_code = response.status_code
         counter += 1
