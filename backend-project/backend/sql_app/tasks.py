@@ -530,8 +530,9 @@ def update_perplexity(
         if db:
             db.close()
 
-@app.task(name='tasks.update_content_score', ignore_result=True)
+@app.task(name='tasks.update_content_score', ignore_result=True, bind=True, max_retries=5)
 def update_content_score(
+    self,
     generation: dict,
 ):
     try:
@@ -564,8 +565,10 @@ def update_content_score(
 
         output = json.dumps(db_generation, cls=AlchemyEncoder)
         return output
+
     except Exception as e:
         print(f"Update content score error: {e}")
+        raise self.retry(exc=e, countdown=10)  
     finally:
         if db:
             db.close()
@@ -622,8 +625,9 @@ def generate_interpretation(
         if db:
             db.close()
 
-@app.task(name='tasks.image_similarity', ignore_result=True)
+@app.task(name='tasks.image_similarity', ignore_result=True, bind=True, max_retries=5)
 def cal_image_similarity(
+    self,
     generation: tuple
 ):
     if generation is None:
@@ -703,6 +707,7 @@ def cal_image_similarity(
         return image_similarity.model_dump()
     except Exception as e:
         print(f"Image similarity error: {e}")
+        raise self.retry(exc=e, countdown=10)
     finally:
         if db:
             db.close()
@@ -855,6 +860,19 @@ def complete_generation_backend(
 def check_error_task():
     try:
         db=database.SessionLocal()
+
+        db_images = crud.get_error_task(
+            db=db,
+            group_type='no_interpretation'
+        )
+
+        if db_images:
+            for db_image in db_images:
+                crud.delete_interpreted_image(
+                    db=db,
+                    image_id=db_image.id
+                )
+
         # stop at generating images
         generations = crud.get_error_task(
             db=db,
@@ -865,7 +883,7 @@ def check_error_task():
                 generate_interpretation(
                     generation_id=generation.id,
                     sentence=generation.sentence,
-                    at=generation.at
+                    at=generation.created_at
                 )
 
         # stop at content score
@@ -957,12 +975,6 @@ def check_error_task():
                         "id": s.generation_id,
                     }]
                 )
-
-        # generation complete
-        generations = crud.get_error_task(
-            db=db,
-            group_type='no_complete'
-        )
 
     except Exception as e:
         print(f"Check error task error: {e}")
