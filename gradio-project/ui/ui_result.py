@@ -124,7 +124,6 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         #     request=request,
         # )
         score = await get_score(int(generation_id), request)
-
         if score:
             similarity = float(score.image_similarity)*100
             if similarity > 80:
@@ -135,6 +134,9 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                 emoji = "🤔"
             else:
                 emoji = "😢"
+        else:
+            similarity = 0
+            emoji = "⏳"
         similarity_md = "# 類似度: {:^10.2f}％ {}".format(similarity, emoji)
         return similarity_md
 
