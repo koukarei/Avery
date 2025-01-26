@@ -185,7 +185,7 @@ async def test_users_with_login(play):
         async_tasks.append(
             guest.test_submit_answer()
         )
-    awaited_results = asyncio.run(asyncio.gather(*async_tasks))
+    awaited_results = asyncio.gather(*async_tasks)
 
 
 
