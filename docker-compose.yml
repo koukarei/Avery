@@ -99,10 +99,8 @@ services:
       - avery-network
     deploy:
       resources:
-        limits:
-          cpus: '0.5'
         reservations:
-          cpus: '0.1'
+          cpus: '0.5'
 
   worker:
     build: 
@@ -131,10 +129,8 @@ services:
       - avery-network
     deploy:
       resources:
-        limits:
-          cpus: '0.5'
         reservations:
-          cpus: '0.1'
+          cpus: '0.5'
 
   dashboard:
     image: mher/flower:0.9.7
@@ -185,7 +181,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.3'
+          cpus: '1.0'
         reservations:
           cpus: '0.1'
 
