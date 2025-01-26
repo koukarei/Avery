@@ -137,7 +137,13 @@ async def get_current_user(db: Annotated[Session, Depends(get_db)],token: Annota
         user = crud.get_user_by_username(db, username=token_data.username)
         if user is None:
             raise credentials_exception
-        return user
+        elif user.is_active:
+            return user
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Inactive user",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     else:
         raise credentials_exception
 
@@ -213,7 +219,7 @@ async def refresh_token(current_user: schemas.User = Security(get_current_user, 
                     "Current User":current_user.username},
         )
     
-@app.post("/users/", tags=["User"], response_model=schemas.User)
+@app.post("/users/", tags=["User"], response_model=schemas.User, status_code=201)
 async def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = crud.get_user_by_email(db, email=user.email)
     if db_user:
@@ -305,7 +311,7 @@ async def read_scenes(current_user: Annotated[schemas.User, Depends(get_current_
     scenes = crud.get_scenes(db, skip=skip, limit=limit)
     return scenes
 
-@app.post("/scene/", tags=["Scene"], response_model=schemas.Scene)
+@app.post("/scene/", tags=["Scene"], response_model=schemas.Scene, status_code=201)
 async def create_scene(current_user: Annotated[schemas.User, Depends(get_current_user)], scene: schemas.SceneBase, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to create scene")
@@ -323,7 +329,7 @@ async def read_stories(current_user: Annotated[schemas.User, Depends(get_current
     return stories
         
 
-@app.post("/story/", tags=["Story"], response_model=schemas.StoryOut)
+@app.post("/story/", tags=["Story"], response_model=schemas.StoryOut, status_code=201)
 async def create_story(
     current_user: Annotated[schemas.User, Depends(get_current_user)], 
     story_content_file: Annotated[UploadFile, File()],
@@ -410,7 +416,7 @@ async def read_leaderboards_admin(
     )
     return leaderboards
 
-@app.post("/leaderboards/", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
+@app.post("/leaderboards/", tags=["Leaderboard"], response_model=schemas.LeaderboardOut, status_code=201)
 async def create_leaderboard(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard: schemas.LeaderboardCreateIn,
@@ -475,7 +481,7 @@ async def create_leaderboard(
 
     return result
 
-@app.post("/leaderboards/bulk_create", tags=["Leaderboard"], response_model=list[schemas.LeaderboardOut])
+@app.post("/leaderboards/bulk_create", tags=["Leaderboard"], response_model=list[schemas.LeaderboardOut], status_code=201)
 async def create_leaderboards(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     zipped_image_files: Annotated[UploadFile, File()],
@@ -704,7 +710,7 @@ async def create_leaderboards(
 
     return leaderboard_list
 
-@app.post("/leaderboards/image", tags=["Leaderboard"], response_model=schemas.IdOnly)
+@app.post("/leaderboards/image", tags=["Leaderboard"], response_model=schemas.IdOnly, status_code=201)
 async def create_leaderboard_image(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     original_image: Annotated[UploadFile, File()],
@@ -782,7 +788,7 @@ async def delete_leaderboard(
         raise HTTPException(status_code=404, detail="Leaderboard not found")
     return crud.delete_leaderboard(db=db, leaderboard_id=leaderboard_id)
 
-@app.post("/program", tags=["Program"], response_model=schemas.Program)
+@app.post("/program", tags=["Program"], response_model=schemas.Program, status_code=201)
 async def create_program(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     program: schemas.ProgramBase,
@@ -857,7 +863,7 @@ async def get_my_rounds(
         leaderboard_id=leaderboard_id,
     )
 
-@app.post("/round/", tags=["Round"], response_model=schemas.Round)
+@app.post("/round/", tags=["Round"], response_model=schemas.Round, status_code=201)
 async def create_round(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     thisround: schemas.RoundCreate,
@@ -1155,7 +1161,7 @@ async def read_vocabularies(current_user: Annotated[schemas.User, Depends(get_cu
     vocabularies = crud.get_vocabularies(db, skip=skip, limit=limit)
     return vocabularies
 
-@app.post("/vocabularies", tags=["Vocabulary"], response_model=List[schemas.Vocabulary])
+@app.post("/vocabularies", tags=["Vocabulary"], response_model=List[schemas.Vocabulary], status_code=201)
 async def create_vocabularies(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     vocabularies_csv: Annotated[UploadFile, File()],
@@ -1217,7 +1223,7 @@ async def read_personal_dictionaries(current_user: Annotated[schemas.User, Depen
     personal_dictionaries = crud.get_personal_dictionaries(db, player_id=player_id)
     return personal_dictionaries
 
-@app.post("/personal_dictionary/", tags=["Personal Dictionary"], response_model=schemas.PersonalDictionary)
+@app.post("/personal_dictionary/", tags=["Personal Dictionary"], response_model=schemas.PersonalDictionary, status_code=201)
 async def create_personal_dictionary(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     personal_dictionary: schemas.PersonalDictionaryCreate,
@@ -1525,7 +1531,7 @@ async def read_my_generations(
     )
     return generations
 
-@app.get("/generation/{generation_id}/score", tags=["Generation"], response_model=schemas.Score)
+@app.get("/generation/{generation_id}/score", tags=["Generation"], response_model=Optional[schemas.Score])
 async def get_generation_score(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     generation_id: int, 

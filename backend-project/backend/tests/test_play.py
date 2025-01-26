@@ -1,253 +1,198 @@
 import os
-import sys
-import datetime
-import time
+import sys, asyncio
+import datetime, time, httpx
+import pytest
 sys.path.append(os.getcwd())
-import csv
 
 from fastapi.testclient import TestClient
 
 from main import app 
-from fastapi import UploadFile
-import pytest
+import random
+
+pytest_plugins = ('pytest_asyncio',)
 
 client = TestClient(app)
 
-@pytest.mark.usefixtures("login")
+@pytest.mark.usefixtures("login_guest")
 class TestPlay:
-    username = os.getenv("ADMIN_USERNAME")
-    password = os.getenv("ADMIN_PASSWORD")
-    _client = client
+    def __init__(self, username, password):
+        self.username = username
+        self.password = password
+        self._client = TestClient(app)
+        self.access_token = self.get_access_token()
 
-    def test_play(self):
-        # Create leaderboards
+    def get_access_token(self):
+        """Fetch access token for the user."""
+        response = self._client.post(
+            "/sqlapp/token", data={"username": self.username, "password": self.password}
+        )
+        assert response.status_code == 200, f"Failed to login user {self.username}."
+        return response.json().get("access_token")
+
+    async def test_submit_answer(self):
+        print(f"User {self.username} with token started operation.")
+        
+        # Select a random leaderboard
+        response = client.get("/sqlapp/leaderboards/", headers={"Authorization": f"Bearer {self.get_access_token()}"})
+
+        leaderboards = response.json()
+        leaderboard_id = random.choice(leaderboards)[0]["id"]
+
+        # Create a new round
+        new_round = {
+            "leaderboard_id": leaderboard_id,
+            "model": "gpt-4o-mini",
+            "created_at": datetime.datetime.now().isoformat(),
+        }
+
         response = client.post(
-            "/sqlapp/leaderboards/create",
-            headers={"Authorization": f"Bearer {self.access_token}"},
+            "/sqlapp/round/", json=new_round, headers={"Authorization": f"Bearer {self.get_access_token()}"}
         )
+        assert response.status_code == 201, f"Failed to create a new round for user {self.username}. {response.json()}"
+        round_id = response.json()["id"]
 
-        picture_dir = 'initial/pic/'
+        # Ask hint
+        new_message = {
+            "content": "I need a hint.",
+            "created_at": datetime.datetime.now().isoformat(),
+        }
 
-        #Get scene id
-        response = client.get(
-            "/sqlapp/scenes/",
-            headers={"Authorization": f"Bearer {self.access_token}"}
+        response = client.put(
+            f"/sqlapp/round/{round_id}/chat", 
+            json=new_message, 
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.get_access_token()}"}
         )
-        scene = response.json()[0]
-        scene_id = scene['id']
+        assert response.status_code == 200, f"Failed to ask for a hint for user {self.username}."
 
-        # Get story id
-        response = client.get(
-            "/sqlapp/stories/",
-            headers={"Authorization": f"Bearer {self.access_token}"}
-        )
-        story = response.json()[0]
-        story_id = story['id']
+        answer_results= []
+        for i in range(5):
+            
+            random_answers = [
+                "This is a picture of a rabbit wearing bikini.",
+                "There is a man rided a horse, expressing his love to nature.",
+                "The woman is holding a baby in her arms. The baby is crying.",
+                "The consequence of the war is the destruction of the city.",
+            ]
 
-        leaderboard_dict = {}
-
-        for filename in os.listdir(picture_dir):
-            image_path = picture_dir+'/'+filename
-
-            # Test upload original image
-            with open(image_path, "rb") as f:
-                response = client.post(
-                    "/sqlapp/leaderboards/image/",
-                    files={"original_image": (filename, f, "image/jpeg")},
-                    headers={"Authorization": f"Bearer {self.access_token}"},
-                )
-
-            assert response.status_code == 200
-            original_image_id = response.json()['id']
-
-            title = filename.split('.')[0]
-            # Test create a new leaderboard
-            new_leaderboard = {
-                "title": title,
-                "story_extract": "",
-                "is_public": True,
-                "scene_id": scene_id,
-                "story_id": story_id,
-                "original_image_id": original_image_id,
+            # Submit answer
+            new_generation = {
+                "round_id": round_id,
+                "created_at": datetime.datetime.now().isoformat(),
+                "generated_time": i+1,
+                "sentence": random.choice(random_answers),
             }
 
-            response = client.post(
-                "/sqlapp/leaderboards/", 
-                json=new_leaderboard.copy(),
-                headers={"Content-Type": "application/json",
-                         "Authorization": f"Bearer {self.access_token}"}
+            response = client.put(
+                f"/sqlapp/round/{round_id}/", 
+                json=new_generation, 
+                headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.get_access_token()}"}
             )
-            print(f"leaderboard created: {response.json()}")
-            assert response.status_code == 200
 
-            leaderboard_dict[title] = response.json()['id']
+            assert response.status_code == 200, f"Failed to submit answer for user {self.username}."
+            generation_id = response.json()["id"]
+            correct_sentence = response.json()["correct_sentence"]
+
+            # Generate interpretation
+            interpretation_generation = {
+                "id": generation_id,
+                "correct_sentence": correct_sentence
+            }
+
+            response = client.put(
+                f"/sqlapp/round/{round_id}/interpretation",
+                    json=interpretation_generation.copy(),
+                    headers={"Content-Type": "application/json",
+                            "Authorization": f"Bearer {self.get_access_token()}"},
+            )
+            assert response.status_code == 200, f"Failed to get interpreted image for user {self.username}." 
+
+            retry_delay = 10
+            await asyncio.sleep(retry_delay)
+            
+            interpreted_counter = 0
+            max_retries = 40
+            # Get interpreted image
+            while True:
+                response = client.get(
+                    f"/sqlapp/interpreted_image/{generation_id}",
+                    headers={"Authorization": f"Bearer {self.get_access_token()}"},
+                )
+
+                if response.status_code == 200:
+                    break
+                interpreted_counter += 1
+                if interpreted_counter >= max_retries:
+                    return f"User {self.username} failed to obtain the interpreted image after {interpreted_counter} retries."
+                await asyncio.sleep(retry_delay)
+
+            # Complete the generation
+            generation_com = {
+                "id": generation_id,
+                "at": datetime.datetime.now().isoformat(),
+            }
+            complete_counter = 0
+            while True:
+                response = client.put(
+                    f"/sqlapp/round/{round_id}/complete",
+                    json=generation_com.copy(),
+                    headers={"Content-Type": "application/json",
+                            "Authorization": f"Bearer {self.get_access_token()}"},
+                )
+                if response.status_code == 200:
+                    break
+                complete_counter += 1
+                if complete_counter >= max_retries:
+                    return f"User {self.username} failed to complete the generation after {complete_counter} retries."
+                await asyncio.sleep(retry_delay)
+
+            # Get the result
+            result_counter = 0
+            while True:
+                response = client.get(
+                    f"/sqlapp/generation/{generation_id}/score",
+                    headers={"Authorization": f"Bearer {self.get_access_token()}"},
+                )
+                result = response.json()
+                if response.status_code == 200 and isinstance(result, dict) and 'image_similarity' in result:
+                    break
+                result_counter += 1
+                if result_counter >= max_retries:
+                    return f"User {self.username} failed to get the result after {result_counter} retries."
+                await asyncio.sleep(retry_delay)
+            answer_results.append(f"User {self.username} operation result\nGet interpreted image: {interpreted_counter} retries\nComplete generation: {complete_counter} retries\nGet result: {result_counter} retries")
+        return f"User {self.username} operation completed successfully.\n{answer_results}"
+
+
+class TestPlays:
+    def __init__(self, guest_ids):
+        self.guest_ids = guest_ids
+        self.guests = [
+            TestPlay(f"guest{guest_id}", "hogehoge") for guest_id in guest_ids
+        ]
+
+@pytest.fixture
+def play(request):
+    return TestPlays(request.param)
+
+# Pytest test case
+@pytest.mark.parametrize("play", [range(1, 41)], indirect=True)
+@pytest.mark.asyncio
+async def test_users_with_login(play):
+    """Test multi-user simulation with login."""
+    async_tasks = []
+    for guest in play.guests:
         
-        # Test read all leaderboards
-        response = client.get("/sqlapp/leaderboards/", headers={"Authorization": f"Bearer {self.access_token}"})
-        assert response.status_code == 200
-
-        # Read csv file
-        with open('initial/entries/202408_Results.csv','r') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                leaderboard_id = leaderboard_dict[row['Picture']]
-                new_round = {
-                    "leaderboard_id": leaderboard_id,
-                    "model": "gpt-4o-mini",
-                    "created_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
-                }
-
-                response = client.post(
-                    f"/sqlapp/round/", 
-                    json=new_round.copy(),
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bearer {self.access_token}"
-                    }
-                )
-                
-                assert response.status_code == 200
-                round_id = response.json()['id']
-
-                new_generation = {
-                    "round_id": round_id,
-                    "created_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
-                    "generated_time": 1,
-                    "sentence": row['User sentence'],
-                }
-
-                response = client.put(
-                    f"/sqlapp/round/{round_id}",
-                    json=new_generation.copy(),
-                    headers={"Content-Type": "application/json",
-                             "Authorization": f"Bearer {self.access_token}"},
-                )
-                
-                assert response.status_code == 200
-                correct_sentence = response.json()['correct_sentence']
-                generation_id = response.json()['id']
-
-                interpretation_generation = {
-                    "id": generation_id,
-                    "correct_sentence": correct_sentence
-                }
-
-                # Test get interpretation
-                response = client.put(
-                    f"/sqlapp/round/{round_id}/interpretation",
-                    json=interpretation_generation.copy(),
-                    headers={"Content-Type": "application/json",
-                             "Authorization": f"Bearer {self.access_token}"},
-                )
-                assert response.status_code == 200
-                
-                #Test get scores
-                response = client.put(
-                    f"/sqlapp/round/{round_id}/complete",
-                    json={
-                        "id":generation_id,
-                        "at":datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
-                    },
-                    headers={"Content-Type": "application/json",
-                             "Authorization": f"Bearer {self.access_token}"},
-                )
-                assert response.status_code == 200
-
-                # Test complete round
-                response = client.post(
-                    f"/sqlapp/round/{round_id}/end",
-                    headers={"Content-Type": "application/json",
-                             "Authorization": f"Bearer {self.access_token}"},
-                )
-                assert response.status_code == 200
-
-@pytest.mark.usefixtures("login")
-class TestPlay2:
-    username = os.getenv("USER_USERNAME")
-    password = os.getenv("USER_PASSWORD")
-    _client = client
-
-    def test_play_2(self):
-        # Get leaderboards
-        response = client.get(
-            "/sqlapp/leaderboards/",
-            headers={"Authorization": f"Bearer {self.access_token}"}
+        async_tasks.append(
+            guest.test_submit_answer()
         )
-        if not response.json():
-            assert False
-        leaderboard = response.json()[0]
-        leaderboard_id = leaderboard['id']
+    awaited_results = asyncio.run(asyncio.gather(*async_tasks))
 
-        # Read csv file
-        with open('initial/entries/202408_Results.csv','r') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                new_round = {
-                    "leaderboard_id": leaderboard_id,
-                    "model": "gpt-4o-mini",
-                    "created_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
-                }
 
-                response = client.post(
-                    f"/sqlapp/round/", 
-                    json=new_round.copy(),
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bearer {self.access_token}"
-                    }
-                )
-                
-                assert response.status_code == 200
-                round_id = response.json()['id']
 
-                new_generation = {
-                    "round_id": round_id,
-                    "created_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
-                    "generated_time": 1,
-                    "sentence": row['User sentence'],
-                }
+    # Assert the number of results matches the number of users
+    assert len(awaited_results) == 40, "The number of results should match the number of users."
 
-                response = client.put(
-                    f"/sqlapp/round/{round_id}",
-                    json=new_generation.copy(),
-                    headers={"Content-Type": "application/json",
-                             "Authorization": f"Bearer {self.access_token}"},
-                )
-                
-                assert response.status_code == 200
-                correct_sentence = response.json()['correct_sentence']
-                generation_id = response.json()['id']
-
-                interpretation_generation = {
-                    "id": generation_id,
-                    "correct_sentence": correct_sentence
-                }
-
-                # Test get interpretation
-                response = client.put(
-                    f"/sqlapp/round/{round_id}/interpretation",
-                    json=interpretation_generation.copy(),
-                    headers={"Content-Type": "application/json",
-                             "Authorization": f"Bearer {self.access_token}"},
-                )
-                assert response.status_code == 200
-                
-                #Test get scores
-                response = client.put(
-                    f"/sqlapp/round/{round_id}/complete",
-                    json={
-                        "id":generation_id,
-                        "at":datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
-                    },
-                    headers={"Content-Type": "application/json",
-                             "Authorization": f"Bearer {self.access_token}"},
-                )
-                assert response.status_code == 200
-
-                # Test complete round
-                response = client.post(
-                    f"/sqlapp/round/{round_id}/end",
-                    headers={"Content-Type": "application/json",
-                             "Authorization": f"Bearer {self.access_token}"},
-                )
-                assert response.status_code == 200
+    # Optional: Check result format
+    for i, result in enumerate(awaited_results, 1):
+        print(result)
+        assert f"User guest{i} operation completed successfully." in result, f"Unexpected result for user guest{i}: {result}"

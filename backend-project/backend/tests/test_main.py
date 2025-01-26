@@ -1,5 +1,5 @@
 import os
-import sys
+import sys, asyncio
 import datetime, time
 import pytest
 sys.path.append(os.getcwd())
@@ -51,6 +51,7 @@ class TestAdmin:
             headers={"Authorization": f"Bearer {self.access_token}"}
         )
         assert response.status_code == 200, response.json()
+        
         new_user = {
             "username": "mary",
             "email": "mary@example.com",
@@ -61,7 +62,7 @@ class TestAdmin:
         # Test create a new user
         response = client.post("/sqlapp/users/", json=new_user.copy(),headers={"Content-Type": "application/json"})
 
-        assert response.status_code == 200, response.json()
+        assert response.status_code == 201, response.json()
         assert response.json()['id'] > 0
         print(f'create a user {response.json()}')
         new_user_id = response.json()['id']
@@ -120,7 +121,7 @@ class TestAdmin:
         }
 
         response = client.post("/sqlapp/scene/", json=new_scene.copy(),headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"})
-        assert response.status_code == 200, response.json()
+        assert response.status_code == 201, response.json()
         scene_id = response.json()['id']
         assert scene_id > 0
 
@@ -136,7 +137,7 @@ class TestAdmin:
 
         for scene in scenes:
             response = client.post("/sqlapp/scene/", json=scene.copy(),headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"})
-            assert response.status_code == 200, response.json()
+            assert response.status_code == 201, response.json()
 
     def test_add_programs(self):
         programs = [
@@ -156,7 +157,7 @@ class TestAdmin:
 
         for program in programs:
             response = client.post("/sqlapp/program", json=program.copy(),headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"})
-            assert response.status_code == 200, response.json()
+            assert response.status_code == 201, response.json()
 
     def test_read_stories(self):
 
@@ -178,84 +179,81 @@ class TestAdmin:
                 headers={"Authorization": f"Bearer {self.access_token}"}
             )
         print(f"story file uploaded: {response.json()}")
-        assert response.status_code == 200, response.json()
+        assert response.status_code == 201, response.json()
 
         # Test whether story is created
         response = client.get("/sqlapp/stories/", headers={"Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 200, response.json()
         assert len(response.json()) == num_stories + 1
 
-    def test_leaderboards(self):
-        # Test read all leaderboards
+    def test_add_guest_ac(self):
         response = client.get(
-            "/sqlapp/leaderboards/",
+            f"/sqlapp/users",
             headers={"Authorization": f"Bearer {self.access_token}"}
         )
-        assert response.status_code == 200, response.json()
-        
-        num_leaderboards = len(response.json())
-        
-        #Get scene id
-        response = client.get(
-            "/sqlapp/scenes/",
-            headers={"Authorization": f"Bearer {self.access_token}"}
-        )
-        scene = response.json()[0]
-        scene_id = scene['id']
+        users = response.json()
+        usernames = [user['username'] for user in users]
+        for i in range(1,41):
+            # Check if the guest account already exists
+            if f"guest{i}" in usernames:
+                continue
+            
+            guest_acc = {
+                "username": f"guest{i}",
+                "email": f"guest{i}@example.com",
+                "password": "hogehoge",
+                "display_name": f"Guest{i}"
+            }
 
-        # Get story id
-        response = client.get(
-            "/sqlapp/stories/",
-            headers={"Authorization": f"Bearer {self.access_token}"}
-        )
-        story = response.json()[0]
-        story_id = story['id']
-
-        test_image_filename="cut_ham_for_test.jpg"
-        test_image_path = "tests/{}".format(test_image_filename)
-
-        # Test upload original image
-        with open(test_image_path, "rb") as f:
             response = client.post(
-                "/sqlapp/leaderboards/image/",
-                files={"original_image": (test_image_filename, f, "image/jpeg")},
-                headers={"Authorization": f"Bearer {self.access_token}"}
+                "/sqlapp/users/",
+                json=guest_acc.copy(),
+                headers={"Content-Type": "application/json"}
             )
+            assert response.status_code == 201, response.json()
 
-        print(f"original image uploaded: {response.json()}")
+    def test_set_guest_ac_inactive(self):
+        response = client.get("/sqlapp/users/", headers={"Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 200, response.json()
-        original_image_id = response.json()['id']
+        for user in response.json():
+            if user['username'].startswith("guest"):
+                user_update = {
+                    'id': user['id'],
+                    'is_active': False
+                }
+                response = client.put(
+                    f"/sqlapp/users/{user['id']}",
+                    json=user_update.copy(),
+                    headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"}
+                )
+                assert response.status_code == 200, response.json()
 
-        # Test create a new leaderboard
-        new_leaderboard = {
-            "title":"Cut the Ham",
-            "story_extract": "The mouse set to work at once to carve the ham. It was a beautiful shiny yellow, streaked with red.",
-            "is_public": True,
-            "scene_id": scene_id,
-            "story_id": story_id,
-            "original_image_id": original_image_id,
-        }
-
-        response = client.post(
-            "/sqlapp/leaderboards/", 
-            json=new_leaderboard.copy(),
-            headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"}
-        )
-        print(f"leaderboard created: {response.json()}")
+    def test_set_guest_ac_active(self):
+        response = client.get("/sqlapp/users/", headers={"Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 200, response.json()
+        for user in response.json():
+            if user['username'].startswith("guest"):
+                user_update = {
+                    'id': user['id'],
+                    'is_active': True
+                }
+                response = client.put(
+                    f"/sqlapp/users/{user['id']}",
+                    json=user_update.copy(),
+                    headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"}
+                )
+                assert response.status_code == 200, response.json()
 
-        # Test read all leaderboards
-        response = client.get("/sqlapp/leaderboards/", headers={"Authorization": f"Bearer {self.access_token}"})
-        assert response.status_code == 200, response.json()
-        assert len(response.json()) == num_leaderboards + 1
 
 @pytest.mark.usefixtures("login")
 class TestUser:
-    username = os.getenv("USER_USERNAME")
-    password = os.getenv("USER_PASSWORD")
     _client = client
     
-    def test_round(self):
+    def __init__(self, username, password):
+        self.username = username
+        self.password = password
+
+    async def test_round(self):
         # Get leaderboard id
         response = client.get("/sqlapp/leaderboards/", headers={"Authorization": f"Bearer {self.access_token}"})
         if not response.json():

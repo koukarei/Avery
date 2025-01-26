@@ -530,7 +530,7 @@ def update_perplexity(
         if db:
             db.close()
 
-@app.task(name='tasks.update_content_score', ignore_result=True, bind=True, max_retries=5)
+@app.task(name='tasks.update_content_score', ignore_result=True, bind=True, max_retries=10)
 def update_content_score(
     self,
     generation: dict,
@@ -625,7 +625,7 @@ def generate_interpretation(
         if db:
             db.close()
 
-@app.task(name='tasks.image_similarity', ignore_result=True, bind=True, max_retries=5)
+@app.task(name='tasks.image_similarity', ignore_result=True, bind=True, max_retries=10)
 def cal_image_similarity(
     self,
     generation: tuple
@@ -694,7 +694,7 @@ def cal_image_similarity(
 
         score_id = db_generation.score_id
         if score_id is None:
-            raise HTTPException(status_code=404, detail="Score not found")
+            raise self.retry(exc=Exception("Score id is None"), countdown=10)
         crud.update_score(
             db=db,
             score=schemas.ScoreUpdate(
