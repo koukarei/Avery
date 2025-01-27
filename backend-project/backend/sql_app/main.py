@@ -373,17 +373,24 @@ async def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_cu
         leaderboards = crud.get_leaderboards(db, school_name=school_name, skip=skip, limit=limit, published_at_end=datetime.datetime.now(tz=zoneinfo.ZoneInfo('Japan')))
         return leaderboards
     
+    print("before convent",published_at_start, published_at_end)
+
+
     if published_at_start:
-        published_at_start = datetime.datetime.strptime(published_at_start, "%d%m%Y").replace(tzinfo=timezone.utc)
+        published_at_start = datetime.datetime.strptime(published_at_start, "%d%m%Y").replace(tzinfo=zoneinfo.ZoneInfo('Japan'))
     if published_at_end:
-        published_at_end = datetime.datetime.strptime(published_at_end, "%d%m%Y").replace(tzinfo=timezone.utc)
-        
+        published_at_end = datetime.datetime.strptime(published_at_end, "%d%m%Y").replace(tzinfo=zoneinfo.ZoneInfo('Japan'))
+    
+    print("after convert",published_at_start, published_at_end)
+
     if current_user.user_type == "student":
-        if published_at_start and published_at_start > datetime.datetime.now(tz=timezone.utc):
-            published_at_start = datetime.datetime.now(tz=timezone.utc)
-        if published_at_end and published_at_end > datetime.datetime.now(tz=timezone.utc):
-            published_at_end = datetime.datetime.now(tz=timezone.utc)
-            
+        if published_at_start and published_at_start > datetime.datetime.now(tz=zoneinfo.ZoneInfo('Japan')):
+            published_at_start = datetime.datetime.now(tz=zoneinfo.ZoneInfo('Japan'))
+        if published_at_end and published_at_end > datetime.datetime.now(tz=zoneinfo.ZoneInfo('Japan')):
+            published_at_end = datetime.datetime.now(tz=zoneinfo.ZoneInfo('Japan'))
+    
+    print("after check",published_at_start, published_at_end)
+
     leaderboards = crud.get_leaderboards(db, school_name=school_name, skip=skip, limit=limit, published_at_start=published_at_start, published_at_end=published_at_end)
     
     return leaderboards
