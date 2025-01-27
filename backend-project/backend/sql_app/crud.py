@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_, notin_
+from sqlalchemy import or_, and_
 
 from . import models, schemas
 
