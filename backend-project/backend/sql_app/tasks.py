@@ -664,16 +664,17 @@ def cal_image_similarity(
 
         semantic1 = db_generation.content_score
 
-        semantic2 = score.calculate_content_score_celery(
-            image=db_generation.interpreted_image.image,
-            sentence=db_generation.sentence
-        )
+        semantic2 = 100
+        # semantic2 = score.calculate_content_score_celery(
+        #     image=db_generation.interpreted_image.image,
+        #     sentence=db_generation.sentence
+        # )
 
-        denominator = semantic1+semantic2['content_score']
+        denominator = semantic1+semantic2
         if denominator == 0:
             blip2_score = 0
         else:
-            blip2_score = abs(semantic1 - semantic2['content_score'])/(semantic1+semantic2['content_score'])
+            blip2_score = abs(semantic1 - semantic2)/(semantic1+semantic2)
             blip2_score = 1 - blip2_score
 
         ssim = score.image_similarity(
@@ -685,7 +686,7 @@ def cal_image_similarity(
 
         image_similarity = schemas.ImageSimilarity(
             semantic_score_original=semantic1,
-            semantic_score_interpreted=semantic2['content_score'],
+            semantic_score_interpreted=semantic2,
             blip2_score=blip2_score,
             ssim=ssim,
             similarity=similarity

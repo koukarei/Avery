@@ -97,6 +97,10 @@ services:
       PORT: 7871
     networks:
       - avery-network
+    deploy:
+      resources:
+        reservations:
+          cpus: '0.5'
 
   worker:
     build: 
@@ -123,6 +127,10 @@ services:
       PORT: 7871
     networks:
       - avery-network
+    deploy:
+      resources:
+        reservations:
+          cpus: '0.5'
 
   dashboard:
     image: mher/flower:0.9.7
@@ -170,6 +178,12 @@ services:
     tty: true
     networks:
       - avery-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+        reservations:
+          cpus: '0.1'
 
 volumes:
   db-store:
