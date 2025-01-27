@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_, notin_
 
 from . import models, schemas
 
@@ -896,9 +896,10 @@ def get_all_tasks(db: Session):
     return db.query(models.Task).all()
 
 def get_error_task(db: Session, group_type: str):
-
+    guest_ids = db.query(models.User).filter('guest' in models.User.username).all()
     answer_input_generation = db.query(models.Generation).\
-        filter(models.Generation.correct_sentence != None)
+        filter(models.Generation.correct_sentence != None).\
+        filter(models.Generation.round.has(models.Round.player_id.notin_([guest.id for guest in guest_ids])))
 
     if group_type == 'no_interpretation':
         image_group = db.query(models.InterpretedImage).\
