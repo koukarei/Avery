@@ -98,6 +98,13 @@ def update_user(db: Session, user: schemas.UserUpdate):
     db_user = db.query(models.User).filter(models.User.id == user.id).first()
     return db_user
 
+def update_user_password(db: Session, user_id: int, new_password: str):
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    db_user.hashed_password = get_password_hash(new_password)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
 def delete_user(db: Session, user_id: int):
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     db_user_profile = db.query(models.UserProfile).filter(models.UserProfile.id == db_user.profile_id).first()

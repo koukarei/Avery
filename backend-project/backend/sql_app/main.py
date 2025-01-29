@@ -252,6 +252,17 @@ async def delete_user(current_user: Annotated[schemas.User, Depends(get_current_
         raise HTTPException(status_code=404, detail="User not found")
     return crud.delete_user(db=db, user_id=user_id)
 
+@app.put("/users/{user_id}/password", tags=["User"], response_model=schemas.User)
+async def update_user_password(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    user: schemas.UserPasswordUpdate,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to update password")
+    user_id = current_user.id
+    return crud.update_user_password(db=db, user_id=user_id, new_password=user.new_password)
+
 @app.put("/users/{user_id}", tags=["User"], response_model=schemas.User)
 async def update_user(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
