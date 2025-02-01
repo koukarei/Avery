@@ -13,6 +13,7 @@ services:
     volumes:
       - ./gradio-project:/app
     command: uvicorn gradio_app:app --host 0.0.0.0 --port 7870
+    restart: unless-stopped
     networks:
       - avery-network
     depends_on:
@@ -78,6 +79,7 @@ services:
     #   - --workers 4
     #   - --bind 0.0.0.0:8000
     command: uvicorn main:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
     ports:
       - "7871:8000"
     tty: true
@@ -120,6 +122,7 @@ services:
       - --loglevel=info
       - --pool=gevent
       - --concurrency=500
+    restart: unless-stopped
     env_file:
       - backend-project/.env
     environment:
@@ -136,6 +139,7 @@ services:
     image: mher/flower:0.9.7
     container_name: dashboard
     command: ['flower', '--broker=redis://redis:7876', '--port=7877']
+    restart: unless-stopped
     ports:
       - "7877:7877"
     depends_on:
@@ -156,6 +160,7 @@ services:
     - --port 7876
     - --maxmemory 32gb
     - --maxmemory-policy allkeys-lfu
+    restart: unless-stopped
     ports:
       - 7876:7876
     environment:
@@ -173,6 +178,7 @@ services:
       - blip2-cache:/root/.cache/huggingface
       - ./blip2-project:/blip2
     command: uvicorn blip2.app.main:app --host 0.0.0.0 --port 7874
+    restart: unless-stopped
     ports: 
       - "7874:7874"
     tty: true
