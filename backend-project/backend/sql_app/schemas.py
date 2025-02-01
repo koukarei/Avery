@@ -114,6 +114,9 @@ class UserOut(BaseModel):
     display_name: str
     level: int
 
+class UserPasswordUpdate(BaseModel):
+    new_password: str
+
 class UserUpdateIn(BaseModel):
     username: Optional[str]=None
     email: Optional[str]=None
@@ -291,7 +294,7 @@ class RoundComplete(BaseModel):
 
 class RoundOut(BaseModel):
     id: int
-    player: UserOut
+    player: Optional[UserOut]=None
     created_at: datetime.datetime
     last_generation_id: Optional[int]=None
     chat_history: int

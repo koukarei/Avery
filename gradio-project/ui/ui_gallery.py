@@ -295,12 +295,11 @@ with gr.Blocks(title="AVERY") as avery_gradio:
             if hasattr(selected, 'score'):
                 score = selected.score
                 duration = round(selected.duration/60,2)
-                
+                player_name = ""
                 if hasattr(request, 'session') and isinstance(request.session, dict) and request.session.get("roles", None) != "student":
-                    player_name = "作成者：{}　".format(selected_round.player.display_name)
-                else:
-                    player_name = ""
-
+                    if selected_round.player is not None:
+                        player_name = "作成者：{}　".format(selected_round.player.display_name)
+                    
                 create_time = convert_to_japan_time(selected_round.created_at)
 
                 md = f"""## {select_leaderboard.title}{leaderboard_vocabularies}
