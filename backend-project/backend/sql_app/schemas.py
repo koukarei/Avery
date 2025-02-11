@@ -266,6 +266,7 @@ class GenerationComplete(BaseModel):
     is_completed: bool
 
 class GenerationOut(GenerationComplete):
+    generated_time: int
     sentence: Optional[str] = None
     correct_sentence: Optional[str] = None
     interpreted_image: Optional[IdOnly]=None
