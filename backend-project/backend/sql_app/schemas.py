@@ -266,7 +266,6 @@ class GenerationComplete(BaseModel):
     is_completed: bool
 
 class GenerationOut(GenerationComplete):
-    generated_time: int
     sentence: Optional[str] = None
     correct_sentence: Optional[str] = None
     interpreted_image: Optional[IdOnly]=None
@@ -274,6 +273,10 @@ class GenerationOut(GenerationComplete):
 
     class Config:
         orm_mode = True
+
+class GenerationAnalysis(GenerationOut):
+    generated_time: int
+    created_at: datetime.datetime
 
 class GenerationScore(BaseModel):
     id: int
@@ -300,6 +303,12 @@ class RoundOut(BaseModel):
     last_generation_id: Optional[int]=None
     chat_history: int
     generations: list[IdOnly]=[]
+
+    class Config:
+        orm_mode = True
+
+class RoundAnalysis(RoundOut):
+    chat: Chat
 
     class Config:
         orm_mode = True

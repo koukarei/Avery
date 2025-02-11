@@ -128,6 +128,7 @@ class Round(Base):
     personal_dictionaries = relationship("PersonalDictionary", back_populates="save_at_round")
     generations = relationship("Generation", back_populates="round")
     leaderboard = relationship("Leaderboard", back_populates="rounds", foreign_keys=[leaderboard_id])
+    chat = relationship("Chat", foreign_keys=[chat_history])
 
 class Generation(Base): 
     __tablename__ = "generations"

@@ -26,7 +26,7 @@ router = APIRouter(
     prefix="/analysis",
 )
 
-@router.get("/generations", tags=["analysis"], response_model=list[Tuple[schemas.GenerationOut, schemas.RoundOut]])
+@router.get("/generations", tags=["analysis"], response_model=list[Tuple[schemas.GenerationAnalysis, schemas.RoundAnalysis]])
 async def read_generations(
     program: Literal["none", "inlab_test","haga_sensei_test","student_january_experiment"],
     db: Session = Depends(get_db)
@@ -38,6 +38,8 @@ async def read_generations(
         )
         return generations
     program = crud.get_program_by_name(db, program)
+    if not program:
+        raise HTTPException(status_code=404, detail="Program not found")
     generations = crud.get_generations(
         db, 
         program_id=program.id,
