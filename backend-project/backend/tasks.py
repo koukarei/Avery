@@ -1,12 +1,18 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.declarative import DeclarativeMeta
-from .dependencies import sentence, score, dictionary, gen_image, openai_chatbot
-from . import crud, schemas, database
-from typing import Union, List, Annotated, Optional
 from fastapi import HTTPException
 from datetime import timezone, datetime
-from .dependencies.util import computing_time_tracker, encode_image
-from .database import SessionLocal, engine, SessionLocal2, engine2
+from typing import Union, List, Annotated, Optional
+
+from sql_app.dependencies import sentence, score, dictionary, gen_image, openai_chatbot
+from sql_app import crud, schemas, database
+from sql_app.dependencies.util import computing_time_tracker, encode_image
+from sql_app.database import SessionLocal, engine
+
+from sql_app_2.dependencies import sentence as sentence2, score as score2, dictionary as dictionary2, gen_image as gen_image2, openai_chatbot as openai_chatbot2
+from sql_app_2 import crud as crud2, schemas as schemas2, database as database2
+from sql_app_2.dependencies.util import computing_time_tracker as computing_time_tracker2, encode_image as encode_image2
+from sql_app_2.database import SessionLocal2, engine2
 
 import torch
 
@@ -58,16 +64,16 @@ class AlchemyEncoder(json.JSONEncoder):
             return fields
         return json.JSONEncoder.default(self, obj)
 
-@app.task(name='tasks.generateDescription', ignore_result=True, track_started=True)
-def generateDescription(leaderboard_id: int, image: str, story: Optional[str], model_name: str="gpt-4o-mini", db_num: int=0):
+@app.task(name='tasks.generateDescription', ignore_result=False, track_started=True)
+def generateDescription(
+    self,
+    leaderboard_id: int, image: str, story: Optional[str], model_name: str="gpt-4o-mini"
+):
     
     try:
-        if db_num >0:
-            db=database.SessionLocal2()
-        else:
-            db=database.SessionLocal()
+        db=database.SessionLocal()
 
-        contents = sentence.generateSentence(
+        response_id, contents = sentence.generateSentence(
             base64_image=image,
             story=story
         )
@@ -87,7 +93,7 @@ def generateDescription(leaderboard_id: int, image: str, story: Optional[str], m
             )
             
             db_descriptions.append(db_description)
-        
+
         db_leaderboard = crud.update_leaderboard_difficulty(
             db=db,
             leaderboard_id=leaderboard_id,
@@ -106,14 +112,10 @@ def generateDescription(leaderboard_id: int, image: str, story: Optional[str], m
 def check_factors_done(
     generation_id: int,
     delete_tasks: bool=False, 
-    db_num: int=0
 ):
     
     try:
-        if db_num >0:
-            db=database.SessionLocal2()
-        else:
-            db=database.SessionLocal()
+        db=SessionLocal()
 
         db_generation = crud.get_generation(db, generation_id=generation_id)
         if db_generation is None:
@@ -165,11 +167,7 @@ def check_factors_done_by_dict(
         raise HTTPException(status_code=400, detail="Invalid items")
     generation = items[0]
     try:
-        db_num = generation.get('db_num', 0)
-        if db_num >0:
-            db=database.SessionLocal2()
-        else:
-            db=database.SessionLocal()
+        db=SessionLocal()
         
         generation_id = generation['id']
         db_generation = crud.get_generation(db, generation_id=generation_id)
@@ -188,7 +186,6 @@ def check_factors_done_by_dict(
                 "id": generation_id,
                 "status": "FINISHED",
                 "tasks": [],
-                "db_num": db_num
             }
 
         celery_tasks = crud.get_tasks(db, generation_id=generation_id)
@@ -209,7 +206,6 @@ def check_factors_done_by_dict(
             "id": generation_id,
             "status": "PENDING",
             "tasks": output,
-            "db_num": db_num
         }
     except Exception as e:
         print(f"Check factors done error: {e}")
@@ -227,18 +223,14 @@ def pass_generation_dict(
         return generation
     return generation[0]
 
-@app.task(name='tasks.calculate_score', ignore_result=True, track_started=True)
+@app.task(name='tasks.calculate_score', ignore_result=False, track_started=True)
 def calculate_score(
     generation: dict,
     is_completed: bool=False, 
 ):
     
     try:
-        db_num = generation.get('db_num', 0)
-        if db_num >0:
-            db=database.SessionLocal2()
-        else:
-            db=database.SessionLocal()
+        db=SessionLocal()
 
         generation_id = generation['id']
         db_generation = crud.get_generation(db, generation_id=generation_id)
@@ -329,18 +321,14 @@ def calculate_score(
         if db:
             db.close()
 
-@app.task(name='tasks.update_vocab_used_time', ignore_result=True, track_started=True)
+@app.task(name='tasks.update_vocab_used_time', ignore_result=False, track_started=True)
 def update_vocab_used_time(
         sentence: str,
         user_id: int,
-        db_num: int=0
 ):
     
     try:
-        if db_num >0:
-            db=database.SessionLocal2()
-        else:
-            db=database.SessionLocal()
+        db=SessionLocal()
         updated_vocab = []
         doc = nlp_models['en_nlp'].get_sentence_nlp(sentence)
         for token in doc:
@@ -378,20 +366,16 @@ def update_vocab_used_time(
         if db:
             db.close()
 
-@app.task(name='tasks.update_n_words', ignore_result=True, track_started=True)
+@app.task(name='tasks.update_n_words', ignore_result=False, track_started=True)
 def update_n_words(
     generation: dict,
-    db_num: int=0
 ):
     
     try:
 
         generation = schemas.GenerationCompleteCreate(**generation)
         en_nlp = nlp_models['en_nlp'].en_nlp
-        if db_num >0:
-            db=database.SessionLocal2()
-        else:
-            db=database.SessionLocal()
+        db=SessionLocal()
 
         db_generation = crud.get_generation(db, generation_id=generation.id)
         if db_generation.updated_n_words:
@@ -430,20 +414,16 @@ def update_n_words(
         if db:
             db.close()
 
-@app.task(name='tasks.update_grammar_spelling', ignore_result=True, track_started=True)
+@app.task(name='tasks.update_grammar_spelling', ignore_result=False, track_started=True)
 def update_grammar_spelling(
     generation: dict,
-    db_num: int=0
 ):
     
     try:
 
         generation = schemas.GenerationCompleteCreate(**generation)
         en_nlp = nlp_models['en_nlp'].en_nlp
-        if db_num >0:
-            db=database.SessionLocal2()
-        else:
-            db=database.SessionLocal()
+        db=SessionLocal()
             
         db_generation = crud.get_generation(db, generation_id=generation.id)
         if db_generation.updated_grammar_errors:
@@ -475,10 +455,9 @@ def update_grammar_spelling(
         if db:
             db.close()
 
-@app.task(name='tasks.update_frequency_word', ignore_result=True, track_started=True)
+@app.task(name='tasks.update_frequency_word', ignore_result=False, track_started=True)
 def update_frequency_word(
     generation: dict,
-    db_num: int=0
 ):
     
     try:
@@ -486,10 +465,7 @@ def update_frequency_word(
         generation = schemas.GenerationCompleteCreate(**generation)
         en_nlp = nlp_models['en_nlp'].en_nlp
 
-        if db_num >0:
-            db=database.SessionLocal2()
-        else:
-            db=database.SessionLocal()
+        db=SessionLocal()
 
         db_generation = crud.get_generation(db, generation_id=generation.id)
         if db_generation.updated_f_word:
@@ -522,19 +498,15 @@ def update_frequency_word(
         if db:
             db.close()
 
-@app.task(name='tasks.update_perplexity', ignore_result=True, track_started=True)
+@app.task(name='tasks.update_perplexity', ignore_result=False, track_started=True)
 def update_perplexity(
         generation: dict, 
-        db_num: int=0
 ):
     
     db=None
     try:
         generation = schemas.GenerationCompleteCreate(**generation)
-        if db_num >0:
-            db=database.SessionLocal2()
-        else:
-            db=database.SessionLocal()
+        db=SessionLocal()
 
         db_generation = crud.get_generation(db, generation_id=generation.id)
         if db_generation.updated_perplexity:
@@ -584,21 +556,17 @@ def update_perplexity(
         if db:
             db.close()
 
-@app.task(name='tasks.update_content_score', ignore_result=True, track_started=True, bind=True, max_retries=10)
+@app.task(name='tasks.update_content_score', ignore_result=False, track_started=True, bind=True, max_retries=10)
 def update_content_score(
     self,
     generation: dict,
-    db_num: int=0
 ):
     
     try:
 
         print("update content score", generation)
         generation = schemas.GenerationCompleteCreate(**generation)
-        if db_num >0:
-            db=database.SessionLocal2()
-        else:
-            db=database.SessionLocal()
+        db=SessionLocal()
             
         db_generation = crud.get_generation(db, generation_id=generation.id)
         if db_generation.updated_content_score:
@@ -639,15 +607,11 @@ def generate_interpretation(
     generation_id: int,
     sentence: str,
     at: datetime, 
-    db_num: int=0
 ):
     
     db=None
     try:
-        if db_num >0:
-            db=database.SessionLocal2()
-        else:
-            db=database.SessionLocal()
+        db=SessionLocal()
 
         db_generation = crud.get_generation(db, generation_id=generation_id)
         if db_generation.interpreted_image_id is not None:
@@ -685,7 +649,6 @@ def generate_interpretation(
         return {
             'id': db_generation.id,
             'at': at,
-            'db_num': db_num,
         }
     except Exception as e:
         print(f"Generate interpretation error: {e}")
@@ -693,7 +656,7 @@ def generate_interpretation(
         if db:
             db.close()
 
-@app.task(name='tasks.image_similarity', ignore_result=True, track_started=True, bind=True, max_retries=10)
+@app.task(name='tasks.image_similarity', ignore_result=False, track_started=True, bind=True, max_retries=10)
 def cal_image_similarity(
     self,
     generation: tuple, 
@@ -704,11 +667,7 @@ def cal_image_similarity(
     generation = generation[0]        
     try:
         generation_id = generation['id']
-        db_num = generation.get('db_num', 0)
-        if db_num >0:
-            db=database.SessionLocal2()
-        else:
-            db=database.SessionLocal()
+        db=SessionLocal()
             
         t = computing_time_tracker("Image similarity")
         
@@ -787,7 +746,7 @@ def cal_image_similarity(
         if db:
             db.close()
 
-@app.task(name="tasks.complete_generation_backend", ignore_result=True, track_started=True)
+@app.task(name="tasks.complete_generation_backend", ignore_result=False, track_started=True)
 def complete_generation_backend(
     items: tuple, 
 ):
@@ -798,11 +757,7 @@ def complete_generation_backend(
     
     try:
         generation_id = generation['id']
-        db_num = generation.get('db_num', 0)
-        if db_num >0:
-            db=database.SessionLocal2()
-        else:
-            db=database.SessionLocal()
+        db=SessionLocal()
             
         t = computing_time_tracker("Complete generation")
 
@@ -937,15 +892,10 @@ def complete_generation_backend(
         if db:
             db.close()
 
-@app.task(name='tasks.check_error_task', ignore_result=True, track_started=True)
-def check_error_task(
-    db_num: int=0
-):
+@app.task(name='tasks.check_error_task', ignore_result=False, track_started=True)
+def check_error_task():
     try:
-        if db_num >0:
-            db=database.SessionLocal2()
-        else:
-            db=database.SessionLocal()
+        db=SessionLocal()
 
         db_images = crud.get_error_task(
             db=db,
@@ -1064,6 +1014,243 @@ def check_error_task(
 
     except Exception as e:
         print(f"Check error task error: {e}")
+    finally:
+        if db:
+            db.close()
+
+# sql_app_2 tasks
+
+@app.task(name='tasks.generateDescription2', ignore_result=False, track_started=True)
+def generateDescription2(
+    self,
+    leaderboard_id: int, image: str, story: Optional[str], model_name: str="gpt-4o-mini"
+):
+    
+    try:
+        db=SessionLocal2()
+
+        response_id, contents = sentence2.generateSentence(
+            base64_image=image,
+            story=story
+        )
+
+        db_descriptions = []
+
+        for content in contents:
+            d = schemas2.DescriptionBase(
+                content=content,
+                model=model_name,
+                leaderboard_id=leaderboard_id
+            )
+            
+            db_description = crud2.create_description(
+                db=db,
+                description=d
+            )
+            
+            db_descriptions.append(db_description)
+        
+        db_leaderboard = crud2.update_leaderboard(
+            db=db,
+            leaderboard=schemas2.LeaderboardUpdate(
+                id=leaderboard_id,
+                response_id=response_id,
+            )
+        )
+        db_leaderboard = crud2.update_leaderboard_difficulty(
+            db=db,
+            leaderboard_id=leaderboard_id,
+            difficulty_level=len(contents)
+        )
+
+        output = json.dumps(db_descriptions, cls=AlchemyEncoder)
+
+        return output
+    except Exception as e:
+        print(f"Generate description error: {e}")
+    finally:
+        if db:
+            db.close()
+
+@app.task(name='tasks.calculate_score_gpt', ignore_result=False, track_started=True)
+def calculate_score_gpt(
+    items: tuple,
+):
+    
+    if items is None:
+        raise HTTPException(status_code=400, detail="Invalid items")
+    if isinstance(items, tuple):
+        generation = items[0]
+    elif 'id' in items:
+        generation = items
+    try:
+        
+        db=SessionLocal2()
+
+        db_generation = crud2.get_generation(db, generation_id=generation['id'])
+        if db_generation is None:
+            raise HTTPException(status_code=404, detail="Generation not found")
+        db_round = crud2.get_round(db, round_id=db_generation.round_id)
+        if db_round is None:
+            raise HTTPException(status_code=404, detail="Round not found")
+        cb = openai_chatbot2.Hint_Chatbot(
+            model_name=db_round.model,
+            first_res_id=db_round.leaderboard.response_id,
+        )
+
+        scores = cb.scoring(
+            sentence=db_generation.sentence,
+            base64_image=db_round.leaderboard.original_image.image,
+        )
+
+        if scores is None:
+            raise HTTPException(status_code=500, detail="Error calculating score")
+        
+        db_score = crud2.create_score(
+            db=db,
+            score=schemas2.ScoreCreate(
+                generation_id = db_generation.id,
+                grammar_score=scores['grammar'],
+                spelling_score=scores['spelling'],
+                vividness_score=scores['content_vividness'],
+                convention=scores['convention'],
+                structure_score=scores['sentence_structure'],
+                content_score=scores['content_comprehension'],
+            ),
+            generation_id=db_generation.id
+        )
+
+        
+        total_score = db_score.grammar_score + db_score.spelling_score + db_score.vividness_score + db_score.convention + db_score.structure_score
+        total_score = int(round(total_score*db_score.content_score)/21*100)
+        db_generation = crud2.update_generation3(
+            db=db,
+            generation=schemas2.GenerationComplete(
+                id=db_generation.id,
+                total_score=total_score,
+                rank=score2.rank(total_score),
+                is_completed=False
+            )
+        )
+
+        image_similarity = cb.image_similarity(
+            image1_base64=db_round.leaderboard.original_image.image,
+            image2_base64=db_generation.interpreted_image.image,
+        )
+
+        db_score = crud2.update_score(
+            db=db,
+            score=schemas2.ScoreUpdate(
+                id=db_score.id,
+                image_similarity=image_similarity
+            )
+        )
+
+        output = [json.dumps(db_generation, cls=AlchemyEncoder),
+                 json.dumps(db_score, cls=AlchemyEncoder)]
+        return output
+
+    except Exception as e:
+        print(f"Calculate score error: {e}")
+    finally:
+        if db:
+            db.close()
+
+@app.task(name='tasks.update_vocab_used_time2', ignore_result=False, track_started=True)
+def update_vocab_used_time2(
+        sentence: str,
+        user_id: int,
+):
+    
+    try:
+        db=SessionLocal2()
+        updated_vocab = []
+        doc = nlp_models['en_nlp'].get_sentence_nlp(sentence)
+        for token in doc:
+            db_vocab = crud2.get_vocabulary(
+                db=db,
+                vocabulary=token.lemma,
+                part_of_speech=token.pos
+            )
+            if db_vocab:
+                db_personal_dictionary = crud2.get_personal_dictionary(
+                    db=db,
+                    player_id=user_id,
+                    vocabulary_id=db_vocab.id
+                )
+
+                if db_personal_dictionary:
+                    updated_vocab.append(
+                        crud2.update_personal_dictionary_used(
+                            db=db,
+                            dictionary=schemas.PersonalDictionaryId(
+                                player=user_id,
+                                vocabulary=db_vocab
+                            )
+                        )
+                    )
+
+        output = [
+            json.dumps(db_vocab, cls=AlchemyEncoder)
+            for db_vocab in updated_vocab
+        ]
+        return output
+    except Exception as e:
+        print(f"Update vocab used time error: {e}")
+    finally:
+        if db:
+            db.close()
+
+@app.task(name='tasks.generate_interpretation2', ignore_result=False)
+def generate_interpretation2(
+    generation_id: int,
+    sentence: str,
+    at: datetime, 
+):
+    
+    db=None
+    try:
+        db=SessionLocal2()
+
+        db_generation = crud2.get_generation(db, generation_id=generation_id)
+        if db_generation.interpreted_image_id is not None:
+            return {
+                'id': db_generation.id,
+                'at': at,
+            }
+        t = computing_time_tracker2("Generate interpretation")
+        url = gen_image2.generate_interpretion(sentence)
+        t.stop_timer()
+
+        # Download and save image
+        try:
+            b_interpreted_image = io.BytesIO(requests.get(url).content)
+            image = encode_image(image_file=b_interpreted_image)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid image file: {str(e)}")
+        
+        # Database operations
+        db_interpreted_image = crud2.create_interpreted_image(
+            db=db,
+            image=schemas2.ImageBase(
+                image=image,
+            )
+        )
+
+        db_generation = crud2.update_generation2(
+            db=db,
+            generation=schemas2.GenerationInterpretation(
+                id=generation_id,
+                interpreted_image_id=db_interpreted_image.id,
+            )
+        )
+
+        return {
+            'id': db_generation.id,
+            'at': at,
+        }
+    except Exception as e:
+        print(f"Generate interpretation error: {e}")
     finally:
         if db:
             db.close()

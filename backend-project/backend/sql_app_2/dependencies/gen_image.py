@@ -22,13 +22,13 @@ def gen_image(sentence,size="1024x1024",quality="standard",n=1):
             continue
     return response.data[0].url
 
-def generate_interpretion(sentence):
+def generate_interpretion(sentence, style="Japanese Anime"):
     prompt="""
             I NEED to test how the tool works with extremely simple prompts. DO NOT add any detail, just use it AS-IS:
-            Generate a image in the style of Japanese Anime for the passage below.
+            Generate a image in the style of {style} for the passage below.
             Only show picture.
             passage: {passage}
-            """.format(passage=sentence)
+            """.format(passage=sentence, style=style)
     url = gen_image(prompt)
     return url
 

@@ -171,12 +171,12 @@ Avery、ロボット（ディズニーのベイマックスのように話すキ
 ## 情報
 ### 記述語
 あなたは以下の英作文とスコアを使って、ユーザーに日本語でフィードバックを提供する必要があります。
-文法得点: 文の文法の正確さに基づいています。満点は5点です。
-スペリング得点: スペルミスを基づいています。満点は5点です。
-鮮明さ: 文の生き生きとした表現に基づいています。満点は5点です。
+文法得点: 文の文法の正確さに基づいています。満点は3点です。
+スペリング得点: スペルミスを基づいています。満点は1点です。
+鮮明さ: 文の生き生きとした表現に基づいています。満点は1点です。
 自然さ: 文の自然さと通用性に基づいています。満点は1点です。
-構造性: 文の複雑さに基づいています。満点は3点です。
-内容得点: 画像に合っているかどうかに基づいています。満点は100点です。
+構造性: 文の複雑さに基づいています。満点は1点です。
+内容得点: 画像に合っているかどうかに基づいています。満点は3点です。
 
 ## 評価の例文
 あなたのミッションは、ユーザーにフィードバックを提供して、ユーザーの英作文が元の画像に合うようにすることです。
@@ -233,20 +233,7 @@ Every soldiers are exhausted and they are sleeping on the floor.
 画像には兵士がいません。😅
 総合評価:
 文法の誤りを修正して、画像に合った内容に変更してください。😇
-        """.format(
-            # user_sentence=sentence,
-            # correct_sentence=correct_sentence,
-            # grammar_score=scoring['grammar_score'],
-            # spelling_score=scoring['spelling_score'],
-            # vividness_score=scoring['vividness_score'],
-            # convention=scoring['convention'],
-            # structure_score=scoring['structure_score'],
-            # content_score=scoring['content_score'],
-            # total_score=scoring['total_score'],
-            # rank=rank,
-            # grammar_errors=grammar_errors,
-            # spelling_errors=spelling_errors
-        )
+        """
 
         self.messages=[]
 
@@ -341,6 +328,202 @@ Every soldiers are exhausted and they are sleeping on the floor.
             print(f"Error: {e}")
             print(f"Messages: {self.messages}")
             return {}
+        
+    def scoring(self, sentence, base64_image=None):
+        instructions = """### ✅ Role
+
+You are an evaluator. Your task is to assess a user-submitted passage based on six specific writing criteria: grammar, spelling, conventions, content comprehension, content vividness, and sentence structure. Use the detailed rubrics provided below to assign a score for each category.
+
+Return the **score** for each category.
+
+### ✳️ Evaluation Rubrics
+
+---
+
+#### **1. Grammar (0–3 points)**  
+Evaluate accuracy in punctuation, verb forms, pronouns, and general grammar.
+
+- **3** – No grammar mistakes.  
+- **2** – Minor errors that don’t affect understanding.  
+- **1** – Noticeable errors, but passage is still understandable.  
+- **0** – Serious grammar mistakes that make it incomprehensible.
+
+**Example**:  
+3 – *An old man is playing with a dog.*  
+2 – *The old is teaching the dog how to jumping.*  
+1 – *A old man play with a dog A man and a dog.*  
+0 – *A old man play with old dog people.*
+
+---
+
+#### **2. Spelling (0–1 point)**  
+Evaluate accuracy of word spelling, including proper nouns and technical terms.
+
+- **1** – No spelling errors.  
+- **0** – Contains one or more spelling errors.
+
+**Example**:  
+1 – *A man plays a dog with a stick on the lawn.*  
+0 – *An old man is waiking a dog.*
+
+---
+
+#### **3. Writing Conventions (0–1 point)**  
+Evaluate use of capitalization, punctuation, spacing, and formatting.
+
+- **1** – All conventions used correctly.  
+- **0** – Contains errors in spacing or punctuation.
+
+**Example**:  
+1 – *A dog plays with its owner.*  
+0 – *The man is practice the dog's jump.*
+
+---
+
+#### **4. Content Comprehension (0–3 points)**  
+Evaluate how well the content reflects a described image or scenario.
+
+- **3** – Includes all key elements: main subjects, their actions/status, and setting.  
+- **2** – Covers a majority of important content.  
+- **1** – Covers only part of the content.  
+- **0** – Irrelevant or extremely vague content.
+
+**Example**:  
+3 – *An old man was teasing the dog with a stick on the lawn.*  
+2 – *The old man is playing with his dog.*  
+1 – *A person and a dog.*  
+0 – *I am sorry, I can not a dog.*
+
+---
+
+#### **5. Content Vividness (0–1 point)**  
+Evaluate if the description uses specific, sensory, or engaging detail.
+
+- **1** – Includes vivid or descriptive details.  
+- **0** – Bland or generic; lacks imagery.
+
+**Example**:  
+1 – *The black dog jumps high to catch the trick.*  
+0 – *A man is playing with a dog.*
+
+---
+
+#### **6. Sentence Structure (0–1 point)**  
+Evaluate sentence complexity and cohesion.
+
+- **1** – Uses compound or complex sentences.  
+- **0** – Only uses basic/simple sentence structures.
+
+**Example**:  
+1 – *An old man is using a stick to play with the dog, whose face is full of smiles.*  
+0 – *An old person is playing with the black dog.*
+
+---
+
+### 🔁 Output Format (Sample)
+
+```
+{"grammar": 2, "spelling": 0, "convention": 1, "content_comprehension": 2, "content_vividness": 0, "sentence_structure": 0}
+```"""
+
+        passage_json_schema = {
+            "format": {
+                "type": "json_schema",
+                "name": "Passage",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "grammar": {"type": "integer"},
+                        "spelling": {"type": "integer"},
+                        "convention": {"type": "integer"},
+                        "content_comprehension": {"type": "integer"},
+                        "content_vividness": {"type": "integer"},
+                        "sentence_structure": {"type": "integer"},
+                    },
+                    "required": [
+                        "grammar",
+                        "spelling",
+                        "convention",
+                        "content_comprehension",
+                        "content_vividness",
+                        "sentence_structure"
+                    ],
+                    "additionalProperties": False
+                    },
+                    "strict": True,
+                }
+        }
+        if self.first_res_id is None:
+            user_inputs=[
+                {
+                    "role": "user",
+                    "content": [
+                        { "type": "input_text", "text": sentence},
+                        {
+                            "type": "input_image",
+                            "image_url": f"data:image/jpeg;base64,{base64_image}"
+                        }
+                    ]
+                }
+            ]
+        else:
+            user_inputs=[
+                {
+                    "role": "user",
+                    "content": [
+                        { "type": "input_text", "text": sentence},
+                    ]
+                }
+            ]
+        
+        try:
+            response = self.client.responses.create(
+                model=self.model_name,
+                instructions=instructions,
+                input=user_inputs,
+                temperature=0.1,
+                text=passage_json_schema,
+                previous_response_id=self.first_res_id
+            )
+
+            return json.loads(response.output_text)
+        except Exception as e:
+            print(f"Error: {e}")
+            print(f"Messages: {self.messages}")
+            print(f"Response: {response}")
+            return {}
+    
+    def image_similarity(self, image1_base64, image2_base64):
+        try:
+            user_inputs=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_image",
+                            "image_url": f"data:image/jpeg;base64,{image1_base64}"
+                        },
+                        {
+                            "type": "input_image",
+                            "image_url": f"data:image/jpeg;base64,{image2_base64}"
+                        }
+                    ]
+                }
+            ]
+            response = self.client.responses.create(
+                model=self.model_name,
+                instructions="Compare two input images and calculate a similarity score between 0 and 1, where 1 means identical and 0 means completely different. Base the similarity on visual features such as shapes, colors, and structure. Return only the similarity score as a float.",
+                input=user_inputs,
+                temperature=0,
+            )
+                
+            similarity_score = float(response.output_text)
+
+            return similarity_score
+        
+        except Exception as e:
+            print(f"Error: {e}")
+            return None
         
     def kill_me(self):
         while self.prev_res_ids:

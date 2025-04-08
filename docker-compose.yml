@@ -142,7 +142,7 @@ services:
       - ./backend-project/backend:/backend
     command:
       - celery
-      - --app=sql_app.tasks.app
+      - --app=tasks.app
       - worker
       - --loglevel=info
       - --pool=gevent

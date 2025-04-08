@@ -271,6 +271,12 @@ def update_leaderboard(
                 )
                 db.add(db_vocab)
                 db.commit()
+
+    if leaderboard.response_id is not None:
+        db_leaderboard.response_id = leaderboard.response_id
+        db.commit()
+        db.refresh(db_leaderboard)
+    
     return db_leaderboard
 
 def update_leaderboard_difficulty(
@@ -684,6 +690,7 @@ def create_score(db: Session, score: schemas.ScoreCreate, generation_id: int):
     db_generation = db.query(models.Generation).filter(models.Generation.id == generation_id).first()
     db_generation.score_id = db_score.id
     db.commit()
+    db.refresh(db_generation)
 
     return db_score
 

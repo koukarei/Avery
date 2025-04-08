@@ -1,5 +1,6 @@
 from openai import OpenAI
 from pydantic import BaseModel
+import json
 
 class Description(BaseModel):
    details: list[str]
@@ -20,11 +21,10 @@ class Passage(BaseModel):
    grammar_mistakes: list[GrammarMistake]
 
 
-def generateSentence(base64_image,story: str=None, model_name="gpt-4o-2024-08-06"):
+def generateSentence(base64_image,story: str=None, model_name="gpt-4o"):
   
   client=OpenAI()
-  messages =[
-    {"role": "system", "content": """
+  system_prompt = """
 # Role
 Image Describer
 
@@ -51,17 +51,16 @@ Provide a detailed, line-by-line description of the image, incorporating relevan
 2. The story's main character stands at the shore, gazing at the horizon with a hopeful expression.
 3. Seagulls glide across the sky, echoing the calm yet melancholic mood of the story.
 4. Gentle waves lap at the sand, their rhythm mirroring the character's deep breaths.
-      """}
-  ]
+      """
+  
+  messages = []
   if story:
     messages.append(
       {"role": "user", "content": [
-        {"type": "text", "text": story},
+        {"type": "input_text", "text": story},
         {
-          "type": "image_url",
-          "image_url": {
-            "url": f"data:image/jpeg;base64,{base64_image}"
-          },
+          "type": "input_image",
+          "image_url": f"data:image/jpeg;base64,{base64_image}"
         },
       ]
       }
@@ -69,31 +68,47 @@ Provide a detailed, line-by-line description of the image, incorporating relevan
   else:
       {"role": "user", "content": [
         {
-          "type": "image_url",
-          "image_url": {
-            "url": f"data:image/jpeg;base64,{base64_image}"
-          },
+          "type": "input_image",
+          "image_url": f"data:image/jpeg;base64,{base64_image}"
         },
       ]
       }
       
-  completion = client.beta.chat.completions.parse(
+  response = client.responses.create(
     model=model_name,
-    messages=messages,
-    response_format=Description,
+    instructions=system_prompt,
+    input=messages,
+    temperature=0.5,
+    text={
+       "format": "json_schema",
+       "name": "description",
+       "schema": {
+          "type": "object",
+          "properties": {
+            "details": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": ["details"]
+        },
+        "strict": True,
+       }
   )
 
-  description = completion.choices[0].message.parsed
+  description = json.loads(response.output_text)
   
-  return description.details
+  return response.id, description['details']
 
 def genSentences(image,story,amt=3):
     
     if "http" not in image:
        image="data:image/jpeg;base64,{}".format(image)
     for i in range(amt):
-        gen_Sentences=generateSentence(image,story)
-    return gen_Sentences
+        response_id, gen_Sentences=generateSentence(image,story)
+    return response_id, gen_Sentences
 
 def checkSentence(passage,temp=1):
   client=OpenAI()

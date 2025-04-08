@@ -139,37 +139,12 @@ class Generation(Base):
     sentence = Column(MEDIUMTEXT, nullable=True)
     correct_sentence = Column(MEDIUMTEXT, nullable=True)
 
-    n_words = Column(Integer, default=0,nullable=True)
-    n_conjunctions = Column(Integer, default=0,nullable=True)
-    n_adj= Column(Integer, default=0,nullable=True)
-    n_adv = Column(Integer, default=0,nullable=True)
-    n_pronouns = Column(Integer, default=0,nullable=True)
-    n_prepositions = Column(Integer, default=0,nullable=True)
-
     grammar_errors = Column(MEDIUMTEXT, nullable=True)
     spelling_errors = Column(MEDIUMTEXT, nullable=True)
-
-    n_grammar_errors = Column(Integer, default=0,nullable=True)
-    n_spelling_errors = Column(Integer, default=0,nullable=True)
-
-    perplexity = Column(Float(precision=10), default=0,nullable=True)
-
-    f_word = Column(Float(precision=10), default=0,nullable=True)
-    f_bigram = Column(Float(precision=10), default=0,nullable=True)
-
-    n_clauses = Column(Integer, default=0,nullable=True)
-
-    content_score = Column(Integer, default=0,nullable=True)
 
     total_score = Column(Integer, default=0,nullable=True)
     rank = Column(String(1), default='F',nullable=True)
     generated_time = Column(Integer, default=1,nullable=True)
-
-    updated_n_words = Column(Boolean, default=False)
-    updated_grammar_errors = Column(Boolean, default=False)
-    updated_perplexity = Column(Boolean, default=False)
-    updated_f_word = Column(Boolean, default=False)
-    updated_content_score = Column(Boolean, default=False)
 
     created_at = Column(DateTime, default=datetime.datetime.now())
     duration = Column(Integer, default=0,nullable=True)

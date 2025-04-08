@@ -146,6 +146,7 @@ class LeaderboardCreateIn(LeaderboardBase):
 
 class LeaderboardCreate(LeaderboardCreateIn):
     created_by_id: int=0
+    response_id: Optional[str]=None
 
 class VocabularyBase(BaseModel):
     word: str
@@ -235,32 +236,9 @@ class Score(ScoreCreate):
 
 class GenerationComplete(BaseModel):
     id: int
-    n_words: Optional[int] = None
-    n_conjunctions: Optional[int] = None
-    n_adj: Optional[int] = None
-    n_adv: Optional[int] = None
-    n_pronouns: Optional[int] = None
-    n_prepositions: Optional[int] = None
-    updated_n_words: Optional[bool] = None
 
     grammar_errors: Optional[str] = None
     spelling_errors: Optional[str] = None
-
-    n_grammar_errors: Optional[int] = None
-    n_spelling_errors: Optional[int] = None
-    updated_grammar_errors: Optional[bool] = None
-
-    perplexity: Optional[float] = None
-    updated_perplexity: Optional[bool] = None
-
-    f_word: Optional[float] = None
-    f_bigram: Optional[float] = None
-    updated_f_word: Optional[bool] = None
-
-    n_clauses: Optional[int] = None
-
-    content_score: Optional[int] = None
-    updated_content_score: Optional[bool] = None
 
     total_score: Optional[int] = None
     rank: Optional[str] = None
@@ -468,6 +446,7 @@ class LeaderboardUpdate(BaseModel):
     title: Optional[str]=None
     school: list[str]=[]
     vocabularies: list[VocabularyBase]=[]
+    response_id: Optional[str]=None
 
 class Task(BaseModel):
     id: str

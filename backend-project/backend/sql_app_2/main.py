@@ -3,13 +3,13 @@ from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, res
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import parse_obj_as
 from sqlalchemy.orm import Session
-import time, os, datetime, shutil, tempfile, zipfile, zoneinfo, asyncio
+import time, os, datetime, shutil, tempfile, zipfile, zoneinfo, asyncio, json
 import pandas as pd
 from pathlib import Path
 
 from . import crud, models, schemas, analysis_router
-from .tasks import app as celery_app
-from .tasks import check_factors_done, check_factors_done_by_dict, generateDescription, update_vocab_used_time, generate_interpretation, pass_generation_dict, update_perplexity, update_content_score, update_frequency_word, update_n_words, update_grammar_spelling, cal_image_similarity, complete_generation_backend, calculate_score, check_error_task
+from tasks import app as celery_app
+from tasks import generateDescription2, update_vocab_used_time2, generate_interpretation2, calculate_score_gpt
 from .database import SessionLocal2, engine2
 
 from .dependencies import sentence, score, dictionary, openai_chatbot, util
@@ -267,14 +267,34 @@ async def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     if user.username=="admin":
         user.is_admin=True
         user.user_type="instructor"
-    return crud.create_user(db=db, user=user)
+    new_user = crud.create_user(db=db, user=user)
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=new_user.id,
+            action="create_user",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+    return new_user
 
 @app.post("/users/lti", tags=["User"], response_model=schemas.User)
 async def create_user_lti(user: schemas.UserLti, db: Session = Depends(get_db)):
     db_user = crud.get_user_by_lti(db, lti_user_id=user.user_id, school=user.school)
     if db_user:
         raise HTTPException(status_code=400, detail="This account already exists")
-    return crud.create_user_lti(db=db, user=user)
+    new_user = crud.create_user_lti(db=db, user=user)
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=new_user.id,
+            action="create_user_lti",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+    return new_user
 
 @app.delete("/users/{user_id}", tags=["User"], response_model=schemas.UserBase)
 async def delete_user(current_user: Annotated[schemas.User, Depends(get_current_user)], user_id: int, db: Session = Depends(get_db), ):
@@ -443,7 +463,7 @@ async def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_cu
         db=db,
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
-            action="view_leaderboard",
+            action="view_leaderboards",
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -477,6 +497,17 @@ async def read_leaderboards_admin(
         published_at_start=published_at_start,
         published_at_end=published_at_end,
     )
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_leaderboards_admin",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+
     return leaderboards
 
 @app.post("/leaderboards/", tags=["Leaderboard"], response_model=schemas.LeaderboardOut, status_code=201)
@@ -492,10 +523,10 @@ async def create_leaderboard(
     story_id = leaderboard.story_id
     if story_id==0:
         story_id=None
-    
+
     leaderboard = schemas.LeaderboardCreate(
         **leaderboard.model_dump(),
-        created_by_id=current_user.id
+        created_by_id=current_user.id,
     )
 
     result = crud.create_leaderboard(
@@ -539,6 +570,16 @@ async def create_leaderboard(
         task=schemas.Task(
             id=t.id,
             leaderboard_id=result.id,
+        )
+    )
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="create_leaderboard",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
     )
 
@@ -750,12 +791,11 @@ async def create_leaderboards(
             leaderboard_list.append(db_leaderboard)
 
             # Generate description
-            t = generateDescription.delay(
+            t = generateDescription2.delay(
                 leaderboard_id=db_leaderboard.id, 
                 image=img.image, 
                 story=story_extract, 
                 model_name="gpt-4o-mini",
-                db_num=1
             )
             crud.create_task(
                 db=db,
@@ -771,6 +811,17 @@ async def create_leaderboards(
     # Remove the temporary directory
     if os.path.exists(temp_dir):
         shutil.rmtree(temp_dir)
+
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="create_leaderboards",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
 
     return leaderboard_list
 
@@ -810,6 +861,17 @@ async def read_leaderboard(current_user: Annotated[schemas.User, Depends(get_cur
     if db_leaderboard is None:
         util.logger1.error(f"Leaderboard not found: {leaderboard_id}")
         raise HTTPException(status_code=404, detail="Leaderboard not found")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_leaderboard_info",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+
     return db_leaderboard
 
 @app.get("/leaderboards/{leaderboard_id}/schools/", tags=["Leaderboard"], response_model=list[schemas.SchoolOut])
@@ -819,6 +881,16 @@ async def read_schools(current_user: Annotated[schemas.User, Depends(get_current
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
     schools = crud.get_school_leaderboard(db, leaderboard_id=leaderboard_id)
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_schools",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
     return schools
 
 @app.put("/leaderboards/{leaderboard_id}", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
@@ -835,6 +907,16 @@ async def update_leaderboard(
     db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
     if db_leaderboard is None:
         raise HTTPException(status_code=404, detail="Leaderboard not found")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="update_leaderboard_info",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
     return crud.update_leaderboard(db=db, leaderboard=leaderboard)
 
 @app.delete("/leaderboards/{leaderboard_id}", tags=["Leaderboard"], response_model=schemas.IdOnly)
@@ -850,6 +932,16 @@ async def delete_leaderboard(
     db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
     if db_leaderboard is None:
         raise HTTPException(status_code=404, detail="Leaderboard not found")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="delete_leaderboard",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
     return crud.delete_leaderboard(db=db, leaderboard_id=leaderboard_id)
 
 @app.post("/program", tags=["Program"], response_model=schemas.Program, status_code=201)
@@ -862,6 +954,16 @@ async def create_program(
         raise HTTPException(status_code=401, detail="Login to create program")
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="create_program",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
     return crud.create_program(db=db, program=program)
 
 @app.get("/programs/", tags=["Program"], response_model=list[schemas.Program])
@@ -871,6 +973,16 @@ async def read_programs(current_user: Annotated[schemas.User, Depends(get_curren
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
     programs = crud.get_programs(db, skip=skip, limit=limit)
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_programs",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
     return programs
 
 @app.get("/leaderboards/{leaderboard_id}/rounds/", tags=["Leaderboard", "Round"], response_model=list[schemas.RoundOut])
@@ -891,6 +1003,16 @@ async def get_rounds_by_leaderboard(
             leaderboard_id=leaderboard_id,
         )
     db_program = crud.get_program_by_name(db, program)
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_rounds_by_leaderboard",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
     return crud.get_rounds(
         db=db,
         leaderboard_id=leaderboard_id,
@@ -919,6 +1041,16 @@ async def get_my_rounds(
                 leaderboard_id=leaderboard_id,
                 program_id=db_program.id
             )
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_my_rounds",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
 
     return crud.get_rounds(
         db=db,
@@ -961,6 +1093,80 @@ async def round_websocket(
             sent_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
         )
     )
+
+    # if user resumes the round
+    if user_action["action"] == "resume":
+        leaderboard_id = user_action["leaderboard_id"]
+        
+        unfinished_rounds = crud.get_rounds(
+            db=db,
+            player_id=player_id,
+            leaderboard_id=leaderboard_id,
+            is_completed=False
+        )
+        if unfinished_rounds:
+            db_round = crud.get_round(
+                db=db,
+                round_id=unfinished_rounds[0].id,
+            )
+            db_leaderboard = crud.get_leaderboard(db=db, leaderboard_id=leaderboard_id)
+            
+            db_generation = crud.get_generation(db=db, generation_id=db_round.last_generation_id)
+            db_chat = crud.get_chat(db=db, chat_id=db_round.chat_history)
+            prev_res_ids = [
+                msg.response_id for msg in db_chat.messages if msg.response_id is not None
+            ]
+            chatbot_obj = openai_chatbot.Hint_Chatbot(
+                model_name=db_round.model,
+                vocabularies=db_leaderboard.vocabularies,
+                first_res_id=db_leaderboard.response_id,
+                prev_res_id=prev_res_ids[-1] if prev_res_ids else db_leaderboard.response_id,
+                prev_res_ids=prev_res_ids
+            )
+            generated_time = db_generation.generated_time
+
+            db_score = crud.get_score(db=db, generation_id=db_generation.id)
+
+            # prepare data to send
+            send_data = {
+                "leaderboard": {
+                    "id": leaderboard_id,
+                    "image": db_round.leaderboard.original_image.image,
+                },
+                "round": {
+                    "id": db_round.id,
+                    "generated_time":generated_time,
+                },
+                "generation": {
+                    "id": db_generation.id,
+                    "interpreted_image": db_generation.interpreted_image.image,
+                    "generated_time": db_generation.generated_time,
+                    "correct_sentence": db_generation.correct_sentence,
+                    "is_completed": db_generation.is_completed,
+                    "image_similarity": db_score.image_similarity if db_score else None,
+                },
+                "chat": {
+                    "id": db_round.chat_history,
+                    "messages" : [
+                        {   
+                            'id': db_message.id,
+                            'sender': db_message.sender,
+                            'content': db_message.content,
+                            'created_at': db_message.created_at.isoformat(),
+                            'is_hint': db_message.is_hint
+                        }
+                        for db_message in db_chat.messages
+                    ]
+                },
+            }
+        else:
+            user_action["action"] = "start"
+            user_action["obj"] = {
+                "program": user_action["program"],
+                "model": user_action["model"],
+                "created_at": datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                "leaderboard_id": leaderboard_id
+            }
 
     if user_action["action"] == "start":
         # create a new round
@@ -1013,7 +1219,8 @@ async def round_websocket(
         chatbot_obj = openai_chatbot.Hint_Chatbot(
             model_name=obj.model,
             vocabularies=db_leaderboard.vocabularies,
-            first_res_id=db_leaderboard.response_id
+            first_res_id=db_leaderboard.response_id,
+            prev_res_id=db_leaderboard.response_id
         )
 
         generated_time = 0
@@ -1042,12 +1249,6 @@ async def round_websocket(
             },
         }
     
-    # if user resumes the round
-    elif user_action["action"] == "resume":
-        pass
-    else: 
-        raise HTTPException(status_code=400, detail="Invalid action")
-
     await websocket.send_json(send_data)
 
     crud.update_user_action(
@@ -1100,7 +1301,8 @@ async def round_websocket(
                             content=hint,
                             sender="assistant",
                             created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
-                            is_hint=True
+                            is_hint=True,
+                            response_id=chatbot_obj.prev_res_id
                         ),
                         chat_id=db_round.chat_history
                     )['message']
@@ -1125,13 +1327,16 @@ async def round_websocket(
             # if user submits the answer
             elif user_action["action"] == "submit":
                 obj = parse_obj_as(schemas.GenerationCreate, user_action['obj'])
-                
+                status = 0
                 if db_generation.correct_sentence is None:
                     db_generation = crud.update_generation0(
                         db=db,
                         generation=obj,
                         generation_id=db_generation.id
                     )
+                elif db_generation.sentence == obj.sentence:
+                    db_generation = crud.get_generation(db=db, generation_id=db_generation.id)
+                    status = 3
                 else: 
                     generated_time = generated_time + 1 
                     obj.generated_time = generated_time
@@ -1141,17 +1346,17 @@ async def round_websocket(
                         generation=obj,
                     )
 
-                try:
-                    status, correct_sentence, spelling_mistakes, grammar_mistakes=sentence.checkSentence(passage=db_generation.sentence)
-                except Exception as e:
-                    util.logger1.error(f"Error in get_user_answer: {str(e)}")
-                    raise HTTPException(status_code=400, detail=str(e))
+                if status != 3:
+                    try:
+                        status, correct_sentence, spelling_mistakes, grammar_mistakes=sentence.checkSentence(passage=db_generation.sentence)
+                    except Exception as e:
+                        util.logger1.error(f"Error in get_user_answer: {str(e)}")
+                        raise HTTPException(status_code=400, detail=str(e))
                 
-                update_vocab_used_time.delay(
-                    sentence=db_generation.sentence,
-                    user_id=db_round.player_id,
-                    db_num=1,
-                )
+                    # update_vocab_used_time2.delay(
+                    #     sentence=db_generation.sentence,
+                    #     user_id=db_round.player_id,
+                    # )
 
                 if status == 0:
                     crud.update_generation3(
@@ -1184,6 +1389,22 @@ async def round_websocket(
                             is_hint=False
                         )
                     ]
+
+                    # server-side processing
+                    generation_dict = {
+                        "id": db_generation.id,
+                        "at": db_generation.created_at,
+                    }
+
+                    chain_interpretation = chain(
+                        group(
+                            generate_interpretation2.s(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at),
+                        ),
+                        group(
+                            calculate_score_gpt.s(),
+                        ),
+                    )
+                    chain_result = chain_interpretation.apply_async()
 
                 elif status == 1:
                     messages = [
@@ -1218,37 +1439,6 @@ async def round_websocket(
                         )['message']
                     )
 
-                # server-side processing
-                generation_dict = {
-                    "id": db_generation.id,
-                    "at": db_generation.created_at,
-                }
-
-                chain_interpretation = chain(
-                    group(
-                        generate_interpretation.s(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at, db_num=1),
-                        update_content_score.s(generation=generation_dict, db_num=1),
-                        update_n_words.s(generation=generation_dict, db_num=1),
-                        update_grammar_spelling.s(generation=generation_dict, db_num=1),
-                        #update_frequency_word.s(generation=generation_dict, db_num=1),
-                        update_perplexity.s(generation=generation_dict, db_num=1),
-                    ),
-                    group(
-                        pass_generation_dict.s(),
-                    ),
-                    group(
-                        check_factors_done_by_dict.s()
-                    ),
-                    group(
-                        pass_generation_dict.s(),
-                        calculate_score.s()
-                    ),
-                    group(
-                        cal_image_similarity.s()
-                    ),
-                )
-                chain_result = chain_interpretation.apply_async()
-
                 # prepare data to send
                 send_data = {
                     "leaderboard": {
@@ -1280,100 +1470,58 @@ async def round_websocket(
 
             elif user_action["action"] == "evaluate":
                 while True:
+                    db_generation = crud.get_generation(
+                        db=db,
+                        generation_id=db_generation.id
+                    )
                     if db_generation.is_completed:
-                        break
-                    elif chain_result.ready():
-                        db_generation = crud.get_generation(
-                            db=db,
-                            generation_id=db_generation.id
-                        )
                         break
                     elif chain_result.failed():
                         raise HTTPException(status_code=500, detail="Error in chain result")
                     elif chain_result.successful():
-                        db_generation = crud.get_generation(
-                            db=db,
-                            generation_id=db_generation.id
-                        )
                         break
-                    elif check_factors_done(
-                            generation_id=db_generation.id,
-                            db_num=1,
-                            )['status'] == 'FINISHED':
-                        time.sleep(1)
-                        db_generation = crud.get_generation(
-                            db=db,
-                            generation_id=db_generation.id
-                        )
+                    elif db_generation.score is not None:
                         break
                     util.logger1.info(f"Waiting for the task to finish... {chain_result.status}")
                     time.sleep(1)
                     
-                    
-                if db_generation.is_completed:
-                    db_scores = crud.get_score(db, score_id=db_generation.score_id)
+                db_score = db_generation.score
+                if db_score is not None:
+                    image_similarity = db_score.image_similarity
+                    scores_dict = {
+                        'grammar_score': db_score.grammar_score,
+                        'spelling_score': db_score.spelling_score,
+                        'vividness_score': db_score.vividness_score,
+                        'convention': db_score.convention,
+                        'structure_score': db_score.structure_score,
+                        'content_score': db_score.content_score,
+                        'total_score': db_generation.total_score,
+                    }
+                elif locals().get('chain_result'):
+                    # Get the result from the chain
+                    chain_score_result = [
+                        json.loads(result) for result in chain_result.result
+                    ]
+                    scores_dict = {
+                        'grammar_score': chain_score_result[1].get('grammar_score', 0),
+                        'spelling_score': chain_score_result[1].get('spelling_score', 0),
+                        'vividness_score': chain_score_result[1].get('vividness_score', 0),
+                        'convention': chain_score_result[1].get('convention', 0),
+                        'structure_score': chain_score_result[1].get('structure_score', 0),
+                        'content_score': chain_score_result[1].get('content_score', 0),
+                        'total_score': chain_score_result[0].get('total_score', 0),
+                    }
+                    image_similarity = chain_score_result[1].get('image_similarity', 0)
                 else:
+                    raise HTTPException(status_code=500, detail="No score found")
+                
+                if not db_generation.is_completed:
                     generation_aware = db_generation.created_at.replace(tzinfo=timezone(timedelta(hours=9)))
                     db_generation_aware = db_round.created_at.replace(tzinfo=timezone(timedelta(hours=9)))
                     duration = (generation_aware - db_generation_aware).seconds
                     
-                    factors = {
-                        'n_words': db_generation.n_words,
-                        'n_conjunctions': db_generation.n_conjunctions,
-                        'n_adj': db_generation.n_adj,
-                        'n_adv': db_generation.n_adv,
-                        'n_pronouns': db_generation.n_pronouns,
-                        'n_prepositions': db_generation.n_prepositions,
-                        'n_grammar_errors': db_generation.n_grammar_errors,
-                        'grammar_errors': db_generation.grammar_errors,
-                        'n_spelling_errors': db_generation.n_spelling_errors,
-                        'spelling_errors': db_generation.spelling_errors,
-                        'perplexity': db_generation.perplexity,
-                        'f_word': db_generation.f_word,
-                        'f_bigram': db_generation.f_bigram,
-                        'n_clauses': db_generation.n_clauses,
-                        'content_score': db_generation.content_score
-                    }
-
-                    if db_generation.score_id is not None:
-                        db_scores = crud.get_score(db, score_id=db_generation.score_id)
-                        total_score = db_generation.total_score
-                    else:
-                        factors, scores = calculate_score(
-                            generation={
-                                'id': db_generation.id,
-                                'db_num': 1,
-                            },
-                        )
-                        db_scores = crud.create_score(
-                            db=db,
-                            score=schemas.ScoreCreate(
-                                generation_id=db_generation.id,
-                                grammar_score=scores['grammar_score'],
-                                spelling_score=scores['spelling_score'],
-                                vividness_score=scores['vividness_score'],
-                                convention=scores['convention'],
-                                structure_score=scores['structure_score'],
-                                content_score=scores['content_score'],
-                            ),
-                            generation_id=db_generation.id
-                        )
-                        total_score = scores['total_score']
-                        
-                    scores_dict = {
-                        'grammar_score': db_scores.grammar_score,
-                        'spelling_score': db_scores.spelling_score,
-                        'vividness_score': db_scores.vividness_score,
-                        'convention': db_scores.convention,
-                        'structure_score': db_scores.structure_score,
-                        'content_score': db_scores.content_score,
-                        'total_score': total_score
-                    }
-
                     generation_com = schemas.GenerationComplete(
                         id=db_generation.id,
-                        total_score=total_score,
-                        rank=score.rank(total_score=total_score),
                         duration=duration,
                         is_completed=True
                     )
@@ -1469,7 +1617,8 @@ async def round_websocket(
                                 content=evaluation_message,
                                 sender="assistant",
                                 created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
-                                is_hint=False
+                                is_hint=False,
+                                responses_id=chatbot_obj.prev_res_id
                             ),
                             chat_id=db_round.chat_history
                         )['message'])
@@ -1511,7 +1660,7 @@ async def round_websocket(
                     "generation": {
                         "id": db_generation.id,
                         "interpreted_image": db_generation.interpreted_image.image,
-                        "image_similarity": db_scores.image_similarity,
+                        "image_similarity": image_similarity,
                     }
                 }
 
@@ -1549,7 +1698,6 @@ async def round_websocket(
                     "generation": {
                         "id": db_generation.id,
                         "interpreted_image": db_generation.interpreted_image.image,
-                        "image_similarity": db_scores.image_similarity,
                     }
                 }
 
@@ -1588,6 +1736,16 @@ async def read_vocabulary(current_user: Annotated[schemas.User, Depends(get_curr
         vocabularies = crud.get_vocabulary(db, vocabulary=vocabulary)
     if not vocabularies:
         raise HTTPException(status_code=404, detail="Vocabulary not found")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="check_vocabulary_info",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
     return vocabularies
 
 @app.get("/vocabularies/", tags=["Vocabulary"], response_model=list[schemas.Vocabulary])
@@ -1595,6 +1753,16 @@ async def read_vocabularies(current_user: Annotated[schemas.User, Depends(get_cu
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view vocabularies")
     vocabularies = crud.get_vocabularies(db, skip=skip, limit=limit)
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="check_vocabularies",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
     return vocabularies
 
 @app.post("/vocabularies", tags=["Vocabulary"], response_model=List[schemas.Vocabulary], status_code=201)
@@ -1646,6 +1814,16 @@ async def create_vocabularies(
                     )
                 )
                 output.append(v)
+    
+        crud.create_user_action(
+            db=db,
+            user_action=schemas.UserActionBase(
+                user_id=current_user.id,
+                action="create_vocabularies",
+                sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+                received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            )
+        )
         return output
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1657,6 +1835,16 @@ async def read_personal_dictionaries(current_user: Annotated[schemas.User, Depen
         return []
     player_id = current_user.id
     personal_dictionaries = crud.get_personal_dictionaries(db, player_id=player_id)
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_personal_dictionary",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
     return personal_dictionaries
 
 @app.post("/personal_dictionary/", tags=["Personal Dictionary"], response_model=schemas.PersonalDictionary, status_code=201)
@@ -1703,6 +1891,16 @@ async def create_personal_dictionary(
                 meaning=meaning
             )
         )
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="create_personal_dictionary",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
 
     return crud.create_personal_dictionary(
                 db=db,
@@ -1722,6 +1920,16 @@ async def update_personal_dictionary(
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to update personal dictionary")
     personal_dictionary.user_id = current_user.id
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="update_personal_dictionary",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
     return crud.update_personal_dictionary(
         db=db,
         dictionary=personal_dictionary,
@@ -1733,6 +1941,16 @@ async def delete_personal_dictionary(
     personal_dictionary_id: int,
     db: Session = Depends(get_db),
 ):
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="delete_personal_dictionary",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
     return crud.delete_personal_dictionary(
         db=db,
         player_id=current_user.id,
@@ -1757,6 +1975,15 @@ async def read_chat(
     if chat is None:
         raise HTTPException(status_code=404, detail="Chat not found")
     
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_chat",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
     return chat
 
 @app.get("/original_image/{leaderboard_id}", tags=["Image"])
@@ -1777,6 +2004,16 @@ async def get_original_image(
         raise HTTPException(status_code=404, detail="Original image not found")
     
     imgdata = util.decode_image(db_leaderboard.original_image.image)
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_original_image",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
     return responses.Response(
         content=imgdata,
         media_type="image/jpeg"  # Adjust this based on your image type (jpeg, png, etc.)
@@ -1807,6 +2044,16 @@ async def get_interpreted_image(
         raise HTTPException(status_code=404, detail="Interpreted image not found")
     
     imgdata = util.decode_image(db_generation.interpreted_image.image)
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_interpreted_image",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
     return responses.Response(
         content=imgdata,
         media_type="image/jpeg"  # Adjust this based on your image type (jpeg, png, etc.)
@@ -1824,6 +2071,16 @@ async def get_image_similarity(
     db_generation = crud.get_generation(
         db=db,
         generation_id=generation_id
+    )
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_image_similarity",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
     )
     if db_generation:
         if db_generation.score_id:
@@ -1855,7 +2112,7 @@ async def read_generation(
         db=db,
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
-            action="view generation",
+            action="view_generation_info",
             sent_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
             received_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
         )
@@ -1876,6 +2133,16 @@ async def read_generations(
         raise HTTPException(status_code=401, detail="Login to view generations")
     if player_id is not None and player_id != current_user.id and current_user.user_type == "student":
         raise HTTPException(status_code=401, detail="You are not authorized to view generations")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_generations",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
 
     if program == "none":
         return []
@@ -1912,6 +2179,16 @@ async def read_my_generations(
 ):
     if not current_user:
         return []
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_my_generations",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
     player_id = current_user.id
     generations = crud.get_generations(
         db=db,
@@ -1945,6 +2222,16 @@ async def get_generation_score(
     if db_generation is None:
         raise HTTPException(status_code=404, detail="Generation not found")
     
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_generation_score",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+
     score = crud.get_score(
         db=db,
         generation_id=generation_id
@@ -1961,6 +2248,16 @@ async def check_leaderboard_playable(
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to check leaderboard")
     
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="check_leaderboard_playable",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+
     if program != "none" or program != "overview":
         db_program = crud.get_program_by_name(db, program)
         if db_program:
@@ -2044,26 +2341,10 @@ async def fix_error_task(
                 }
                 chain_interpretation = chain(
                     group(
-                        generate_interpretation.s(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at, db_num=1),
-                        update_content_score.s(generation=generation_dict, db_num=1),
-                        update_n_words.s(generation=generation_dict, db_num=1),
-                        update_grammar_spelling.s(generation=generation_dict, db_num=1),
-                        #update_frequency_word.s(generation=generation_dict, db_num=1),
-                        update_perplexity.s(generation=generation_dict, db_num=1),
+                        generate_interpretation2.s(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at),
                     ),
                     group(
-                        pass_generation_dict.s(),
-                    ),
-                    group(
-                        check_factors_done_by_dict.s()
-                    ),
-                    group(
-                        pass_generation_dict.s(),
-                        calculate_score.s()
-                    ),
-                    group(
-                        cal_image_similarity.s(),
-                        complete_generation_backend.s()
+                        calculate_score_gpt.s()
                     ),
                 )
                 chain_interpretation.apply_async()
@@ -2079,52 +2360,10 @@ async def fix_error_task(
                 generation_dict = {
                     "id": db_generation.id,
                     "at": db_generation.created_at,
-                    "db_num": 1,
                 }
-                check = check_factors_done(
-                    generation_id=db_generation.id
+                calculate_score_gpt.s(
+                    items=[generation_dict],
                 )
-                if check["status"] == "FINISHED":
-                    chain_interpretation = chain(
-                        group(
-                            pass_generation_dict.s(generation=[generation_dict]),
-                            calculate_score.s(
-                                generation=generation_dict
-                            )
-                        ),
-                        group(
-                            cal_image_similarity.s(),
-                            complete_generation_backend.s()
-                        ),
-                    )
-                    chain_interpretation.apply_async()
-                    chain_interpretations.append(chain_interpretation)
-
-        db_scores = crud.get_error_task(
-            db=db,
-            group_type='no_similarity'
-        )
-
-        if db_scores:
-            for db_score in db_scores:
-                db_generation = crud.get_generation(
-                    db=db,
-                    generation_id=db_score.generation_id
-                )
-                if db_generation.score_id == db_score.id:
-                    chain_interpretation = chain(
-                        cal_image_similarity.s(generation=[{
-                            'id': db_score.generation_id,
-                            'db_num': 1,
-                        }]),
-                    )
-                    chain_interpretation.apply_async()
-                    chain_interpretations.append(chain_interpretation)
-                else:
-                    crud.delete_score(
-                        db=db,
-                        score_id=db_score.id
-                    )
 
         return chain_interpretations
     except Exception as e:

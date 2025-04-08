@@ -7,8 +7,8 @@ import pandas as pd
 from pathlib import Path
 
 from . import crud, models, schemas, analysis_router
-from .tasks import app as celery_app
-from .tasks import check_factors_done, check_factors_done_by_dict, generateDescription, update_vocab_used_time, generate_interpretation, pass_generation_dict, update_perplexity, update_content_score, update_frequency_word, update_n_words, update_grammar_spelling, cal_image_similarity, complete_generation_backend, calculate_score, check_error_task
+from tasks import app as celery_app
+from tasks import check_factors_done, check_factors_done_by_dict, generateDescription, update_vocab_used_time, generate_interpretation, pass_generation_dict, update_perplexity, update_content_score, update_frequency_word, update_n_words, update_grammar_spelling, cal_image_similarity, complete_generation_backend, calculate_score, check_error_task
 from .database import SessionLocal, engine
 
 from .dependencies import sentence, score, dictionary, openai_chatbot, util
