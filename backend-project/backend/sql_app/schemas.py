@@ -309,6 +309,7 @@ class RoundOut(BaseModel):
 
 class RoundAnalysis(RoundOut):
     chat: Chat
+    leaderboard: LeaderboardBase
 
     class Config:
         orm_mode = True
