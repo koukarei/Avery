@@ -27,13 +27,13 @@ def test_start_data():
     }
 
     response = client.post(
-        "/sqlapp/users/", 
+        "/sqlapp2/users/", 
         json=user_acc.copy(), 
         headers={"Content-Type": "application/json"}
     )
 
     response = client.post(
-        "/sqlapp/users/",
+        "/sqlapp2/users/",
         json=user_acc2.copy(),
         headers={"Content-Type": "application/json"}
     )
@@ -47,7 +47,7 @@ class TestAdmin:
     def test_users(self):
         # Test read all users
         response = client.get(
-            "/sqlapp/users/",
+            "/sqlapp2/users/",
             headers={"Authorization": f"Bearer {self.access_token}"}
         )
         assert response.status_code == 200, response.json()
@@ -60,7 +60,7 @@ class TestAdmin:
         }
 
         # Test create a new user
-        response = client.post("/sqlapp/users/", json=new_user.copy(),headers={"Content-Type": "application/json"})
+        response = client.post("/sqlapp2/users/", json=new_user.copy(),headers={"Content-Type": "application/json"})
 
         assert response.status_code == 201, response.json()
         assert response.json()['id'] > 0
@@ -69,14 +69,14 @@ class TestAdmin:
 
         # Test read a user
         response = client.get(
-            f"/sqlapp/users/{new_user_id}",
+            f"/sqlapp2/users/{new_user_id}",
             headers={"Authorization": f"Bearer {self.access_token}"}
         )
         assert response.status_code == 200, response.json()
 
         # Test read all users
         response = client.get(
-            "/sqlapp/users/",
+            "/sqlapp2/users/",
             headers={"Authorization": f"Bearer {self.access_token}"}
         )
         assert response.status_code == 200, response.json()
@@ -85,21 +85,21 @@ class TestAdmin:
 
         # Test delete an unexisting user
         response = client.delete(
-            f"/sqlapp/users/{new_user_id + 1}",
+            f"/sqlapp2/users/{new_user_id + 1}",
             headers={"Authorization": f"Bearer {self.access_token}"}
         )
         assert response.status_code == 404, response.json()
 
         # Test delete a user
         response = client.delete(
-            f"/sqlapp/users/{new_user_id}",
+            f"/sqlapp2/users/{new_user_id}",
             headers={"Authorization": f"Bearer {self.access_token}"}
         )
         assert response.status_code == 200, response.json()
 
         # Test read all users
         response = client.get(
-            "/sqlapp/users/",
+            "/sqlapp2/users/",
             headers={"Authorization": f"Bearer {self.access_token}"}
         )
         assert response.status_code == 200, response.json()
@@ -109,7 +109,7 @@ class TestAdmin:
         
         # Test read all scenes
         response = client.get(
-            "/sqlapp/scenes/",
+            "/sqlapp2/scenes/",
             headers={"Authorization": f"Bearer {self.access_token}"}
         )
         assert response.status_code == 200, response.json()
@@ -120,7 +120,7 @@ class TestAdmin:
             "prompt": "in the style of Beatrix Potter"
         }
 
-        response = client.post("/sqlapp/scene/", json=new_scene.copy(),headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"})
+        response = client.post("/sqlapp2/scene/", json=new_scene.copy(),headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 201, response.json()
         scene_id = response.json()['id']
         assert scene_id > 0
@@ -136,7 +136,7 @@ class TestAdmin:
         ]
 
         for scene in scenes:
-            response = client.post("/sqlapp/scene/", json=scene.copy(),headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"})
+            response = client.post("/sqlapp2/scene/", json=scene.copy(),headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"})
             assert response.status_code == 201, response.json()
 
     def test_add_programs(self):
@@ -152,17 +152,21 @@ class TestAdmin:
             {
                 "name": "student_january_experiment",
                 "description": "For January experiment in Saikyo High School year 1",
+            },
+            {
+                "name": "student_first_semester_experiment",
+                "description": "for first semester experiment",
             }
         ]
 
         for program in programs:
-            response = client.post("/sqlapp/program", json=program.copy(),headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"})
+            response = client.post("/sqlapp2/program", json=program.copy(),headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"})
             assert response.status_code == 201, response.json()
 
     def test_read_stories(self):
 
         # Test read all stories
-        response = client.get("/sqlapp/stories/", headers={"Authorization": f"Bearer {self.access_token}"})
+        response = client.get("/sqlapp2/stories/", headers={"Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 200, response.json()
         num_stories = len(response.json())
 
@@ -170,7 +174,7 @@ class TestAdmin:
         test_file_path = "tests/mice_story_for_test.txt"
         with open(test_file_path, "rb") as f:
             response = client.post(
-                "/sqlapp/story/",
+                "/sqlapp2/story/",
                 files={"story_content_file": ("mice_story_for_test.txt", f, "text/plain")},
                 data={
                     "title": "The Tale of Two Bad Mice",
@@ -182,13 +186,13 @@ class TestAdmin:
         assert response.status_code == 201, response.json()
 
         # Test whether story is created
-        response = client.get("/sqlapp/stories/", headers={"Authorization": f"Bearer {self.access_token}"})
+        response = client.get("/sqlapp2/stories/", headers={"Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 200, response.json()
         assert len(response.json()) == num_stories + 1
 
     def test_add_guest_ac(self):
         response = client.get(
-            f"/sqlapp/users",
+            f"/sqlapp2/users",
             headers={"Authorization": f"Bearer {self.access_token}"}
         )
         users = response.json()
@@ -206,14 +210,14 @@ class TestAdmin:
             }
 
             response = client.post(
-                "/sqlapp/users/",
+                "/sqlapp2/users/",
                 json=guest_acc.copy(),
                 headers={"Content-Type": "application/json"}
             )
             assert response.status_code == 201, response.json()
 
     def test_set_guest_ac_inactive(self):
-        response = client.get("/sqlapp/users/", headers={"Authorization": f"Bearer {self.access_token}"})
+        response = client.get("/sqlapp2/users/", headers={"Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 200, response.json()
         for user in response.json():
             if user['username'].startswith("guest"):
@@ -222,14 +226,14 @@ class TestAdmin:
                     'is_active': False
                 }
                 response = client.put(
-                    f"/sqlapp/users/{user['id']}",
+                    f"/sqlapp2/users/{user['id']}",
                     json=user_update.copy(),
                     headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"}
                 )
                 assert response.status_code == 200, response.json()
 
     def test_set_guest_ac_active(self):
-        response = client.get("/sqlapp/users/", headers={"Authorization": f"Bearer {self.access_token}"})
+        response = client.get("/sqlapp2/users/", headers={"Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 200, response.json()
         for user in response.json():
             if user['username'].startswith("guest"):
@@ -238,7 +242,7 @@ class TestAdmin:
                     'is_active': True
                 }
                 response = client.put(
-                    f"/sqlapp/users/{user['id']}",
+                    f"/sqlapp2/users/{user['id']}",
                     json=user_update.copy(),
                     headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"}
                 )
@@ -255,14 +259,14 @@ class TestUser:
 
     async def test_round(self):
         # Get leaderboard id
-        response = client.get("/sqlapp/leaderboards/", headers={"Authorization": f"Bearer {self.access_token}"})
+        response = client.get("/sqlapp2/leaderboards/", headers={"Authorization": f"Bearer {self.access_token}"})
         if not response.json():
             assert False
         leaderboard = response.json()[0]
         leaderboard_id = leaderboard['id']
 
         # Test read all rounds for a leaderboard
-        response = client.get(f"/sqlapp/leaderboards/{leaderboard_id}/rounds/", headers={"Authorization": f"Bearer {self.access_token}"})
+        response = client.get(f"/sqlapp2/leaderboards/{leaderboard_id}/rounds/", headers={"Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 200, response.json()
         num_rounds = len(response.json())
 
@@ -274,7 +278,7 @@ class TestUser:
         }
 
         response = client.post(
-            f"/sqlapp/round/", 
+            f"/sqlapp2/round/", 
             json=new_round.copy(),
             headers={
                 "Content-Type": "application/json",
@@ -287,7 +291,7 @@ class TestUser:
 
         # Test read unfinish rounds for a leaderboard
         response = client.get(
-            f"/sqlapp/unfinished_rounds/",
+            f"/sqlapp2/unfinished_rounds/",
             headers={"Authorization": f"Bearer {self.access_token}"}
         )
         assert response.status_code == 200, response.json()
@@ -300,7 +304,7 @@ class TestUser:
         }
 
         response = client.put(
-            f"/sqlapp/round/{round_id}/chat",
+            f"/sqlapp2/round/{round_id}/chat",
             json=new_message.copy(),
             headers={"Content-Type": "application/json",
                      "Authorization": f"Bearer {self.access_token}"},
@@ -316,7 +320,7 @@ class TestUser:
             "sentence": "The mouse set to work at once to carve the ham."
         }
         response = client.put(
-            f"/sqlapp/round/{round_id}",
+            f"/sqlapp2/round/{round_id}",
             json=new_generation.copy(),
             headers={"Content-Type": "application/json",
                      "Authorization": f"Bearer {self.access_token}"},
@@ -333,7 +337,7 @@ class TestUser:
 
         # Test get interpretation
         response = client.put(
-            f"/sqlapp/round/{round_id}/interpretation",
+            f"/sqlapp2/round/{round_id}/interpretation",
             json=interpretation_generation.copy(),
             headers={"Content-Type": "application/json",
                      "Authorization": f"Bearer {self.access_token}"},
@@ -344,7 +348,7 @@ class TestUser:
 
         #Test get scores
         response = client.put(
-            f"/sqlapp/round/{round_id}/complete",
+            f"/sqlapp2/round/{round_id}/complete",
             json={
                 "id":generation_id,
                 "at":datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
@@ -357,7 +361,7 @@ class TestUser:
 
         # Test complete round
         response = client.post(
-            f"/sqlapp/round/{round_id}/end",
+            f"/sqlapp2/round/{round_id}/end",
             headers={"Content-Type": "application/json",
                      "Authorization": f"Bearer {self.access_token}"},
         )
@@ -365,13 +369,13 @@ class TestUser:
         assert response.status_code == 200, response.json()
 
         # Test read all rounds for a leaderboard
-        response = client.get(f"/sqlapp/leaderboards/{leaderboard_id}/rounds/", headers={"Authorization": f"Bearer {self.access_token}"})
+        response = client.get(f"/sqlapp2/leaderboards/{leaderboard_id}/rounds/", headers={"Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 200, response.json()
         assert len(response.json()) == num_rounds + 1
     
     def test_chat(self):
         # Get leaderboard id
-        response = client.get("/sqlapp/leaderboards/", headers={"Authorization": f"Bearer {self.access_token}"})
+        response = client.get("/sqlapp2/leaderboards/", headers={"Authorization": f"Bearer {self.access_token}"})
         if not response.json():
             return
         leaderboard = response.json()[0]
@@ -379,7 +383,7 @@ class TestUser:
 
         # Get round id
         response = client.get(
-            f"/sqlapp/leaderboards/{leaderboard_id}/rounds/",
+            f"/sqlapp2/leaderboards/{leaderboard_id}/rounds/",
             headers={"Authorization": f"Bearer {self.access_token}"}
         )
         if not response.json():
@@ -388,7 +392,7 @@ class TestUser:
 
         # Get chat
         response = client.get(
-            f"/sqlapp/chat/{thisround['id']}",
+            f"/sqlapp2/chat/{thisround['id']}",
             headers={"Authorization": f"Bearer {self.access_token}"}
         )
         assert response.status_code == 200, response.json()
@@ -398,7 +402,7 @@ class TestUser:
 
         # Get leaderboard id
         response = client.get(
-            "/sqlapp/leaderboards/",
+            "/sqlapp2/leaderboards/",
             headers={"Authorization": f"Bearer {self.access_token}"}
         )
         if not response.json():
@@ -408,14 +412,14 @@ class TestUser:
 
         # Get original image
         response = client.get(
-            f"/sqlapp/original_image/{leaderboard_id}",
+            f"/sqlapp2/original_image/{leaderboard_id}",
             headers={"Authorization": f"Bearer {self.access_token}"}
         )
         assert response.status_code == 200, response.json()
 
         # Get round id
         response = client.get(
-            f"/sqlapp/leaderboards/{leaderboard_id}/rounds/",
+            f"/sqlapp2/leaderboards/{leaderboard_id}/rounds/",
             headers={"Authorization": f"Bearer {self.access_token}"}
         )
         assert response.status_code == 200, response.json()
@@ -425,7 +429,7 @@ class TestUser:
 
         # Get generated image
         response = client.get(
-            f"/sqlapp/interpreted_image/{generation_id}",
+            f"/sqlapp2/interpreted_image/{generation_id}",
             headers={"Authorization": f"Bearer {self.access_token}"}
         )
         assert response.status_code == 200, response.json()
@@ -435,7 +439,7 @@ def test_content_score():
 
     with open(f"tests/{test_image_filename}", "rb") as f:
         response = client.post(
-            "/sqlapp/content_score/",
+            "/sqlapp2/content_score/",
             files={"image": (test_image_filename, f, "image/jpeg")},
             data={"sentence":"The mouse set to work at once to carve the ham."}
         )

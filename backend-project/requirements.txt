@@ -34,3 +34,4 @@ gevent
 memory_profiler
 psutil
 pytest_asyncio
+websockets

@@ -61,6 +61,31 @@ services:
     networks:
       - avery-network
       
+  db2:
+    build:
+      context: db-project
+      dockerfile: Dockerfile
+    container_name: mysql2
+    command: mysqld
+    restart: always
+    env_file:
+      - db-project/.env
+    ports:
+        - 7875:3306
+    volumes:
+        - db-store2:/var/lib/mysql
+        - ./db-project/conf.d:/etc/mysql/conf.d
+        # ★ ローカルのscriptディレクトリにマウントします
+        - ./db-project/init:/docker-entrypoint-initdb.d 
+    tty: true
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    networks:
+      - avery-network
+
   backend-project:
     env_file:
       - backend-project/.env
@@ -193,6 +218,7 @@ services:
 
 volumes:
   db-store:
+  db-store2:
   node_modules:
   stanza_resources:
   gpt2-cache:

@@ -56,3 +56,12 @@ def login_guest(request):
 def asyncio_default_loop_scope():
     """Sets the asyncio default event loop scope."""
     return "class"  # Change to "function", "class", "module", or "session" as needed
+
+# Timer for each test function
+@pytest.fixture(autouse=True, scope="function")
+def timer():
+    import time
+    start_time = time.time()
+    yield
+    end_time = time.time()
+    print(f"Test function took {end_time - start_time:.2f} seconds")
