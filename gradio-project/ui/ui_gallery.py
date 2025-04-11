@@ -2,7 +2,7 @@ import gradio as gr
 import os
 from typing import Optional
 import requests
-import datetime
+import datetime, zoneinfo
 
 from starlette.applications import Starlette
 from starlette.middleware.sessions import SessionMiddleware
@@ -14,28 +14,6 @@ from app import app as fastapi_app
 from app import get_root_url
 import gradio.route_utils 
 gradio.route_utils.get_root_url = get_root_url
-
-import pytz
-
-def convert_to_japan_time(dt):
-    """
-    Converts a given datetime object to Japan time zone (Asia/Tokyo).
-
-    Parameters:
-        dt (datetime): The datetime object to be converted.
-
-    Returns:
-        datetime: The converted datetime in Japan time zone.
-    """
-    # Define the Japan time zone
-    japan_tz = pytz.timezone('Asia/Tokyo')
-    
-    # If the datetime is naive, assume it is in UTC and localize it
-    if dt.tzinfo is None:
-        dt = pytz.utc.localize(dt)
-    
-    # Convert to Japan time zone
-    return dt.astimezone(japan_tz)
 
 class Gallery:
     """Create a gallery object for the user interface."""
@@ -88,9 +66,10 @@ with gr.Blocks(title="AVERY") as avery_gradio:
     unfinished = gr.State()
     
     async def set_image_date():
-        current_time = datetime.datetime.now().astimezone(datetime.timezone.utc)
-        today_str = convert_to_japan_time(current_time).strftime("%Y-%m-%d")
+        current_time = datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo"))
+        today_str = current_time.strftime("%Y-%m-%d")
         return today_str, today_str
+
 
     async def initialize_game(request: gr.Request, published_at_start: Optional[datetime.datetime]=None, published_at_end: Optional[datetime.datetime]=None):
         is_admin = False
@@ -111,8 +90,8 @@ with gr.Blocks(title="AVERY") as avery_gradio:
             published_at_end = datetime.datetime.fromtimestamp(published_at_end)
             leaderboards = await read_leaderboard(request, published_at_end=published_at_end, is_admin=is_admin)
         else:
-            published_at_start = datetime.datetime.now()
-            published_at_end = datetime.datetime.now()
+            published_at_start = datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo"))
+            published_at_end = datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo"))
             leaderboards = await read_leaderboard(request, published_at_start, published_at_end, is_admin=is_admin)
         return [
             await get_original_images(leaderboard.id, request) 
@@ -167,7 +146,9 @@ with gr.Blocks(title="AVERY") as avery_gradio:
 
     try: 
         avery_gradio.load(set_image_date, outputs=[published_at_start_dropdown, published_at_end_dropdown])
+        # not work if some package version not match <<
         avery_gradio.load(initialize_game, inputs=[published_at_start_dropdown, published_at_end_dropdown], outputs=[gallery.gallery,leaderboards])
+        # >> not work if some package version not match
     except Exception as e:
         RedirectResponse(url="/avery/")
 
@@ -184,13 +165,6 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         request = request.request
         select_leaderboard = leaderboards[evt.index]
         
-        # # Get the related vocabularies
-        # leaderboard_vocabularies = [v.word for v in select_leaderboard.vocabularies]
-        # leaderboard_vocabularies = "/ ".join(leaderboard_vocabularies)
-        # if leaderboard_vocabularies:
-        #     leaderboard_vocabularies=f"\n\n関連単語：*{leaderboard_vocabularies}*"
-        # else:
-        #     leaderboard_vocabularies=""
         leaderboard_vocabularies = ""
         
         info = f"## {select_leaderboard.title}{leaderboard_vocabularies}"
@@ -300,7 +274,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                     if selected_round.player is not None:
                         player_name = "作成者：{}　".format(selected_round.player.display_name)
                     
-                create_time = convert_to_japan_time(selected_round.created_at)
+                create_time = selected_round.created_at
 
                 md = f"""## {select_leaderboard.title}{leaderboard_vocabularies}
 
@@ -348,6 +322,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         leaderboard_published_at = leaderboard.published_at.timestamp()
         return leaderboard.is_public, leaderboard_published_at, schools, '', '', ''
 
+    # not work if some package version not match <<
     # Load leaderboards
     gr.on(
         triggers=[published_at_start_dropdown.change, published_at_end_dropdown.change],
@@ -355,7 +330,9 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         inputs=[published_at_start_dropdown, published_at_end_dropdown],
         outputs=[gallery.gallery, leaderboards],
     )
+    # >> not work if some package version not match
 
+    # not work if some package version not match <<
     # Set the selected leaderboard
     gr.on(
         triggers=[gallery.gallery.select],
@@ -384,7 +361,9 @@ with gr.Blocks(title="AVERY") as avery_gradio:
             my_generations,
         ],
     )
+    # >> not work if some package version not match
 
+    # not work if some package version not match <<
     # Set the selected interpreted image
     gr.on(
         triggers=[gallery.generated_img.select],
@@ -400,7 +379,9 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         inputs=[my_generations, selected_leaderboard],
         outputs=[gallery.my_info],
     )
+    # >> not work if some package version not match
 
+    # not work if some package version not match <<
     # Delete the selected leaderboard
     gr.on(
         triggers=[gallery.delete_btn.click],
@@ -408,7 +389,9 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         inputs=[selected_leaderboard, published_at_start_dropdown, published_at_end_dropdown],
         outputs=[gallery.gallery, leaderboards],
     )
+    # >> not work if some package version not match
 
+    # not work if some package version not match <<
     # Change accessibilities of the schools
     gr.on(
         triggers=[gallery.update_btn.click],
@@ -416,6 +399,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         inputs=[selected_leaderboard, gallery.is_public, gallery.published_at, gallery.school_group, gallery.word, gallery.pos, gallery.meaning],
         outputs=[gallery.is_public, gallery.published_at, gallery.school_group, gallery.word, gallery.pos, gallery.meaning],
     )
+    # >> not work if some package version not match
 
 
 
