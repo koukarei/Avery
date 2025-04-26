@@ -9,7 +9,7 @@ from pathlib import Path
 
 from . import crud, models, schemas, analysis_router
 from tasks import app as celery_app
-from tasks import generateDescription2, update_vocab_used_time2, generate_interpretation2, calculate_score_gpt
+from tasks import generateDescription2, update_vocab_used_time2, generate_interpretation2, calculate_score_gpt, cal_image_similarity
 from .database import SessionLocal2, engine2
 
 from .dependencies import sentence, score, dictionary, openai_chatbot, util
@@ -65,12 +65,6 @@ async def check_status(
     if result.status == "SUCCESS":
         crud.delete_task(db, task_id)
     return status
-
-@app.get("/tasks/generation/{generation_id}", tags=["Task"], response_model=schemas.TasksOut)
-async def check_generation_task_status(
-    generation_id: int, 
-):
-    return check_factors_done(generation_id)
 
 @app.get("/tasks/leaderboard/{leaderboard_id}", tags=["Task"], response_model=list[schemas.TaskStatus])
 async def check_leaderboard_task_status(
@@ -558,7 +552,7 @@ async def create_leaderboard(
                     vocabulary_id=vocab.id
                 )
 
-    t = generateDescription.delay(
+    t = generateDescription2.delay(
         leaderboard_id=result.id, 
         image=db_original_image.image, 
         story=story, 
@@ -1094,15 +1088,20 @@ async def round_websocket(
         )
     )
 
+    # set program
+    obj = parse_obj_as(schemas.RoundCreate, user_action['obj'])
+    db_program = crud.get_program_by_name(db, obj.program)
+
     # if user resumes the round
     if user_action["action"] == "resume":
-        leaderboard_id = user_action["leaderboard_id"]
+        leaderboard_id = user_action["obj"]["leaderboard_id"]
         
         unfinished_rounds = crud.get_rounds(
             db=db,
             player_id=player_id,
             leaderboard_id=leaderboard_id,
-            is_completed=False
+            is_completed=False,
+            program_id=db_program.id
         )
         if unfinished_rounds:
             db_round = crud.get_round(
@@ -1129,6 +1128,7 @@ async def round_websocket(
 
             # prepare data to send
             send_data = {
+                "feedback": db_program.feedback,
                 "leaderboard": {
                     "id": leaderboard_id,
                     "image": db_round.leaderboard.original_image.image,
@@ -1136,11 +1136,15 @@ async def round_websocket(
                 "round": {
                     "id": db_round.id,
                     "generated_time":generated_time,
+                    "generations": [
+                        g.id for g in db_round.generations if g.is_completed
+                    ]
                 },
                 "generation": {
                     "id": db_generation.id,
-                    "interpreted_image": db_generation.interpreted_image.image,
+                    "interpreted_image": db_generation.interpreted_image.image if db_generation.interpreted_image else None,
                     "generated_time": db_generation.generated_time,
+                    "sentence": db_generation.sentence,
                     "correct_sentence": db_generation.correct_sentence,
                     "is_completed": db_generation.is_completed,
                     "image_similarity": db_score.image_similarity if db_score else None,
@@ -1161,19 +1165,11 @@ async def round_websocket(
             }
         else:
             user_action["action"] = "start"
-            user_action["obj"] = {
-                "program": user_action["program"],
-                "model": user_action["model"],
-                "created_at": datetime.datetime.now(tz=timezone(timedelta(hours=9))),
-                "leaderboard_id": leaderboard_id
-            }
 
     if user_action["action"] == "start":
-        # create a new round
-        obj = parse_obj_as(schemas.RoundCreate, user_action['obj'])
-        db_program = crud.get_program_by_name(db, obj.program)
 
         db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
+        db_score = None
 
         if db_program is None:
             db_round = crud.create_round(
@@ -1227,6 +1223,7 @@ async def round_websocket(
 
         # prepare data to send
         send_data = {
+            "feedback": db_program.feedback,
             "leaderboard": {
                 "id": leaderboard_id,
                 "image": db_round.leaderboard.original_image.image,
@@ -1234,6 +1231,15 @@ async def round_websocket(
             "round": {
                 "id": db_round.id,
                 "generated_time":generated_time,
+                "generations": []
+            },
+            "generation": {
+                "id": db_generation.id,
+                "interpreted_image": db_generation.interpreted_image.image if db_generation.interpreted_image else None,
+                "generated_time": db_generation.generated_time,
+                "correct_sentence": db_generation.correct_sentence,
+                "is_completed": db_generation.is_completed,
+                "image_similarity": db_score.image_similarity if db_score else None,
             },
             "chat": {
                 "id": db_round.chat_history,
@@ -1328,13 +1334,17 @@ async def round_websocket(
             elif user_action["action"] == "submit":
                 obj = parse_obj_as(schemas.GenerationCreate, user_action['obj'])
                 status = 0
+                sentences = [
+                    g.sentence for g in db_round.generations if g.sentence != '' and g.correct_sentence is not None and g.id != db_generation.id
+                ]
+                
                 if db_generation.correct_sentence is None:
                     db_generation = crud.update_generation0(
                         db=db,
                         generation=obj,
                         generation_id=db_generation.id
                     )
-                elif db_generation.sentence == obj.sentence:
+                elif obj.sentence in sentences:
                     db_generation = crud.get_generation(db=db, generation_id=db_generation.id)
                     status = 3
                 else: 
@@ -1395,15 +1405,22 @@ async def round_websocket(
                         "id": db_generation.id,
                         "at": db_generation.created_at,
                     }
-
-                    chain_interpretation = chain(
-                        group(
-                            generate_interpretation2.s(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at),
-                        ),
-                        group(
-                            calculate_score_gpt.s(),
-                        ),
-                    )
+    
+                    if "IMG" in db_round.program.feedback:
+                        chain_interpretation = chain(
+                            group(
+                                generate_interpretation2.s(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at),
+                            ),
+                            group(
+                                calculate_score_gpt.s(),
+                            ),
+                        )
+                    else:
+                        chain_interpretation = chain(
+                            group(
+                                calculate_score_gpt.s(items=generation_dict),
+                            ),
+                        )
                     chain_result = chain_interpretation.apply_async()
 
                 elif status == 1:
@@ -1420,6 +1437,15 @@ async def round_websocket(
                     messages = [
                         schemas.MessageBase(
                             content="ブー！不適切な言葉が含まれています。",
+                            sender="assistant",
+                            created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                            is_hint=False
+                        )
+                    ]
+                elif status == 3:
+                    messages = [
+                        schemas.MessageBase(
+                            content="ブー！同じ回答がすでに提出されています。新しいアイデアを試してみましょう！",
                             sender="assistant",
                             created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
                             is_hint=False
@@ -1468,6 +1494,8 @@ async def round_websocket(
                     }
                 }
 
+            elif user_action["action"] == "evaluate" and (db_generation.correct_sentence is None or db_generation.correct_sentence == ""):
+                send_data = {}
             elif user_action["action"] == "evaluate":
                 while True:
                     db_generation = crud.get_generation(
@@ -1483,6 +1511,7 @@ async def round_websocket(
                     elif db_generation.score is not None:
                         break
                     util.logger1.info(f"Waiting for the task to finish... {chain_result.status}")
+                    await websocket.send_json({"feedback": "waiting"})
                     time.sleep(1)
                     
                 db_score = db_generation.score
@@ -1533,49 +1562,68 @@ async def round_websocket(
                     descriptions = crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
                     descriptions = [des.content for des in descriptions]
 
-                    evaluation = chatbot_obj.get_result(
-                        sentence=db_generation.sentence,
-                        correct_sentence=db_generation.correct_sentence,
-                        scoring=scores_dict,
-                        rank=db_generation.rank,
-                        base64_image=db_round.leaderboard.original_image.image,
-                        grammar_errors=db_generation.grammar_errors,
-                        spelling_errors=db_generation.spelling_errors,
-                        descriptions=descriptions
-                    )
+                    if "AWE" in db_program.feedback:
+                        evaluation = chatbot_obj.get_result(
+                            sentence=db_generation.sentence,
+                            correct_sentence=db_generation.correct_sentence,
+                            scoring=scores_dict,
+                            rank=db_generation.rank,
+                            base64_image=db_round.leaderboard.original_image.image,
+                            grammar_errors=db_generation.grammar_errors,
+                            spelling_errors=db_generation.spelling_errors,
+                            descriptions=descriptions
+                        )
+                    else:
+                        evaluation = None
+                        db_evaluate_msg = None
 
-                    if evaluation:
-                        score_message = """あなたの回答（評価対象）：{user_sentence}
+                    score_message = """あなたの回答（評価対象）：{user_sentence}
 
 修正された回答　　　　 ：{correct_sentence}
 
 
 | 　　          | 得点   | 満点       |
 |---------------|--------|------|
-| 文法得点      |{:>5}|  5  |
-| スペリング得点|{:>5}|  5  |
-| 鮮明さ        |{:>5}|  5  |
+| 文法得点      |{:>5}|  3  |
+| スペリング得点|{:>5}|  1  |
+| 鮮明さ        |{:>5}|  1  |
 | 自然さ        |{:>5}|  1  |
-| 構造性        |{:>5}|  3  |
-| 内容得点      |{:>5}| 100 |
+| 構造性        |{:>5}|  1  |
+| 内容得点      |{:>5}|  3  |
 | 合計点        |{:>5}| 100 |
 | ランク        |{:>5}|(A-最高, B-上手, C-良い, D-普通, E-もう少し, F-頑張ろう)|""".format(
-                            round(scores_dict['grammar_score'],2),
-                            round(scores_dict['spelling_score'],2),
-                            round(scores_dict['vividness_score'],2),
-                            scores_dict['convention'],
-                            scores_dict['structure_score'],
-                            scores_dict['content_score'],
-                            scores_dict['total_score'],
-                            db_generation.rank,
-                            user_sentence=db_generation.sentence,
-                            correct_sentence=db_generation.correct_sentence,
-                        )
+                        round(scores_dict['grammar_score'],2),
+                        round(scores_dict['spelling_score'],2),
+                        round(scores_dict['vividness_score'],2),
+                        scores_dict['convention'],
+                        scores_dict['structure_score'],
+                        scores_dict['content_score'],
+                        scores_dict['total_score'],
+                        db_generation.rank,
+                        user_sentence=db_generation.sentence,
+                        correct_sentence=db_generation.correct_sentence,
+                    )
 
+                    db_messages = []
+                    db_messages.append(crud.create_message(
+                        db=db,
+                        message=schemas.MessageBase(
+                            content=score_message,
+                            sender="assistant",
+                            created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                            is_hint=False,
+                            is_evaluation=True,
+                        ),
+                        chat_id=db_round.chat_history
+                    )['message'])
+
+
+                    if evaluation:
                         if len(db_round.generations) > 2:
                             recommended_vocabs = db_round.leaderboard.vocabularies
                             recommended_vocabs = [vocab.word for vocab in recommended_vocabs]
-                            recommended_vocab = "\n\n**おすすめの単語**\n" + ", ".join(recommended_vocabs)
+                            if recommended_vocabs:
+                                recommended_vocab = "\n\n**おすすめの単語**\n" + ", ".join(recommended_vocabs)
                         else:
                             recommended_vocab = ""
 
@@ -1599,40 +1647,32 @@ async def round_websocket(
                             recommended_vocab=recommended_vocab
                         )
 
-                        db_messages = []
-                        db_messages.append(crud.create_message(
-                            db=db,
-                            message=schemas.MessageBase(
-                                content=score_message,
-                                sender="assistant",
-                                created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
-                                is_hint=False
-                            ),
-                            chat_id=db_round.chat_history
-                        )['message'])
-
-                        db_messages.append(crud.create_message(
+                        db_evaluate_msg = crud.create_message(
                             db=db,
                             message=schemas.MessageBase(
                                 content=evaluation_message,
                                 sender="assistant",
                                 created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
                                 is_hint=False,
+                                is_evaluation=True,
                                 responses_id=chatbot_obj.prev_res_id
                             ),
                             chat_id=db_round.chat_history
-                        )['message'])
+                        )['message']
 
-                        generation_com = schemas.GenerationComplete(
-                            id=db_generation.id,
-                            is_completed=True,
-                            duration=duration
-                        )
+                        db_messages.append(db_evaluate_msg)
 
-                        db_generation = crud.update_generation3(
-                            db=db,
-                            generation=generation_com,
-                        )
+                    generation_com = schemas.GenerationComplete(
+                        id=db_generation.id,
+                        is_completed=True,
+                        duration=duration,
+                        evaluation_id=db_evaluate_msg.id if db_evaluate_msg else None
+                    )
+
+                    db_generation = crud.update_generation3(
+                        db=db,
+                        generation=generation_com,
+                    )
 
                 # prepare data to send
                 send_data = {
@@ -1659,8 +1699,9 @@ async def round_websocket(
                     },
                     "generation": {
                         "id": db_generation.id,
-                        "interpreted_image": db_generation.interpreted_image.image,
+                        "interpreted_image": db_generation.interpreted_image.image if 'IMG' in db_program.feedback else None,
                         "image_similarity": image_similarity,
+                        "evaluation_msg": db_evaluate_msg.content if 'AWE' in db_program.feedback else None
                     }
                 }
 
@@ -1701,7 +1742,7 @@ async def round_websocket(
                     }
                 }
 
-                chatbot_obj.kill_me()
+                chatbot_obj.kill()
 
             # send details to the user
             await websocket.send_json(send_data)
@@ -1956,6 +1997,39 @@ async def delete_personal_dictionary(
         player_id=current_user.id,
         vocabulary_id=personal_dictionary_id,
     )
+@app.get("/evaluation_msg/{generation_id}", tags=["Generation"], response_model=schemas.Message)
+async def get_evaluation(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    generation_id: int, 
+    db: Session = Depends(get_db)
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view images")
+    
+    db_generation = crud.get_generation(
+        db=db,
+        generation_id=generation_id
+    )
+
+    db_round = crud.get_round(
+        db=db,
+        round_id=db_generation.round_id
+    )
+
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_evaluation",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+    if "AWE" in db_round.program.feedback and db_generation.is_completed:
+        
+        return db_generation.evaluation
+    
+    raise HTTPException(status_code=500, detail="No evaluation message.")
 
 @app.get("/chat/{round_id}", tags=["Chat"], response_model=schemas.Chat)
 async def read_chat(
@@ -2258,7 +2332,7 @@ async def check_leaderboard_playable(
         )
     )
 
-    if program != "none" or program != "overview":
+    if program != "none" and program != "overview":
         db_program = crud.get_program_by_name(db, program)
         if db_program:
             program_id = db_program.id

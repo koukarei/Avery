@@ -1,7 +1,6 @@
-from ui.ui_result import app as fastapi_app
+from ui.ui_writing import app as fastapi_app
 
 from ui.ui_chatbot import Guidance
-from ui.ui_result import Result
 
 import gradio as gr
 import os

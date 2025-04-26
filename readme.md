@@ -25,3 +25,6 @@
 
 ## Add Programs
 ```pytest tests/test_main.py::TestAdmin::test_add_programs```
+
+## Add Story
+```pytest tests/test_main.py::TestAdmin::test_read_stories```

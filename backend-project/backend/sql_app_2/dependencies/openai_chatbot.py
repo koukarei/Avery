@@ -525,7 +525,7 @@ Evaluate sentence complexity and cohesion.
             print(f"Error: {e}")
             return None
         
-    def kill_me(self):
+    def kill(self):
         while self.prev_res_ids:
             prev_res_id = self.prev_res_ids.pop()
             

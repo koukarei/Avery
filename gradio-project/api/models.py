@@ -72,6 +72,7 @@ class LeaderboardDetail(BaseModel):
 class MessageSend(BaseModel):
     content: str
     created_at: datetime
+    is_hint: Optional[bool]=False
 
 class MessageReceive(MessageSend):
     id: int
@@ -135,28 +136,13 @@ class GenerationCompleteCreate(BaseModel):
 
 class GenerationComplete(BaseModel):
     id: int
-    n_words: int
-    n_conjunctions: int
-    n_adj: int
-    n_adv: int
-    n_pronouns: int
-    n_prepositions: int
+    grammar_errors: Optional[str] = None
+    spelling_errors: Optional[str] = None
+    evaluation_id: Optional[int] = None
 
-    n_grammar_errors: int
-    n_spelling_errors: int
-
-    perplexity: float
-
-    f_word: float
-    f_bigram: float
-
-    n_clauses: int
-
-    content_score: int
-
-    total_score: int
-    rank: str
-    duration: int
+    total_score: Optional[int] = None
+    rank: Optional[str] = None
+    duration: Optional[int] = None
     is_completed: bool
 
 class ScoreCreate(BaseModel):
@@ -205,3 +191,29 @@ class LeaderboardUpdate(BaseModel):
     title: Optional[str]=None
     school: list[str]=[]
     vocabularies: list[VocabularyBase]=[]
+
+class ResponseLeaderboard(BaseModel):
+    id: int
+    image: str
+
+class ResponseRound(BaseModel):
+    id: int
+    generated_time: int
+    generations: Optional[list[int]]=[]
+
+class ResponseGeneration(BaseModel):
+    id: int
+    interpreted_image: Optional[str]=None
+    evaluation_msg: Optional[str]=None
+    generated_time: Optional[int]=None
+    sentence: Optional[str]=None
+    correct_sentence: Optional[str]=None
+    is_completed: Optional[bool]=None
+    image_similarity: Optional[float]=None
+
+class Response(BaseModel):
+    feedback: Optional[str]=None
+    leaderboard: Optional[ResponseLeaderboard]=None
+    round: Optional[ResponseRound]=None
+    chat: Optional[Chat]=None
+    generation: Optional[ResponseGeneration]=None

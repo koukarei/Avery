@@ -66,7 +66,6 @@ class AlchemyEncoder(json.JSONEncoder):
 
 @app.task(name='tasks.generateDescription', ignore_result=False, track_started=True)
 def generateDescription(
-    self,
     leaderboard_id: int, image: str, story: Optional[str], model_name: str="gpt-4o-mini"
 ):
     
@@ -1022,7 +1021,6 @@ def check_error_task():
 
 @app.task(name='tasks.generateDescription2', ignore_result=False, track_started=True)
 def generateDescription2(
-    self,
     leaderboard_id: int, image: str, story: Optional[str], model_name: str="gpt-4o-mini"
 ):
     
@@ -1093,6 +1091,7 @@ def calculate_score_gpt(
         db_round = crud2.get_round(db, round_id=db_generation.round_id)
         if db_round is None:
             raise HTTPException(status_code=404, detail="Round not found")
+        
         cb = openai_chatbot2.Hint_Chatbot(
             model_name=db_round.model,
             first_res_id=db_round.leaderboard.response_id,
@@ -1132,11 +1131,13 @@ def calculate_score_gpt(
                 is_completed=False
             )
         )
-
-        image_similarity = cb.image_similarity(
-            image1_base64=db_round.leaderboard.original_image.image,
-            image2_base64=db_generation.interpreted_image.image,
-        )
+        if "IMG" in db_round.program.feedback:
+            image_similarity = cb.image_similarity(
+                image1_base64=db_round.leaderboard.original_image.image,
+                image2_base64=db_generation.interpreted_image.image,
+            )
+        else:
+            image_similarity = 0
 
         db_score = crud2.update_score(
             db=db,

@@ -83,18 +83,27 @@ class TestAdmin:
             {
                 "name": "inlab_test",
                 "description": "For in-lab experiment. Link disclosed to LMS",
+                "feedback": "AWE+IMG"
             },
             {
                 "name": "haga_sensei_test",
                 "description": "For Haga sensei trial version",
+                "feedback": "AWE+IMG"
             },
             {
                 "name": "student_january_experiment",
                 "description": "For January experiment in Saikyo High School year 1",
+                "feedback": "AWE+IMG"
             },
             {
-                "name": "student_first_semester_experiment",
-                "description": "for first semester experiment",
+                "name": "student_1_sem_awe",
+                "description": "for first semester experiment with automated writing evaluation",
+                "feedback": "AWE"
+            },
+            {
+                "name": "student_1_sem_img",
+                "description": "for first semester experiment with generated images",
+                "feedback": "IMG"
             }
         ]
 
@@ -128,3 +137,5 @@ class TestAdmin:
         response = client.get("/sqlapp2/stories/", headers={"Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 200, response.json()
         assert len(response.json()) == num_stories + 1
+
+    

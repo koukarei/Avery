@@ -38,6 +38,7 @@ class InterpretedImageOut(ImageBase):
 
 class MessageReceive(BaseModel):
     is_hint: Optional[bool]=False
+    is_evaluation: Optional[bool]=False
     response_id: Optional[str]=None
     content: str
     created_at: datetime.datetime
@@ -60,6 +61,7 @@ class Chat(ChatBase):
 class ProgramBase(BaseModel):
     name: str
     description: str
+    feedback: str
 
 class Program(ProgramBase):
     id: int
@@ -239,6 +241,7 @@ class GenerationComplete(BaseModel):
 
     grammar_errors: Optional[str] = None
     spelling_errors: Optional[str] = None
+    evaluation_id: Optional[int] = None
 
     total_score: Optional[int] = None
     rank: Optional[str] = None

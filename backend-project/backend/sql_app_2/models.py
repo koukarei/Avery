@@ -104,6 +104,7 @@ class Program(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(100), index=True)
     description = Column(String(255), index=True)
+    feedback = Column(String(100), index=True)
 
     rounds = relationship("Round", back_populates="program")
 
@@ -154,10 +155,12 @@ class Generation(Base):
     interpreted_image_id=Column(Integer,ForeignKey("interpreted_images.id"),nullable=True)
     round_id=Column(Integer,ForeignKey("rounds.id"))
     score_id=Column(Integer,ForeignKey("scores.id"),nullable=True)
+    evaluation_id = Column(Integer, ForeignKey("messages.id"), nullable=True)
 
     interpreted_image = relationship("InterpretedImage", back_populates="generation",foreign_keys=[interpreted_image_id])
     round = relationship("Round", back_populates="generations",foreign_keys=[round_id])
     score = relationship("Score",foreign_keys=[score_id])
+    evaluation = relationship("Message", foreign_keys=[evaluation_id])
 
 class Score(Base):
     __tablename__ = "scores"
@@ -189,6 +192,7 @@ class Message(Base):
     sender = Column(String(50), index=True)
     created_at = Column(DateTime, default=datetime.datetime.now())
     is_hint = Column(Boolean, default=False)
+    is_evaluation = Column(Boolean, default=False)
 
     chat = relationship("Chat", back_populates="messages")
 

@@ -10,10 +10,10 @@ from lti import validate_lti_request
 import os
 import json
 from typing import Annotated
-import datetime
+import datetime, zoneinfo
 
 from api import models
-from api.connection import *
+from api.connection_2 import *
 
 from functools import wraps
 from typing import Dict, Optional
@@ -105,7 +105,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 async def shutdown_client():
     await http_client.aclose()
 
-BACKEND_URL = os.getenv("BACKEND_URL")
+BACKEND_URL = os.getenv("BACKEND_URL2")
 
 origins = [
     BACKEND_URL,
@@ -141,7 +141,7 @@ async def login_form(request: Request):
         request.session["token"] = token.model_dump()
         request.session["username"] = form_data["username"]
         request.session["roles"] = "instructor" if form_data["username"] == "admin" else "student"
-        request.session["program"] = "overview"
+        request.session["program"] = form_data.get("program", "inlab_test")
 
         # print(request.session)
         # app.state.token = token.model_dump()
@@ -243,165 +243,17 @@ async def redirect_page(request: Request):
             assert response.status_code == 401
         except:
             return RedirectResponse(url="/avery/logout", status_code=status.HTTP_303_SEE_OTHER)
-    return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
-    
-@app.get("/retry")
-async def retry(request: Request):
-    request.session.pop('generation_id', None)
-    leaderboard_id = request.session.get('leaderboard_id', None)
-    the_round=await read_my_rounds(
-        request=request,
-        is_completed=False,
-        leaderboard_id=leaderboard_id,
-        program=request.session["program"],
-    )
-    if not the_round:
-        return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
-    request.session["round"]=convert_json(the_round[0])
-    
-    return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)    
-
-@app.get("/resume_game/{leaderboard_id}")
-async def resume_game(request: Request, leaderboard_id: Optional[int]=None):
-    if not leaderboard_id:
-        return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
-    request.session["leaderboard_id"] = leaderboard_id
-    
-    # Check if the user has a round incompleted
-    res = await read_my_rounds(
-        request=request,
-        is_completed=False,
-        leaderboard_id=leaderboard_id,
-        program=request.session["program"],
-    )
-
-    if not res:
-        return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
-    last_round = res[0]
-    request.session["round"] = convert_json(last_round)
-
-    # Check if the user has started a generation
-    if last_round.last_generation_id is None:
-        request.session["generated_time"] = 0
-        return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
-
-    last_gen = await get_generation(
-        generation_id=last_round.last_generation_id,
-        request=request,
-    )
-
-    if last_gen:
-        request.session["generation_id"] = last_gen.id
-        # Check if the generation is completed
-        if last_gen.is_completed:
-            
-            generated_time = len(last_round.generations)
-            request.session["generated_time"] = generated_time
-
-            if request.session["generated_time"] > (MAX_GENERATION-1):
-                output = await end_round(
-                    round_id=last_round.id,
-                    request=request,
-                )
-                if not output:
-                    raise HTTPException(status_code=500, detail="Failed to end round")
-            return RedirectResponse(url="/avery/result", status_code=status.HTTP_303_SEE_OTHER)
-        if last_gen.correct_sentence is not None:
-            if last_gen.interpreted_image is not None:
-                generated_time = len(last_round.generations)
-                request.session["generated_time"] = generated_time
-                return RedirectResponse(url=f"/avery/go_to_result/{last_gen.id}", status_code=status.HTTP_303_SEE_OTHER)
-            
-            output = await get_interpretation(
-                round_id=last_round.id,
-                interpretation=models.GenerationCorrectSentence(
-                    id=last_gen.id,
-                    correct_sentence=last_gen.correct_sentence,
-                ),
-                request=request,
-            )
-
-            if not output:
-                raise HTTPException(status_code=500, detail="Failed to get interpretation")
-            return RedirectResponse(url=f"/avery/go_to_result/{last_gen.id}", status_code=status.HTTP_303_SEE_OTHER)
-        
-        request.session["generation"] = convert_json(last_gen)
-        if len(last_round.generations) > 1:
-            request.session["generated_time"] = len(last_round.generations)-1
-        else:
-            request.session["generated_time"] = 0
-    return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
-
-
-@app.get("/new_game")
-async def new_game(request: Request):
-    cur_round = request.session.get('round', None)
-    if cur_round:
-        res = await end_round(cur_round['id'], request)
-
-    request.session.pop('round', None)
-    request.session.pop('generation_id', None)
-    request.session.pop('generated_time', None)
-    request.session.pop('leaderboard_id', None)
+    if "leaderboard_id" in request.session:
+        request.session.pop("leaderboard_id")
     return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
 
-@app.get("/go_to_answer/{leaderboard_id}")
+@app.get("/go_to_writing/{leaderboard_id}")
 async def redirect_to_answer(request: Request, leaderboard_id: Optional[int]=None):
     if not leaderboard_id:
         return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
     request.session["leaderboard_id"] = leaderboard_id
-    utc_time = datetime.datetime.now(datetime.timezone.utc)
-    japan_time = convert_to_japan_time(utc_time)
-    output = await create_round(
-        new_round=models.RoundStart(
-            leaderboard_id=leaderboard_id,
-            program=request.session["program"],
-            created_at=utc_time,
-        ),
-        request=request,
-    )
-    request.session["round"] = convert_json(output)
-    request.session["generated_time"]= 0
-    return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
-
-@app.get("/go_to_result/{generation_id}")
-@concurrency_control.limit_concurrency(max_concurrent=40, per_client=True)
-async def redirect_to_result(request: Request, generation_id: Optional[int]=None):
     
-    if request.session.get('leaderboard_id', None) is None:
-        return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
-    
-    cur_round = await read_my_rounds(
-        request=request,
-        is_completed=False,
-        leaderboard_id=request.session.get('leaderboard_id'),
-        program=request.session["program"],
-    )
-
-    if cur_round is None:
-        return RedirectResponse(url="/avery/leaderboards", status_code=status.HTTP_303_SEE_OTHER)
-    
-    latest_gen = await get_generation(
-        generation_id=cur_round[0].last_generation_id,
-        request=request,
-    )
-    
-    generated_time = len(cur_round[0].generations)
-    if latest_gen.interpreted_image is None or latest_gen.correct_sentence is None:
-        generated_time = len(cur_round[0].generations)-1
-        return RedirectResponse(url="/avery/answer", status_code=status.HTTP_303_SEE_OTHER)
-    request.session["generated_time"] = generated_time
-    request.session["generation_id"] = latest_gen.id
-    
-    if generated_time > (MAX_GENERATION-1):
-        output = await end_round(
-            round_id=request.session.get('round')['id'], 
-            request=request
-        )
-        if not output:
-            raise HTTPException(status_code=500, detail="Round not ended")
-    
-    return RedirectResponse(url="/avery/result", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url="/avery/write", status_code=status.HTTP_303_SEE_OTHER)
 
 @app.exception_handler(Exception)
 async def exception_handler(request: Request, exc: Exception):
