@@ -242,8 +242,10 @@ with gr.Blocks(title="AVERY") as avery_gradio:
 
             async def get_evaluation(ws: Play_Round_WS, feedback: str, chat_history: list,sentence: str, generated_time: int, generation_id: int, generations: list, request: gr.Request):
 
-                if chat_history and chat_history[-1][1].startswith("ブー！") or len(generations) >= MAX_GENERATION:
+                if chat_history and chat_history[-1][1].startswith("ブー！"):
                     gr.Warning(chat_history[-1][1])
+
+                if chat_history and chat_history[-1][1].startswith("ブー！") or len(generations) >= MAX_GENERATION or sentence == "":
                     ai_image_visible = gr.update()
                     ai_image=gr.update()
                     evaluation=gr.update()
