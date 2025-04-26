@@ -1358,7 +1358,7 @@ async def round_websocket(
                         "at": db_generation.created_at,
                     }
     
-                    if "IMG" in db_round.program.feedback:
+                    if "IMG" in db_program.feedback and "AWS" in db_program.feedback:
                         chain_interpretation = chain(
                             group(
                                 generate_interpretation2.s(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at),
@@ -1367,13 +1367,24 @@ async def round_websocket(
                                 calculate_score_gpt.s(),
                             ),
                         )
-                    else:
+                        chain_result = chain_interpretation.apply_async()
+                    elif "IMG" in db_program.feedback:
+                        chain_interpretation = chain(
+                            group(
+                                generate_interpretation2.s(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at),
+                            )
+                        )
+                        chain_result = chain_interpretation.apply_async()
+                    elif "AWS" in db_program.feedback:
                         chain_interpretation = chain(
                             group(
                                 calculate_score_gpt.s(items=generation_dict),
                             ),
                         )
-                    chain_result = chain_interpretation.apply_async()
+                        chain_result = chain_interpretation.apply_async()
+                    else:
+                        chain_result = None
+                    
 
                 elif status == 1:
                     messages = [
@@ -1449,52 +1460,70 @@ async def round_websocket(
             elif user_action["action"] == "evaluate" and (db_generation.correct_sentence is None or db_generation.correct_sentence == ""):
                 send_data = {}
             elif user_action["action"] == "evaluate":
-                while True:
-                    db_generation = crud.get_generation(
-                        db=db,
-                        generation_id=db_generation.id
-                    )
-                    if db_generation.is_completed:
-                        break
-                    elif chain_result.failed():
-                        raise HTTPException(status_code=500, detail="Error in chain result")
-                    elif chain_result.successful():
-                        break
-                    elif db_generation.score is not None:
-                        break
-                    util.logger1.info(f"Waiting for the task to finish... {chain_result.status}")
-                    await websocket.send_json({"feedback": "waiting"})
-                    await asyncio.sleep(3)
+                if "IMG" in db_program.feedback or "AWS" in db_program.feedback:
+                    while True:
+                        db_generation = crud.get_generation(
+                            db=db,
+                            generation_id=db_generation.id
+                        )
+                        if db_generation.is_completed:
+                            break
+                        elif chain_result.failed():
+                            raise HTTPException(status_code=500, detail="Error in chain result")
+                        elif chain_result.successful():
+                            break
+                        elif ("AWS" in db_program.feedback and db_generation.score is not None) and ("IMG" in db_program.feedback and db_generation.interpreted_image is not None):
+                            break
+                        elif ("AWS" in db_program.feedback and db_generation.score is not None) and ("IMG" not in db_program.feedback):
+                            break
+                        elif ("AWS" not in db_program.feedback) and ("IMG" in db_program.feedback and db_generation.interpreted_image is not None):
+                            break
+                        
+                        util.logger1.info(f"Waiting for the task to finish... {chain_result.status}")
+                        await websocket.send_json({"feedback": "waiting"})
+                        await asyncio.sleep(3)
                     
-                db_score = db_generation.score
-                if db_score is not None:
-                    image_similarity = db_score.image_similarity
-                    scores_dict = {
-                        'grammar_score': db_score.grammar_score,
-                        'spelling_score': db_score.spelling_score,
-                        'vividness_score': db_score.vividness_score,
-                        'convention': db_score.convention,
-                        'structure_score': db_score.structure_score,
-                        'content_score': db_score.content_score,
-                        'total_score': db_generation.total_score,
-                    }
-                elif locals().get('chain_result'):
-                    # Get the result from the chain
-                    chain_score_result = [
-                        json.loads(result) for result in chain_result.result
-                    ]
-                    scores_dict = {
-                        'grammar_score': chain_score_result[1].get('grammar_score', 0),
-                        'spelling_score': chain_score_result[1].get('spelling_score', 0),
-                        'vividness_score': chain_score_result[1].get('vividness_score', 0),
-                        'convention': chain_score_result[1].get('convention', 0),
-                        'structure_score': chain_score_result[1].get('structure_score', 0),
-                        'content_score': chain_score_result[1].get('content_score', 0),
-                        'total_score': chain_score_result[0].get('total_score', 0),
-                    }
-                    image_similarity = chain_score_result[1].get('image_similarity', 0)
+                if "AWS" in db_program.feedback:
+                    db_score = db_generation.score
+                    if db_score is not None:
+                        image_similarity = db_score.image_similarity
+                        scores_dict = {
+                            'grammar_score': db_score.grammar_score,
+                            'spelling_score': db_score.spelling_score,
+                            'vividness_score': db_score.vividness_score,
+                            'convention': db_score.convention,
+                            'structure_score': db_score.structure_score,
+                            'content_score': db_score.content_score,
+                            'total_score': db_generation.total_score,
+                        }
+                    elif locals().get('chain_result'):
+                        # Get the result from the chain
+                        chain_score_result = [
+                            json.loads(result) for result in chain_result.result
+                        ]
+                        scores_dict = {
+                            'grammar_score': chain_score_result[1].get('grammar_score', 0),
+                            'spelling_score': chain_score_result[1].get('spelling_score', 0),
+                            'vividness_score': chain_score_result[1].get('vividness_score', 0),
+                            'convention': chain_score_result[1].get('convention', 0),
+                            'structure_score': chain_score_result[1].get('structure_score', 0),
+                            'content_score': chain_score_result[1].get('content_score', 0),
+                            'total_score': chain_score_result[0].get('total_score', 0),
+                        }
+                        image_similarity = chain_score_result[1].get('image_similarity', 0)
+                    else:
+                        raise HTTPException(status_code=500, detail="No score found")
                 else:
-                    raise HTTPException(status_code=500, detail="No score found")
+                    scores_dict = {
+                        'grammar_score': 3,
+                        'spelling_score': 1,
+                        'vividness_score': 1,
+                        'convention': 1,
+                        'structure_score': 1,
+                        'content_score': 3,
+                        'total_score': 100,
+                    }
+                    image_similarity = 100
                 
                 if not db_generation.is_completed:
                     generation_aware = db_generation.created_at.replace(tzinfo=timezone(timedelta(hours=9)))
@@ -1513,6 +1542,49 @@ async def round_websocket(
 
                     descriptions = crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
                     descriptions = [des.content for des in descriptions]
+    
+                    # Set messages for score and evaluation
+                    db_messages = []
+
+                    if "AWS" in db_program.feedback:
+                        score_message = """あなたの回答（評価対象）：{user_sentence}
+
+修正された回答　　　　 ：{correct_sentence}
+
+
+| 　　          | 得点   | 満点       |
+|---------------|--------|------|
+| 文法得点      |{:>5}|  3  |
+| スペリング得点|{:>5}|  1  |
+| 鮮明さ        |{:>5}|  1  |
+| 自然さ        |{:>5}|  1  |
+| 構造性        |{:>5}|  1  |
+| 内容得点      |{:>5}|  3  |
+| 合計点        |{:>5}| 100 |
+| ランク        |{:>5}|(A-最高, B-上手, C-良い, D-普通, E-もう少し, F-頑張ろう)|""".format(
+                            round(scores_dict['grammar_score'],2),
+                            round(scores_dict['spelling_score'],2),
+                            round(scores_dict['vividness_score'],2),
+                            scores_dict['convention'],
+                            scores_dict['structure_score'],
+                            scores_dict['content_score'],
+                            scores_dict['total_score'],
+                            db_generation.rank,
+                            user_sentence=db_generation.sentence,
+                            correct_sentence=db_generation.correct_sentence,
+                        )
+
+                        db_messages.append(crud.create_message(
+                            db=db,
+                            message=schemas.MessageBase(
+                                content=score_message,
+                                sender="assistant",
+                                created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                                is_hint=False,
+                                is_evaluation=True,
+                            ),
+                            chat_id=db_round.chat_history
+                        )['message'])
 
                     if "AWE" in db_program.feedback:
                         evaluation = chatbot_obj.get_result(
@@ -1529,55 +1601,14 @@ async def round_websocket(
                         evaluation = None
                         db_evaluate_msg = None
 
-                    score_message = """あなたの回答（評価対象）：{user_sentence}
-
-修正された回答　　　　 ：{correct_sentence}
-
-
-| 　　          | 得点   | 満点       |
-|---------------|--------|------|
-| 文法得点      |{:>5}|  3  |
-| スペリング得点|{:>5}|  1  |
-| 鮮明さ        |{:>5}|  1  |
-| 自然さ        |{:>5}|  1  |
-| 構造性        |{:>5}|  1  |
-| 内容得点      |{:>5}|  3  |
-| 合計点        |{:>5}| 100 |
-| ランク        |{:>5}|(A-最高, B-上手, C-良い, D-普通, E-もう少し, F-頑張ろう)|""".format(
-                        round(scores_dict['grammar_score'],2),
-                        round(scores_dict['spelling_score'],2),
-                        round(scores_dict['vividness_score'],2),
-                        scores_dict['convention'],
-                        scores_dict['structure_score'],
-                        scores_dict['content_score'],
-                        scores_dict['total_score'],
-                        db_generation.rank,
-                        user_sentence=db_generation.sentence,
-                        correct_sentence=db_generation.correct_sentence,
-                    )
-
-                    db_messages = []
-                    db_messages.append(crud.create_message(
-                        db=db,
-                        message=schemas.MessageBase(
-                            content=score_message,
-                            sender="assistant",
-                            created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
-                            is_hint=False,
-                            is_evaluation=True,
-                        ),
-                        chat_id=db_round.chat_history
-                    )['message'])
-
 
                     if evaluation:
+                        recommended_vocab = ""
                         if len(db_round.generations) > 2:
                             recommended_vocabs = db_round.leaderboard.vocabularies
                             recommended_vocabs = [vocab.word for vocab in recommended_vocabs]
                             if recommended_vocabs:
                                 recommended_vocab = "\n\n**おすすめの単語**\n" + ", ".join(recommended_vocabs)
-                        else:
-                            recommended_vocab = ""
 
                         evaluation_message = """**文法**
 {grammar_feedback}

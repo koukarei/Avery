@@ -8,7 +8,7 @@ def login(request):
     print(f"Logging in with username: {username}")
 
     token_json = request.cls._client.post(
-        "/sqlapp/token", data={"username": username, "password": password}
+        "/sqlapp2/token", data={"username": username, "password": password}
     )
     assert token_json.status_code == 200
     assert 'access_token' in token_json.json()
@@ -33,7 +33,7 @@ def login_guest(request):
     print(f"Logging in with username: {username}")
 
     token_json = request.cls._client.post(
-        "/sqlapp/token", data={"username": username, "password": password}
+        "/sqlapp2/token", data={"username": username, "password": password}
     )
     assert token_json.status_code == 200
     assert 'access_token' in token_json.json()
