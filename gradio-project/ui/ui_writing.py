@@ -296,7 +296,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                 if remain_time>0:
                     submit_btn_update = gr.update(interactive=True, value=f"送信(あと{remain_time}回)")
                 if len(generations) == MAX_GENERATION:
-                    ws.end()
+                    await ws.end()
                 return chat_history,ai_image_visible, ai_image, evaluation, answer_box, generated_time, generation_id, generations, detail_visible, slider_update, submit_btn_update
 
             writing.submit_btn.click(
@@ -328,7 +328,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                     generation_id=show_generation_id,
                     request=request
                 )
-                detail = gen.sentence
+                detail = f"**あなたの回答**：\n\n{gen.sentence}"
 
                 if "IMG" in feedback:
                     ai_image = await get_interpreted_image(

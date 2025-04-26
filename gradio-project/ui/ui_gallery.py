@@ -207,10 +207,10 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         program = request.session.get("program", 'none')
         unfinished_rounds = await get_unfinished_rounds_from_backend(request, select_leaderboard.id, program)
         link = "/avery/go_to_writing/{}".format(select_leaderboard.id)
-        if playable:
-            start_btn = gr.update(value="始める",interactive=True, link=link)
-        elif unfinished_rounds:
+        if unfinished_rounds:
             start_btn = gr.update(value="再開", interactive=True, link=link)
+        elif playable:
+            start_btn = gr.update(value="始める",interactive=True, link=link)
         else:
             start_btn = gr.update(value="回想",interactive=True, link=link)
 
