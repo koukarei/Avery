@@ -12,6 +12,7 @@ python-multipart
 pillow
 numpy
 openai
+google-genai
 stanza
 pytest
 langchain

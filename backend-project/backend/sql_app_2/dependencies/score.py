@@ -1,11 +1,11 @@
 import cv2
-from . import util
+from util import base64_to_cv
 from skimage.metrics import structural_similarity as ssim
 
 def image_similarity(image1, image2):
     # Read images using OpenCV
-    img1 = util.base64_to_cv(image1)
-    img2 = util.base64_to_cv(image2)
+    img1 = base64_to_cv(image1)
+    img2 = base64_to_cv(image2)
 
     # Check if images were read successfully
     if img1 is None or img2 is None:

@@ -7,7 +7,7 @@ import pandas as pd
 from . import crud, schemas
 from .database import SessionLocal2, engine2
 
-from .dependencies import sentence, score, dictionary, openai_chatbot, util
+from .dependencies import sentence, score, dictionary, openai_chatbot
 
 from typing import Tuple, List, Annotated, Optional, Union, Literal
 from datetime import timezone, timedelta

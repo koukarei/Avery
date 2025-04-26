@@ -12,8 +12,9 @@ from tasks import app as celery_app
 from tasks import generateDescription2, generate_interpretation2, calculate_score_gpt
 from .database import SessionLocal2, engine2
 
-from .dependencies import sentence, score, dictionary, openai_chatbot, util
+from .dependencies import sentence, score, dictionary, openai_chatbot
 from .authentication import authenticate_user, authenticate_user_2, create_access_token, oauth2_scheme, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, REFRESH_TOKEN_EXPIRE_MINUTES, JWTError, jwt
+from util import *
 
 from typing import Tuple, List, Annotated, Optional, Union, Literal
 from datetime import timezone, timedelta
@@ -238,7 +239,7 @@ async def refresh_token(current_user: schemas.User = Security(get_current_user, 
             )
             return {"access_token": access_token}
     else:
-        util.logger1.error(
+        logger1.error(
             msg=f"Invalid token: {current_user}",
         )
         raise HTTPException(
@@ -415,7 +416,7 @@ async def create_story(
         )
                 
     except Exception:
-        util.logger1.error(f"Error uploading file: {Exception}")
+        logger1.error(f"Error uploading file: {Exception}")
         raise HTTPException(status_code=400, detail="Error uploading file")
     finally:
         story_content_file.file.close()
@@ -630,7 +631,7 @@ async def create_leaderboards(
             for image_file in images_files:
                 try:
                     with open(f'{temp_dir}/{image_file}', 'rb') as f:
-                        img = util.encode_image(image_file=f)
+                        img = encode_image(image_file=f)
                 except Exception:
                     raise HTTPException(status_code=400, detail="Please upload a valid image file")
 
@@ -645,7 +646,7 @@ async def create_leaderboards(
                 images[title] = db_original_image
 
         except Exception as e:
-            util.logger1.error(f"Error creating images: {str(e)}")
+            logger1.error(f"Error creating images: {str(e)}")
             raise HTTPException(status_code=400, detail=str(e))
 
     # Read the CSV file
@@ -671,7 +672,7 @@ async def create_leaderboards(
             img = images.get(util.remove_special_chars(img_title), None)
 
             if img is None:
-                util.logger1.error(f"Image not found: {img_title}")
+                logger1.error(f"Image not found: {img_title}")
                 continue
 
             # Create leaderboard
@@ -725,7 +726,7 @@ async def create_leaderboards(
                 # Log the difference between the added and preset vocabularies
                 diff = set(added_vocabularies) - set(preset_vocabularies)
                 if diff:
-                    util.logger1.info(f"Leaderboard {index} Added vocabularies: {diff}")
+                    logger1.info(f"Leaderboard {index} Added vocabularies: {diff}")
             
             # Add school
             if school:
@@ -788,7 +789,7 @@ async def create_leaderboard_image(
 
     try:
         original_image.file.seek(0)
-        img = util.encode_image(image_file=original_image.file)
+        img = encode_image(image_file=original_image.file)
     except Exception:
         raise HTTPException(status_code=400, detail="Please upload a valid image file")
     finally:
@@ -809,7 +810,7 @@ async def read_leaderboard(current_user: Annotated[schemas.User, Depends(get_cur
         raise HTTPException(status_code=401, detail="Login to view leaderboards")
     db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
     if db_leaderboard is None:
-        util.logger1.error(f"Leaderboard not found: {leaderboard_id}")
+        logger1.error(f"Leaderboard not found: {leaderboard_id}")
         raise HTTPException(status_code=404, detail="Leaderboard not found")
     
     crud.create_user_action(
@@ -1316,7 +1317,7 @@ async def round_websocket(
                     try:
                         status, correct_sentence, spelling_mistakes, grammar_mistakes=sentence.checkSentence(passage=db_generation.sentence)
                     except Exception as e:
-                        util.logger1.error(f"Error in get_user_answer: {str(e)}")
+                        logger1.error(f"Error in get_user_answer: {str(e)}")
                         raise HTTPException(status_code=400, detail=str(e))
                 
 
@@ -1479,7 +1480,7 @@ async def round_websocket(
                         elif ("AWS" not in db_program.feedback) and ("IMG" in db_program.feedback and db_generation.interpreted_image is not None):
                             break
                         
-                        util.logger1.info(f"Waiting for the task to finish... {chain_result.status}")
+                        logger1.info(f"Waiting for the task to finish... {chain_result.status}")
                         await websocket.send_json({"feedback": "waiting"})
                         await asyncio.sleep(3)
                     
@@ -2040,7 +2041,7 @@ async def get_original_image(
     if db_leaderboard.original_image is None:
         raise HTTPException(status_code=404, detail="Original image not found")
     
-    imgdata = util.decode_image(db_leaderboard.original_image.image)
+    imgdata = decode_image(db_leaderboard.original_image.image)
     
     crud.create_user_action(
         db=db,
@@ -2080,7 +2081,7 @@ async def get_interpreted_image(
     if db_generation.interpreted_image is None:
         raise HTTPException(status_code=404, detail="Interpreted image not found")
     
-    imgdata = util.decode_image(db_generation.interpreted_image.image)
+    imgdata = decode_image(db_generation.interpreted_image.image)
     
     crud.create_user_action(
         db=db,

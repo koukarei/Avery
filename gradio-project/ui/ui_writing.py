@@ -212,11 +212,11 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                 if sentence == "":
                     show = gr.update(visible=True)
                     Noshow = gr.update(visible=False)
-                    return chat_history, show, generated_time, generation_id
+                    return sentence, chat_history, show, generated_time, generation_id
                 elif len(generations) >= MAX_GENERATION:
                     show = gr.update(visible=True)
                     Noshow = gr.update(visible=False)
-                    return chat_history, show, generated_time, generation_id
+                    return sentence, chat_history, show, generated_time, generation_id
                 
                 generated_time = generated_time + 1
 
@@ -238,7 +238,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                 chat = response.chat
                 if chat:
                     chat_history += convert_history(chat)
-                return chat_history, generated_time, generation_id
+                return sentence, chat_history, generated_time, generation_id
 
             async def get_evaluation(ws: Play_Round_WS, feedback: str, chat_history: list,sentence: str, generated_time: int, generation_id: int, generations: list, request: gr.Request):
 
@@ -302,7 +302,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
             writing.submit_btn.click(
                 fn=submit_answer,
                 inputs=[ws_client, guidance.chat, writing.sentence, generations_state, generated_time_state, generation_id_state, round_id_state],
-                outputs=[guidance.chat, generated_time_state, generation_id_state],
+                outputs=[writing.sentence, guidance.chat, generated_time_state, generation_id_state],
             ).then(
                 fn=get_evaluation,
                 inputs=[ws_client, feedback_state, guidance.chat, writing.sentence, generated_time_state, generation_id_state, generations_state],
@@ -313,7 +313,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
             writing.sentence.submit(
                 fn=submit_answer,
                 inputs=[ws_client, guidance.chat, writing.sentence, generations_state, generated_time_state, generation_id_state, round_id_state],
-                outputs=[guidance.chat, generated_time_state, generation_id_state],
+                outputs=[writing.sentence, guidance.chat, generated_time_state, generation_id_state],
             ).then(
                 fn=get_evaluation,
                 inputs=[ws_client, feedback_state, guidance.chat, writing.sentence, generated_time_state, generation_id_state, generations_state],

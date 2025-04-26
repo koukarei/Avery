@@ -6,7 +6,7 @@ from typing import Union, List, Annotated, Optional
 
 from sql_app_2.dependencies import sentence as sentence2, score as score2, dictionary as dictionary2, gen_image as gen_image2, openai_chatbot as openai_chatbot2
 from sql_app_2 import crud as crud2, schemas as schemas2, database as database2
-from sql_app_2.dependencies.util import computing_time_tracker as computing_time_tracker2, encode_image as encode_image2
+from util import computing_time_tracker , encode_image
 from sql_app_2.database import SessionLocal2, engine2
 
 import torch
@@ -202,14 +202,10 @@ def generate_interpretation2(
                 'id': db_generation.id,
                 'at': at,
             }
-        t = computing_time_tracker2("Generate interpretation")
-        url = gen_image2.generate_interpretion(sentence)
-        t.stop_timer()
-
-        # Download and save image
+        t = computing_time_tracker("Generate interpretation")
         try:
-            b_interpreted_image = io.BytesIO(requests.get(url).content)
-            image = encode_image2(image_file=b_interpreted_image)
+            image = gen_image2.generate_interpretion(sentence, model="gemini")
+            t.stop_timer()
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid image file: {str(e)}")
         
