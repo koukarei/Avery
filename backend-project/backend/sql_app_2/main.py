@@ -1514,16 +1514,8 @@ async def round_websocket(
                     else:
                         raise HTTPException(status_code=500, detail="No score found")
                 else:
-                    scores_dict = {
-                        'grammar_score': 3,
-                        'spelling_score': 1,
-                        'vividness_score': 1,
-                        'convention': 1,
-                        'structure_score': 1,
-                        'content_score': 3,
-                        'total_score': 100,
-                    }
-                    image_similarity = 100
+                    scores_dict = None
+                    image_similarity = None
                 
                 if not db_generation.is_completed:
                     generation_aware = db_generation.created_at.replace(tzinfo=timezone(timedelta(hours=9)))
@@ -1590,8 +1582,6 @@ async def round_websocket(
                         evaluation = chatbot_obj.get_result(
                             sentence=db_generation.sentence,
                             correct_sentence=db_generation.correct_sentence,
-                            scoring=scores_dict,
-                            rank=db_generation.rank,
                             base64_image=db_round.leaderboard.original_image.image,
                             grammar_errors=db_generation.grammar_errors,
                             spelling_errors=db_generation.spelling_errors,

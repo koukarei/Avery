@@ -157,7 +157,7 @@ Avery、ロボット（ディズニーのベイマックスのように話すキ
             print(f"Messages: {self.messages}")
             return {}
             
-    def get_result(self, sentence, correct_sentence,scoring,rank,base64_image,grammar_errors,spelling_errors, descriptions):
+    def get_result(self, sentence, correct_sentence,base64_image,grammar_errors,spelling_errors, descriptions):
         prompt = """
 # 役割
 あなたの名前は Avery、ロボットです。
@@ -240,27 +240,11 @@ Every soldiers are exhausted and they are sleeping on the floor.
         user_prompt = """# 現状
 1. ユーザーの英作文（評価対象）：{user_sentence}
 2. 修正された英作文: {correct_sentence}
-3. 文法得点: {grammar_score}
-検出された文法の誤り: {grammar_errors}
-4. スペリング得点: {spelling_score}
-検出されたスペルミス: {spelling_errors}
-5. 鮮明さ: {vividness_score}
-6. 自然さ: {convention}
-自然さについて参考された内容: {descriptions}
-7. 構造性: {structure_score}
-8. 内容得点: {content_score}
-9. 合計点: {total_score}
-10. ランク: {rank}""".format(
+3. 検出された文法の誤り: {grammar_errors}
+4. 検出されたスペルミス: {spelling_errors}
+5. 参考記述: {descriptions}""".format(
     user_sentence=sentence,
     correct_sentence=correct_sentence,
-    grammar_score=scoring['grammar_score'],
-    spelling_score=scoring['spelling_score'],
-    vividness_score=scoring['vividness_score'],
-    convention=scoring['convention'],
-    structure_score=scoring['structure_score'],
-    content_score=scoring['content_score'],
-    total_score=scoring['total_score'],
-    rank=rank,
     grammar_errors=grammar_errors,
     spelling_errors=spelling_errors, 
     descriptions=descriptions
