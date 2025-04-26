@@ -355,6 +355,7 @@ class PersonalDictionaryCreate(BaseModel):
     save_at_round_id: int
     created_at: datetime.datetime
     relevant_sentence: str
+    pos: str
 
     class Config:
         orm_mode = True

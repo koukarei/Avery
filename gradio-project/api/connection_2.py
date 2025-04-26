@@ -102,6 +102,11 @@ async def create_user_lti(newuser: models.UserLti):
     
     return response
 
+def decode_image(image_str: str):
+    b = str.encode(image_str)
+    imgdata = base64.b64decode(b)
+    return PILImage.open(io.BytesIO(imgdata))
+
 async def get_access_token_from_backend(
         form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ):
@@ -390,8 +395,11 @@ class Play_Round_WS:
                 "action": "evaluate",
             }
         )
-        response = await self.receive_json()
-        response = models.Response(**response)
+        while True:
+            response = await self.receive_json()
+            response = models.Response(**response)
+            if not(response.feedback and response.feedback=="waiting"):
+                break
         return response
     
     async def end(self)-> models.Response:

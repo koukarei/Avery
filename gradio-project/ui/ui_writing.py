@@ -8,7 +8,7 @@ import datetime, zoneinfo
 
 from starlette.applications import Starlette
 from starlette.middleware.sessions import SessionMiddleware
-from api.connection_2 import Play_Round_WS, get_interpreted_image, obtain_evaluation_from_past, get_generation
+from api.connection_2 import Play_Round_WS, get_interpreted_image, obtain_evaluation_from_past, get_generation, decode_image
 from api.connection import models
 
 from ui.ui_gallery import app as fastapi_app
@@ -257,10 +257,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                 request = request.request
                 
                 generated_time = generated_time + 1
-                while True:
-                    response = await ws.evaluate()
-                    if not (response.feedback and response.feedback=="waiting"):
-                        break
+                response = await ws.evaluate()
                 
                 chat = response.chat
                 if chat:
@@ -281,18 +278,12 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                     slider_update = gr.update(maximum=total_generations, value=total_generations, interactive=True, visible=True)
 
                     if "IMG" in feedback:
-                        ai_image = await get_interpreted_image(
-                            generation_id=generation_id,
-                            request=request
-                        )
+                        ai_image = decode_image(response.generation.interpreted_image)
                         ai_image_visible = gr.update(visible=True)
 
 
                     if "AWE" in feedback:
-                        evaluation_msg = await obtain_evaluation_from_past(
-                            generation_id=generation_id,
-                            request=request
-                        )
+                        evaluation_msg = response.generation.evaluation_msg
                         evaluation = gr.update(value=evaluation_msg.replace("\n", "\n\n"), visible=True)
                     
                     answer_box = ""
@@ -304,6 +295,8 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                 submit_btn_update = gr.update(interactive=False, value=f"送信(あと0回)")
                 if remain_time>0:
                     submit_btn_update = gr.update(interactive=True, value=f"送信(あと{remain_time}回)")
+                if len(generations) == MAX_GENERATION:
+                    ws.end()
                 return chat_history,ai_image_visible, ai_image, evaluation, answer_box, generated_time, generation_id, generations, detail_visible, slider_update, submit_btn_update
 
             writing.submit_btn.click(

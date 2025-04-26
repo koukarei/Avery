@@ -9,7 +9,7 @@ from pathlib import Path
 
 from . import crud, models, schemas, analysis_router
 from tasks import app as celery_app
-from tasks import generateDescription2, update_vocab_used_time2, generate_interpretation2, calculate_score_gpt, cal_image_similarity
+from tasks import generateDescription2, generate_interpretation2, calculate_score_gpt
 from .database import SessionLocal2, engine2
 
 from .dependencies import sentence, score, dictionary, openai_chatbot, util
@@ -535,22 +535,6 @@ async def create_leaderboard(
         story=db_story.content
 
     db_original_image = crud.get_original_image(db, image_id=leaderboard.original_image_id)
-    en_nlp = dictionary.Dictionary()
-    # add leaderboard vocabularies
-    if leaderboard.story_extract:
-        words = en_nlp.get_sentence_nlp(leaderboard.story_extract)
-        for word in words:
-            vocab = crud.get_vocabulary(
-                db=db,
-                vocabulary=word.lemma,
-                part_of_speech=word.pos
-            )
-            if vocab:
-                crud.create_leaderboard_vocabulary(
-                    db=db,
-                    leaderboard_id=result.id,
-                    vocabulary_id=vocab.id
-                )
 
     t = generateDescription2.delay(
         leaderboard_id=result.id, 
@@ -708,40 +692,12 @@ async def create_leaderboards(
 
             added_vocabularies = []
 
-            en_nlp = dictionary.Dictionary()
-
-            # Add vocabularies
-            if story_extract:
-                words = en_nlp.get_sentence_nlp(story_extract)
-                
-                for word in words:
-                    vocab = crud.get_vocabulary(
-                        db=db,
-                        vocabulary=word.lemma,
-                        part_of_speech=word.pos
-                    )
-                    if vocab and not crud.get_leaderboard_vocabulary(
-                            db=db,
-                            leaderboard_id=db_leaderboard.id,
-                            vocabulary_id=vocab.id
-                    ):
-                        crud.create_leaderboard_vocabulary(
-                            db=db,
-                            leaderboard_id=db_leaderboard.id,
-                            vocabulary_id=vocab.id
-                        )
-                        added_vocabularies.append(vocab.word)
-
-                words = [word.lemma for word in words]
-
             # Add preset vocabularies
             if 'vocabularies' in leaderboards.columns:
                 preset_vocabularies = row['vocabularies']
                 preset_vocabularies = preset_vocabularies.split(",")
                 preset_vocabularies = [word.strip() for word in preset_vocabularies]
                 for word in preset_vocabularies:
-                    if word in words:
-                        continue
                     vocab = crud.get_vocabulary(
                         db=db,
                         vocabulary=word
@@ -1363,10 +1319,6 @@ async def round_websocket(
                         util.logger1.error(f"Error in get_user_answer: {str(e)}")
                         raise HTTPException(status_code=400, detail=str(e))
                 
-                    # update_vocab_used_time2.delay(
-                    #     sentence=db_generation.sentence,
-                    #     user_id=db_round.player_id,
-                    # )
 
                 if status == 0:
                     crud.update_generation3(
@@ -1512,7 +1464,7 @@ async def round_websocket(
                         break
                     util.logger1.info(f"Waiting for the task to finish... {chain_result.status}")
                     await websocket.send_json({"feedback": "waiting"})
-                    time.sleep(1)
+                    await asyncio.sleep(3)
                     
                 db_score = db_generation.score
                 if db_score is not None:
@@ -1827,14 +1779,12 @@ async def create_vocabularies(
         if not all(col in vocabularies.columns for col in col_names):
             raise HTTPException(status_code=400, detail="CSV file must have 'word' and 'pos' columns")
         
-        en_nlp = dictionary.Dictionary()
-
         for index, row in vocabularies.iterrows():
             pos = row['pos'].split(",")
             for p in pos:
                 p = p.strip()
 
-                meaning = await en_nlp.get_meaning(
+                meaning = await dictionary.get_meaning(
                     lemma=row['word'],
                     pos=p
                 )
@@ -1898,26 +1848,18 @@ async def create_personal_dictionary(
         raise HTTPException(status_code=401, detail="Login to create personal dictionary")
 
     personal_dictionary.user_id = current_user.id
-
-    en_nlp = dictionary.Dictionary()
-
-    word_lemma = en_nlp.get_pos_lemma(
-        word=personal_dictionary.vocabulary,
-        relevant_sentence=personal_dictionary.relevant_sentence
-    )
     
     vocab = crud.get_vocabulary(
         db=db,
-        vocabulary=word_lemma['lemma'],
-        part_of_speech=word_lemma['pos']
+        vocabulary=personal_dictionary.vocabulary,
+        part_of_speech=personal_dictionary.pos
     )
 
-    en_nlp = dictionary.Dictionary()
 
     if not vocab:
-        meanings=await en_nlp.get_meaning(
-            lemma=word_lemma['lemma'],
-            pos=word_lemma['pos']
+        meanings=await dictionary.get_meaning(
+            lemma=personal_dictionary.vocabulary,
+            pos=personal_dictionary.pos
         )
         if isinstance(meanings, list):
             meaning = '; '.join(meanings)
@@ -1927,8 +1869,8 @@ async def create_personal_dictionary(
         vocab = crud.create_vocabulary(
             db=db,
             vocabulary=schemas.VocabularyBase(
-                word=word_lemma['lemma'],
-                pos=word_lemma['pos'],
+                word=personal_dictionary.vocabulary,
+                pos=personal_dictionary.pos,
                 meaning=meaning
             )
         )
@@ -2132,40 +2074,6 @@ async def get_interpreted_image(
         content=imgdata,
         media_type="image/jpeg"  # Adjust this based on your image type (jpeg, png, etc.)
     )
-    
-@app.get("/image_similarity/{generation_id}", tags=["Image"])
-async def get_image_similarity(
-    current_user: Annotated[schemas.User, Depends(get_current_user)],
-    generation_id: int, 
-    db: Session = Depends(get_db)
-):
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Login to get image similarity")
-    
-    db_generation = crud.get_generation(
-        db=db,
-        generation_id=generation_id
-    )
-    
-    crud.create_user_action(
-        db=db,
-        user_action=schemas.UserActionBase(
-            user_id=current_user.id,
-            action="view_image_similarity",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-        )
-    )
-    if db_generation:
-        if db_generation.score_id:
-            if db_generation.score.image_similarity:
-                return db_generation.score.image_similarity
-            return cal_image_similarity(
-                generation=[{
-                    'id': generation_id,
-                }]
-            )
-    return None
 
 @app.get("/generation/{generation_id}", tags=["Generation"], response_model=schemas.GenerationOut)
 async def read_generation(
