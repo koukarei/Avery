@@ -1060,10 +1060,78 @@ async def round_websocket(
             is_completed=False,
             program_id=db_program.id
         )
+        finished_rounds = crud.get_rounds(
+            db=db,
+            player_id=player_id,
+            leaderboard_id=leaderboard_id,
+            is_completed=True,
+            program_id=db_program.id
+        )
+
         if unfinished_rounds:
             db_round = crud.get_round(
                 db=db,
                 round_id=unfinished_rounds[0].id,
+            )
+            db_leaderboard = crud.get_leaderboard(db=db, leaderboard_id=leaderboard_id)
+            
+            db_generation = crud.get_generation(db=db, generation_id=db_round.last_generation_id)
+            db_chat = crud.get_chat(db=db, chat_id=db_round.chat_history)
+            prev_res_ids = [
+                msg.response_id for msg in db_chat.messages if msg.response_id is not None
+            ]
+            chatbot_obj = openai_chatbot.Hint_Chatbot(
+                model_name=db_round.model,
+                vocabularies=db_leaderboard.vocabularies,
+                first_res_id=db_leaderboard.response_id,
+                prev_res_id=prev_res_ids[-1] if prev_res_ids else db_leaderboard.response_id,
+                prev_res_ids=prev_res_ids
+            )
+            generated_time = db_generation.generated_time
+
+            db_score = crud.get_score(db=db, generation_id=db_generation.id)
+
+            # prepare data to send
+            send_data = {
+                "feedback": db_program.feedback,
+                "leaderboard": {
+                    "id": leaderboard_id,
+                    "image": db_round.leaderboard.original_image.image,
+                },
+                "round": {
+                    "id": db_round.id,
+                    "generated_time":generated_time,
+                    "generations": [
+                        g.id for g in db_round.generations if g.is_completed
+                    ]
+                },
+                "generation": {
+                    "id": db_generation.id,
+                    "interpreted_image": db_generation.interpreted_image.image if db_generation.interpreted_image else None,
+                    "generated_time": db_generation.generated_time,
+                    "sentence": db_generation.sentence,
+                    "correct_sentence": db_generation.correct_sentence,
+                    "is_completed": db_generation.is_completed,
+                    "image_similarity": db_score.image_similarity if db_score else None,
+                },
+                "chat": {
+                    "id": db_round.chat_history,
+                    "messages" : [
+                        {   
+                            'id': db_message.id,
+                            'sender': db_message.sender,
+                            'content': db_message.content,
+                            'created_at': db_message.created_at.isoformat(),
+                            'is_hint': db_message.is_hint
+                        }
+                        for db_message in db_chat.messages
+                    ]
+                },
+            }
+        elif finished_rounds:
+            db_round = crud.get_round(
+                db=db,
+                round_id=finished_rounds[0].id,
             )
             db_leaderboard = crud.get_leaderboard(db=db, leaderboard_id=leaderboard_id)
             
