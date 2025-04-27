@@ -152,12 +152,13 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         
         remain_time = MAX_GENERATION-len(generations)
         submit_btn_update = gr.update(interactive=False, value=f"送信(あと0回)")
+        answer_box = gr.update(interactive=False, value=response.generation.sentence)
         if remain_time>0:
             submit_btn_update = gr.update(interactive=True, value=f"送信(あと{remain_time}回)")
-            
+            answer_box = gr.update(interactive=True, value="")
         chat_history = convert_history(response.chat)
 
-        return original_img, play_round_ws, generated_time, chat_history, response.feedback, detail_visible, evaluation, interpreted_image, interpreted_image_visible, submit_btn_update, round_id, generations, slider_update
+        return original_img, play_round_ws, generated_time, chat_history, response.feedback, detail_visible, evaluation, interpreted_image, interpreted_image_visible, submit_btn_update, round_id, generations, slider_update, answer_box
     
     async def ask_hint( message: str, chathist: list, ws: Play_Round_WS):
         if message == "":
@@ -297,6 +298,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                     submit_btn_update = gr.update(interactive=True, value=f"送信(あと{remain_time}回)")
                 if len(generations) == MAX_GENERATION:
                     await ws.end()
+                    answer_box = gr.update(value=sentence, interactive=False)
                 return chat_history,ai_image_visible, ai_image, evaluation, answer_box, generated_time, generation_id, generations, detail_visible, slider_update, submit_btn_update
 
             writing.submit_btn.click(
@@ -377,7 +379,8 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         writing.submit_btn, 
         round_id_state, 
         generations_state,
-        writing.slider
+        writing.slider,
+        writing.sentence
     ])
     
     avery_gradio.queue(max_size=128, default_concurrency_limit=50)
