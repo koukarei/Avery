@@ -202,9 +202,14 @@ def generate_interpretation2(
                 'id': db_generation.id,
                 'at': at,
             }
+        db_leaderboard = crud2.get_leaderboard(db, leaderboard_id=db_generation.round.leaderboard_id)
         t = computing_time_tracker("Generate interpretation")
         try:
-            image = gen_image2.generate_interpretion(sentence, model="gemini")
+            image = gen_image2.generate_interpretion(
+                sentence=sentence, 
+                model="gemini",
+                style=db_leaderboard.scene.prompt
+            )
             t.stop_timer()
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid image file: {str(e)}")

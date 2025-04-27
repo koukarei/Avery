@@ -46,10 +46,10 @@ def get_image_gemini(prompt):
             image = Image.open(BytesIO((part.inline_data.data)))
             return image
 
-def generate_interpretion(sentence, style="Japanese Anime", model="dall-e-3"):
+def generate_interpretion(sentence, style="in the style of Japanese Anime", model="dall-e-3"):
     prompt="""
             I NEED to test how the tool works with extremely simple prompts. DO NOT add any detail, just use it AS-IS:
-            Generate a image in the style of {style} for the passage below.
+            Generate a image {style} for the passage below.
             
             passage: {passage}
             """.format(passage=sentence, style=style)
