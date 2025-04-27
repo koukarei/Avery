@@ -2337,7 +2337,8 @@ async def check_leaderboard_playable(
             db_rounds = crud.get_rounds(
                 db=db,
                 leaderboard_id=leaderboard_id,
-                program_id=program_id
+                program_id=program_id,
+                player_id=current_user.id
             )
             if db_rounds:
                 return schemas.LeaderboardPlayable(
