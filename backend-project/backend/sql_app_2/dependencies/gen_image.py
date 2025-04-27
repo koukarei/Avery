@@ -47,18 +47,23 @@ def get_image_gemini(prompt):
             return image
 
 def generate_interpretion(sentence, style="in the style of Japanese Anime", model="dall-e-3"):
-    prompt="""
-            I NEED to test how the tool works with extremely simple prompts. DO NOT add any detail, just use it AS-IS:
-            Generate a image {style} for the passage below.
-            
-            passage: {passage}
-            """.format(passage=sentence, style=style)
     if model == "dall-e-3":
+        prompt="""
+                I NEED to test how the tool works with extremely simple prompts. DO NOT add any detail, just use it AS-IS:
+                Generate a image {style} for the passage below.
+                
+                passage: {passage}
+                """.format(passage=sentence, style=style)
         url = gen_image(prompt)
         b_interpreted_image = BytesIO(requests.get(url).content)
         image = encode_image(image_file=b_interpreted_image)
         return image
     elif model == "gemini":
+        prompt="""
+                Generate a image {style} for the passage below.
+                
+                passage: {passage}
+                """.format(passage=sentence, style=style)
         pil_interpreted_image = get_image_gemini(prompt)
         buffer = BytesIO()
         pil_interpreted_image.save(buffer, format="PNG")
