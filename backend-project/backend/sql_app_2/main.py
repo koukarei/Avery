@@ -2340,7 +2340,7 @@ async def check_leaderboard_playable(
                 program_id=program_id,
                 player_id=current_user.id
             )
-            if db_rounds:
+            if db_rounds is not None or db_rounds == []:
                 return schemas.LeaderboardPlayable(
                     id=leaderboard_id,
                     is_playable=False
@@ -2353,7 +2353,7 @@ async def check_leaderboard_playable(
             player_id=current_user.id
         )
 
-        if db_rounds:
+        if db_rounds is not None or db_rounds == []:
             return schemas.LeaderboardPlayable(
                 id=leaderboard_id,
                 is_playable=False
