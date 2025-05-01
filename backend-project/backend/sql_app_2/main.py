@@ -1778,10 +1778,6 @@ async def round_websocket(
                         "id": db_round.chat_history,
                         "messages" : []
                     },
-                    "generation": {
-                        "id": db_generation.id,
-                        "interpreted_image": db_generation.interpreted_image.image,
-                    }
                 }
 
                 chatbot_obj.kill()
