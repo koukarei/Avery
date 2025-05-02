@@ -2337,7 +2337,6 @@ async def check_leaderboard_playable(
                 player_id=current_user.id
             )
             if db_rounds:
-                print(db_rounds)
                 return schemas.LeaderboardPlayable(
                     id=leaderboard_id,
                     is_playable=False
