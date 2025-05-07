@@ -287,7 +287,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                         evaluation_msg = response.generation.evaluation_msg
                         evaluation = gr.update(value=evaluation_msg.replace("\n", "\n\n"), visible=True)
                     
-                    answer_box = ""
+                    answer_box = gr.update(interactive=True)
                 else:
                     generated_time = generated_time - 1
                     detail_visible=gr.update()
@@ -298,7 +298,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                     submit_btn_update = gr.update(interactive=True, value=f"送信(あと{remain_time}回)")
                 if len(generations) == MAX_GENERATION:
                     await ws.end()
-                    answer_box = gr.update(value=sentence, interactive=False)
+                    answer_box = gr.update(interactive=False)
                 return chat_history,ai_image_visible, ai_image, evaluation, answer_box, generated_time, generation_id, generations, detail_visible, slider_update, submit_btn_update
 
             writing.submit_btn.click(
