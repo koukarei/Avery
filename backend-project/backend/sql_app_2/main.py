@@ -1360,7 +1360,7 @@ async def round_websocket(
                 obj = parse_obj_as(schemas.GenerationCreate, user_action['obj'])
                 status = 0
                 sentences = [
-                    g.sentence for g in db_round.generations if g.sentence != '' and g.correct_sentence is not None and g.id != db_generation.id
+                    g.sentence.strip() for g in db_round.generations if g.sentence != '' and g.correct_sentence is not None and g.id != db_generation.id
                 ]
                 
                 if db_generation.correct_sentence is None:
@@ -1369,7 +1369,7 @@ async def round_websocket(
                         generation=obj,
                         generation_id=db_generation.id
                     )
-                elif obj.sentence in sentences:
+                elif obj.sentence.strip() in sentences:
                     db_generation = crud.get_generation(db=db, generation_id=db_generation.id)
                     status = 3
                 else: 
