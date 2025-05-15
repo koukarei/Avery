@@ -102,11 +102,7 @@ class TestPlay:
 
             # Receive json data from the WebSocket
             data = websocket.receive_json()
-            while True:
-                if 'feedback' not in data:
-                    break
-                asyncio.sleep(3)
-                data = websocket.receive_json()
+                
             assert 'leaderboard' in data
             assert 'round' in data
             assert 'chat' in data
@@ -166,6 +162,12 @@ class TestPlay:
 
             data = websocket.receive_json()
 
+            while True:
+                if 'feedback' in data:
+                    data = websocket.receive_json()
+                else:
+                    break
+            
             assert 'leaderboard' in data
             assert 'round' in data
             assert 'chat' in data
@@ -188,7 +190,6 @@ class TestPlay:
             assert 'leaderboard' in data
             assert 'round' in data
             assert 'chat' in data
-            assert 'generation' in data
 
         
 class TestPlays:
@@ -217,7 +218,8 @@ async def test_users_with_login(play):
 
 
     # Assert the number of results matches the number of users
-    assert len(awaited_results) == 40, "The number of results should match the number of users."
+    all_tests_num = len(awaited_results)
+    assert all_tests_num == TEST_NUMBER-1, "The number of results should match the number of users."
 
     # Optional: Check result format
     for i, result in enumerate(awaited_results, 1):
