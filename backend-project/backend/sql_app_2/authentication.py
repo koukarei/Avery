@@ -37,6 +37,8 @@ def authenticate_user(
         raise HTTPException(status_code=400, detail="The user does not exist.")
     if not verify_password(password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect password")
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Inactive user")
     return user
 
 def authenticate_user_2(
