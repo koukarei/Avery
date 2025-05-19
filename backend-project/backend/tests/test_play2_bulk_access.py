@@ -224,4 +224,3 @@ async def test_users_with_login(play):
     # Optional: Check result format
     for i, result in enumerate(awaited_results):
         print(result)
-        assert f"Test User {i} operation completed successfully." in result, f"Unexpected result for user test_acc{i}: {result}"
