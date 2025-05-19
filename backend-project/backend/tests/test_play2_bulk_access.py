@@ -58,7 +58,6 @@ class Test_TestAC:
             assert response.status_code == 200, response.json()
 
 @pytest.mark.usefixtures("login")
-@pytest.mark.asyncio(scope="class")
 class TestPlay:
     def __init__(self, username, password):
         self.username = username
