@@ -58,6 +58,7 @@ class Test_TestAC:
             assert response.status_code == 200, response.json()
 
 @pytest.mark.usefixtures("login")
+@pytest.mark.asyncio(scope="class")
 class TestPlay:
     def __init__(self, username, password):
         self.username = username
@@ -205,7 +206,6 @@ def play(request):
 
 # Pytest test case
 @pytest.mark.parametrize("play", [range(1, TEST_NUMBER)], indirect=True)
-@pytest.mark.asyncio
 async def test_users_with_login(play):
     """Test multi-user simulation with login."""
     async_tasks = []
