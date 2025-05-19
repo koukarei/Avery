@@ -222,6 +222,6 @@ async def test_users_with_login(play):
     assert all_tests_num == TEST_NUMBER-1, "The number of results should match the number of users."
 
     # Optional: Check result format
-    for i, result in enumerate(awaited_results, 1):
+    for i, result in enumerate(awaited_results):
         print(result)
         assert f"Test User {i} operation completed successfully." in result, f"Unexpected result for user test_acc{i}: {result}"
