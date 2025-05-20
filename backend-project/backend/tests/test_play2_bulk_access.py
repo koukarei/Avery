@@ -83,7 +83,7 @@ class TestPlay:
         leaderboard = response.json()[0]
         leaderboard_id = leaderboard[0]['id']
 
-        async with self._client.websocket_connect(
+        with self._client.websocket_connect(
             f"/sqlapp2/ws/{leaderboard_id}?token={self.access_token}",
         ) as websocket:
             # Sent json data to the WebSocket to start the game
