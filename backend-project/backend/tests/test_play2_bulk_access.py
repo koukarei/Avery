@@ -6,7 +6,7 @@ from main import app
 
 client = TestClient(app)
 
-TEST_NUMBER = 31
+TEST_NUMBER = 6
 
 def test_create_test_accounts():
     """Create test accounts for multi-user simulation."""
