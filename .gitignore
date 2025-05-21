@@ -9,3 +9,4 @@ __pycache__/
 gradio-project/data/*
 typings
 typings/*
+.gpt-runner*

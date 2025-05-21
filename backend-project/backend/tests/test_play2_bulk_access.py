@@ -1,7 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
-import sys, os, asyncio
+import sys, os, asyncio,json
 from httpx import AsyncClient
+from httpx_ws import aconnect_ws
 sys.path.append(os.getcwd())
 from main import app 
 
@@ -56,6 +57,16 @@ class Test_TestAC:
             )
             assert response.status_code == 200, response.json()
 
+def send_json(websocket, data):
+    """Send JSON data to the WebSocket."""
+    data = json.dumps(data)
+    websocket.send_text(data)
+
+def receive_json(websocket):
+    data = websocket.receive_text()
+    data = json.loads(data)
+    return data
+
 @pytest.mark.asyncio(scope="class")
 @pytest.mark.usefixtures("login")
 class TestPlay:
@@ -87,11 +98,12 @@ class TestPlay:
         leaderboard = response.json()[0]
         leaderboard_id = leaderboard[0]['id']
 
-        async with self._client.websocket_connect(
+        async with aconnect_ws(
             f"/sqlapp2/ws/{leaderboard_id}?token={self.access_token}",
+            self._client
         ) as websocket:
             # Sent json data to the WebSocket to start the game
-            websocket.send_json(
+            send_json(websocket,
                 {
                     "action": "start",
                     "program": "inlab_test",
@@ -105,7 +117,7 @@ class TestPlay:
             )
 
             # Receive json data from the WebSocket
-            data = websocket.receive_json()
+            data = receive_json(websocket)
                 
             assert 'leaderboard' in data
             assert 'round' in data
@@ -116,7 +128,7 @@ class TestPlay:
             chat = data['chat']
 
             # Ask for a hint
-            websocket.send_json(
+            send_json(websocket,
                 {
                     "action": "hint",
                     "program": "inlab_test",
@@ -128,13 +140,13 @@ class TestPlay:
                 }
             )
 
-            data = websocket.receive_json()
+            data = receive_json(websocket)
             assert 'chat' in data
 
             print(data['chat']['messages'])
 
             # Submit answer
-            websocket.send_json(
+            send_json(websocket,
                 {
                     "action": "submit",
                     "program": "inlab_test",
@@ -146,7 +158,7 @@ class TestPlay:
                     }
                 }
             )
-            data = websocket.receive_json()
+            data = receive_json(websocket)
 
             assert 'leaderboard' in data
             assert 'round' in data
@@ -158,17 +170,17 @@ class TestPlay:
             print(generation['correct_sentence'])
 
             # Get evaluation result
-            websocket.send_json(
+            send_json(websocket,
                 {
                     "action": "evaluate",
                 }
             )
 
-            data = websocket.receive_json()
+            data = receive_json(websocket)
 
             while True:
                 if 'feedback' in data:
-                    data = websocket.receive_json()
+                    data = receive_json(websocket)
                 else:
                     break
             
@@ -184,13 +196,13 @@ class TestPlay:
             assert 'image_similarity' in generation
 
             # end the game
-            websocket.send_json(
+            send_json(websocket,
                 {
                     "action": "end",
                 }
             )
 
-            data = websocket.receive_json()
+            data = receive_json(websocket)
             assert 'leaderboard' in data
             assert 'round' in data
             assert 'chat' in data
