@@ -1,8 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 import sys, os, asyncio,json
-from httpx import AsyncClient
-from httpx_ws import aconnect_ws, ReadTimeout
+from httpx import AsyncClient, ReadTimeout
+from httpx_ws import aconnect_ws
 sys.path.append(os.getcwd())
 from main import app 
 
