@@ -268,3 +268,12 @@ async def test_users_with_login(play):
     # Optional: Check result format
     for i, result in enumerate(awaited_results):
         print(result)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_id", list(range(1, TEST_NUMBER)))
+async def test_user_play(test_id):
+    username = f"test_acc{test_id}"
+    password = "hogehoge"
+    test_play = TestPlay(username, password)
+    await test_play.test_websocket()
