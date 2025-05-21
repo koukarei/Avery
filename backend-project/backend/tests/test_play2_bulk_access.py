@@ -5,6 +5,7 @@ from httpx import AsyncClient, ReadTimeout
 from httpx_ws import aconnect_ws
 sys.path.append(os.getcwd())
 from main import app 
+from wsproto.utilities import LocalProtocolError
 
 TEST_NUMBER = 11
 
@@ -58,44 +59,77 @@ class Test_TestAC:
             )
             assert response.status_code == 200, response.json()
 
-async def send_json(websocket, data, max_retries=3, backoff=1):
-    """Send JSON data to the WebSocket."""
-    last_exception = None
-    for attempt in range(max_retries):
-        try:
-            data = json.dumps(data)
-            return await websocket.send_text(data)
-            
-        except ReadTimeout as e:
-            last_exception = e
-            if attempt < max_retries - 1:
-                await asyncio.sleep(backoff)
-                backoff *= 2
-    raise last_exception
-
-async def receive_json(websocket, max_retries=3, backoff=1):
-    """Receive JSON data from the WebSocket."""
-    last_exception = None
-    for attempt in range(max_retries):
-        try:
-            data = await websocket.receive_text()
-            data = json.loads(data)
-            return data
-        except ReadTimeout as e:
-            last_exception = e
-            if attempt < max_retries - 1:
-                await asyncio.sleep(backoff)
-                backoff *= 2
-    raise last_exception
-
 @pytest.mark.asyncio(loop_scope="session", scope="class")
 @pytest.mark.usefixtures("login")
 class TestPlay:
+
+    @classmethod
+    async def create(cls):
+        instance = cls()
+        instance._client = AsyncClient(base_url="http://localhost:8000", timeout=20)
+        await instance.set_access_token()
+
+        # Get leaderboard id
+        response = await instance._client.get("/sqlapp2/leaderboards/", headers={"Authorization": f"Bearer {instance.access_token}"})
+        assert response.status_code == 200, response.json()
+        assert len(response.json()) > 0, "No leaderboard found."
+        assert 'id' in response.json()[0][0], "No leaderboard id found."
+        
+        leaderboard = response.json()[0]
+        instance.leaderboard_id = leaderboard[0]['id']
+
+        instance.url = f"ws/{instance.leaderboard_id}?token={await instance.get_access_token()}"
+        
+        instance._ws_context = aconnect_ws(instance.url, instance._client, keepalive_ping_timeout_seconds=60)
+        instance.ws = await instance._ws_context.__aenter__()
+        return instance
+    
     def __init__(self, username, password):
         self.username = username
         self.password = password
-        self._client = AsyncClient(base_url="http://localhost:8000", timeout=20)
         self.access_token = None
+
+
+    async def send_json(self, data, max_retries=3, backoff=1):
+        """Send JSON data to the WebSocket."""
+        last_exception = None
+        for attempt in range(max_retries):
+            try:
+                text_data = json.dumps(data)
+                return await self.ws.send_text(text_data)
+                
+            except ReadTimeout as e:
+                last_exception = e
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(backoff)
+                    backoff *= 2
+            except LocalProtocolError:
+                self.ws.close()
+                self._ws_context = aconnect_ws(self.url, self._client, keepalive_ping_timeout_seconds=60)
+                self.ws = await self._ws_context.__aenter__()
+
+                await self.ws.send_text(json.dumps(self.resume_round))
+                await self.ws.receive_text()
+                # resend data
+                await self.ws.send_text(text_data)
+
+        raise last_exception
+
+    async def receive_json(self, max_retries=3, backoff=1):
+        """Receive JSON data from the WebSocket."""
+        last_exception = None
+        for attempt in range(max_retries):
+            try:
+                data = await self.ws.receive_text()
+                data = json.loads(data)
+                return data
+            except ReadTimeout as e:
+                last_exception = e
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(backoff)
+                    backoff *= 2
+
+        raise last_exception
 
     async def get_access_token(self, max_retries=3, backoff=1):
         """Fetch access token for the user."""
@@ -117,125 +151,123 @@ class TestPlay:
         self.access_token = await self.get_access_token()
         
     async def test_websocket(self):
-        await self.set_access_token()
-        # Get leaderboard id
-        response = await self._client.get("/sqlapp2/leaderboards/", headers={"Authorization": f"Bearer {self.access_token}"})
-        assert response.status_code == 200, response.json()
-        assert len(response.json()) > 0, "No leaderboard found."
-        assert 'id' in response.json()[0][0], "No leaderboard id found."
-        
-        leaderboard = response.json()[0]
-        leaderboard_id = leaderboard[0]['id']
+        """Test WebSocket connection and interaction."""
 
-        async with aconnect_ws(
-            f"/sqlapp2/ws/{leaderboard_id}?token={self.access_token}",
-            self._client,
-            keepalive_ping_timeout_seconds=60
-        ) as websocket:
+        self.resume_round = {
+                "action": "resume",
+                "program": "inlab_test",
+                "obj": {
+                    "leaderboard_id": self.leaderboard_id,
+                    "program": "inlab_test",
+                    "model": "gpt-4o-mini",
+                    "created_at": "2025-04-06T00:00:00Z",
+                }
+            }
+
             # Sent json data to the WebSocket to start the game
-            await send_json(websocket,
-                {
-                    "action": "start",
+        await self.send_json(
+            {
+                "action": "start",
+                "program": "inlab_test",
+                "obj": {
+                    "leaderboard_id": self.leaderboard_id,
                     "program": "inlab_test",
-                    "obj": {
-                        "leaderboard_id": leaderboard_id,
-                        "program": "inlab_test",
-                        "model": "gpt-4o-mini",
-                        "created_at": "2025-04-06T00:00:00Z",
-                    }
+                    "model": "gpt-4o-mini",
+                    "created_at": "2025-04-06T00:00:00Z",
                 }
-            )
+            }
+        )
 
-            # Receive json data from the WebSocket
-            data = await receive_json(websocket)
-                
-            assert 'leaderboard' in data
-            assert 'round' in data
-            assert 'chat' in data
-
-            leaderboard_image = data['leaderboard']['image']
-            round = data['round']
-            chat = data['chat']
-
-            # Ask for a hint
-            await send_json(websocket,
-                {
-                    "action": "hint",
-                    "program": "inlab_test",
-                    "obj": {
-                        "is_hint": True,
-                        "content": "ヒントをちょうだい",
-                        "created_at": "2025-04-06T00:00:00Z",
-                    }
-                }
-            )
-
-            data = await receive_json(websocket)
-            assert 'chat' in data
-
-            print(data['chat']['messages'])
-
-            # Submit answer
-            await send_json(websocket,
-                {
-                    "action": "submit",
-                    "program": "inlab_test",
-                    "obj": {
-                        "round_id": round['id'],
-                        "created_at": "2025-04-06T00:00:00Z",
-                        "generated_time": round['generated_time'],
-                        "sentence": "An old man crafted a wooden duck maciliously."
-                    }
-                }
-            )
-            data = await receive_json(websocket)
-
-            assert 'leaderboard' in data
-            assert 'round' in data
-            assert 'chat' in data
-            assert 'generation' in data
-
-            print(data['chat']['messages'])
-            generation = data['generation']
-            print(generation['correct_sentence'])
-
-            # Get evaluation result
-            await send_json(websocket,
-                {
-                    "action": "evaluate",
-                }
-            )
-
-            data = await receive_json(websocket)
-
-            while True:
-                if 'feedback' in data:
-                    data = await receive_json(websocket)
-                else:
-                    break
+        # Receive json data from the WebSocket
+        data = await self.receive_json()
             
-            assert 'leaderboard' in data
-            assert 'round' in data
-            assert 'chat' in data
-            assert 'generation' in data
+        assert 'leaderboard' in data
+        assert 'round' in data
+        assert 'chat' in data
 
-            print(data['chat']['messages'])
-            generation = data['generation']
+        leaderboard_image = data['leaderboard']['image']
+        round = data['round']
+        chat = data['chat']
 
-            assert 'interpreted_image' in generation
-            assert 'image_similarity' in generation
-
-            # end the game
-            await send_json(websocket,
-                {
-                    "action": "end",
+        # Ask for a hint
+        await self.send_json(
+            {
+                "action": "hint",
+                "program": "inlab_test",
+                "obj": {
+                    "is_hint": True,
+                    "content": "ヒントをちょうだい",
+                    "created_at": "2025-04-06T00:00:00Z",
                 }
-            )
+            }
+        )
 
-            data = await receive_json(websocket)
-            assert 'leaderboard' in data
-            assert 'round' in data
-            assert 'chat' in data
+        data = await self.receive_json()
+        assert 'chat' in data
+
+        print(data['chat']['messages'])
+
+        # Submit answer
+        await self.send_json(
+            {
+                "action": "submit",
+                "program": "inlab_test",
+                "obj": {
+                    "round_id": round['id'],
+                    "created_at": "2025-04-06T00:00:00Z",
+                    "generated_time": round['generated_time'],
+                    "sentence": "An old man crafted a wooden duck maciliously."
+                }
+            }
+        )
+        data = await self.receive_json()
+
+        assert 'leaderboard' in data
+        assert 'round' in data
+        assert 'chat' in data
+        assert 'generation' in data
+
+        print(data['chat']['messages'])
+        generation = data['generation']
+        print(generation['correct_sentence'])
+
+        # Get evaluation result
+        await self.send_json(
+            {
+                "action": "evaluate",
+            }
+        )
+
+        data = await self.receive_json()
+
+        while True:
+            if 'feedback' in data:
+                data = await self.receive_json()
+            else:
+                break
+        
+        assert 'leaderboard' in data
+        assert 'round' in data
+        assert 'chat' in data
+        assert 'generation' in data
+
+        print(data['chat']['messages'])
+        generation = data['generation']
+
+        assert 'interpreted_image' in generation
+        assert 'image_similarity' in generation
+
+        # end the game
+        await self.send_json(
+            {
+                "action": "end",
+            }
+        )
+
+        data = await self.receive_json()
+        assert 'leaderboard' in data
+        assert 'round' in data
+        assert 'chat' in data
 
         
 class TestPlays:
