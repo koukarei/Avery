@@ -87,7 +87,7 @@ async def receive_json(websocket, max_retries=3, backoff=1):
                 backoff *= 2
     raise last_exception
 
-@pytest.mark.asyncio(scope="class")
+@pytest.mark.asyncio(loop_scope="session", scope="class")
 @pytest.mark.usefixtures("login")
 class TestPlay:
     def __init__(self, username, password):
