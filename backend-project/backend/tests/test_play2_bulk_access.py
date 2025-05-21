@@ -62,7 +62,7 @@ class TestPlay:
     def __init__(self, username, password):
         self.username = username
         self.password = password
-        self._client = AsyncClient(app=app, base_url="http://test")
+        self._client = AsyncClient(base_url="https://localhost:8000")
         self.access_token = self.get_access_token()
 
     def get_access_token(self):
