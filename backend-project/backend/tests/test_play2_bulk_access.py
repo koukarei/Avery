@@ -1,10 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
 import sys, os, asyncio
+from httpx import AsyncClient
 sys.path.append(os.getcwd())
 from main import app 
-
-client = TestClient(app)
 
 TEST_NUMBER = 6
 
@@ -27,7 +26,7 @@ def test_create_test_accounts():
 class Test_TestAC:
     username = os.getenv("ADMIN_USERNAME")
     password = os.getenv("ADMIN_PASSWORD")
-    _client = client
+    _client = TestClient(app)
         
     async def test_deactivate_test_accounts(self):
         """Deactivate test accounts after multi-user simulation."""
@@ -57,12 +56,13 @@ class Test_TestAC:
             )
             assert response.status_code == 200, response.json()
 
+@pytest.mark.asyncio(scope="class")
 @pytest.mark.usefixtures("login")
 class TestPlay:
     def __init__(self, username, password):
         self.username = username
         self.password = password
-        self._client = TestClient(app)
+        self._client = AsyncClient(app=app, base_url="http://test")
         self.access_token = self.get_access_token()
 
     def get_access_token(self):
@@ -207,12 +207,11 @@ def play(request):
 @pytest.mark.parametrize("play", [range(1, TEST_NUMBER)], indirect=True)
 async def test_users_with_login(play):
     """Test multi-user simulation with login."""
-    async_tasks = []
-    for t in play.tests:
-        
-        async_tasks.append(
+    async_tasks = [
             t.test_websocket()
-        )
+            for t in play.tests
+    ]
+    
     awaited_results = await asyncio.gather(*async_tasks)
 
 
