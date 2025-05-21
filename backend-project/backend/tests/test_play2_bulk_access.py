@@ -63,7 +63,7 @@ class TestPlay:
         self.username = username
         self.password = password
         self._client = AsyncClient(base_url="https://localhost:8000")
-        self.access_token = self.get_access_token()
+        self.access_token = None
 
     async def get_access_token(self):
         """Fetch access token for the user."""
@@ -72,8 +72,12 @@ class TestPlay:
         )
         assert response.status_code == 200, f"Failed to login user {self.username}."
         return response.json().get("access_token")
+    
+    async def set_access_token(self):
+        self.access_token = await self.get_access_token()
         
     async def test_websocket(self):
+        self.set_access_token()
         # Get leaderboard id
         response = await self._client.get("/sqlapp2/leaderboards/", headers={"Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 200, response.json()
