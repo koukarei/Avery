@@ -6,9 +6,10 @@ from httpx_ws import aconnect_ws
 sys.path.append(os.getcwd())
 from main import app 
 
-TEST_NUMBER = 6
+TEST_NUMBER = 31
 
 def test_create_test_accounts():
+    client = TestClient(app)
     """Create test accounts for multi-user simulation."""
     for i in range(1, TEST_NUMBER):
         user_acc = {
