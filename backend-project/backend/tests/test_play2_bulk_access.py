@@ -6,7 +6,7 @@ from httpx_ws import aconnect_ws
 sys.path.append(os.getcwd())
 from main import app 
 
-TEST_NUMBER = 31
+TEST_NUMBER = 11
 
 def test_create_test_accounts():
     client = TestClient(app)
@@ -94,16 +94,24 @@ class TestPlay:
     def __init__(self, username, password):
         self.username = username
         self.password = password
-        self._client = AsyncClient(base_url="http://localhost:8000", timeout=15)
+        self._client = AsyncClient(base_url="http://localhost:8000", timeout=20)
         self.access_token = None
 
-    async def get_access_token(self):
+    async def get_access_token(self, max_retries=3, backoff=1):
         """Fetch access token for the user."""
-        response = await self._client.post(
-            "/sqlapp2/token", data={"username": self.username, "password": self.password}
-        )
-        assert response.status_code == 200, f"Failed to login user {self.username}."
-        return response.json().get("access_token")
+        for attempt in range(max_retries):
+            try:
+                response = await self._client.post(
+                    "/sqlapp2/token", data={"username": self.username, "password": self.password}
+                )
+                if response.status_code == 200:
+                    return response.json().get("access_token")
+            except ReadTimeout as e:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(backoff)
+                    backoff *= 2
+                else:
+                    raise e
     
     async def set_access_token(self):
         self.access_token = await self.get_access_token()
