@@ -65,9 +65,9 @@ class TestPlay:
         self._client = AsyncClient(base_url="https://localhost:8000")
         self.access_token = self.get_access_token()
 
-    def get_access_token(self):
+    async def get_access_token(self):
         """Fetch access token for the user."""
-        response = self._client.post(
+        response = await self._client.post(
             "/sqlapp2/token", data={"username": self.username, "password": self.password}
         )
         assert response.status_code == 200, f"Failed to login user {self.username}."
@@ -75,7 +75,7 @@ class TestPlay:
         
     async def test_websocket(self):
         # Get leaderboard id
-        response = self._client.get("/sqlapp2/leaderboards/", headers={"Authorization": f"Bearer {self.access_token}"})
+        response = await self._client.get("/sqlapp2/leaderboards/", headers={"Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 200, response.json()
         assert len(response.json()) > 0, "No leaderboard found."
         assert 'id' in response.json()[0][0], "No leaderboard id found."
@@ -83,7 +83,7 @@ class TestPlay:
         leaderboard = response.json()[0]
         leaderboard_id = leaderboard[0]['id']
 
-        with self._client.websocket_connect(
+        async with self._client.websocket_connect(
             f"/sqlapp2/ws/{leaderboard_id}?token={self.access_token}",
         ) as websocket:
             # Sent json data to the WebSocket to start the game
