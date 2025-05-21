@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 import sys, os, asyncio,json
 from httpx import AsyncClient
-from httpx_ws import aconnect_ws
+from httpx_ws import aconnect_ws, ReadTimeout
 sys.path.append(os.getcwd())
 from main import app 
 
@@ -57,15 +57,35 @@ class Test_TestAC:
             )
             assert response.status_code == 200, response.json()
 
-async def send_json(websocket, data):
+async def send_json(websocket, data, max_retries=3, backoff=1):
     """Send JSON data to the WebSocket."""
-    data = json.dumps(data)
-    await websocket.send_text(data)
+    last_exception = None
+    for attempt in range(max_retries):
+        try:
+            data = json.dumps(data)
+            return await websocket.send_text(data)
+            
+        except ReadTimeout as e:
+            last_exception = e
+            if attempt < max_retries - 1:
+                await asyncio.sleep(backoff)
+                backoff *= 2
+    raise last_exception
 
-async def receive_json(websocket):
-    data = await websocket.receive_text()
-    data = json.loads(data)
-    return data
+async def receive_json(websocket, max_retries=3, backoff=1):
+    """Receive JSON data from the WebSocket."""
+    last_exception = None
+    for attempt in range(max_retries):
+        try:
+            data = await websocket.receive_text()
+            data = json.loads(data)
+            return data
+        except ReadTimeout as e:
+            last_exception = e
+            if attempt < max_retries - 1:
+                await asyncio.sleep(backoff)
+                backoff *= 2
+    raise last_exception
 
 @pytest.mark.asyncio(scope="class")
 @pytest.mark.usefixtures("login")
@@ -100,7 +120,8 @@ class TestPlay:
 
         async with aconnect_ws(
             f"/sqlapp2/ws/{leaderboard_id}?token={self.access_token}",
-            self._client
+            self._client,
+            keepalive_ping_timeout_seconds=30
         ) as websocket:
             # Sent json data to the WebSocket to start the game
             await send_json(websocket,
