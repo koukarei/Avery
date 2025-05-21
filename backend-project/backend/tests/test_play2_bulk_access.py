@@ -62,8 +62,8 @@ def send_json(websocket, data):
     data = json.dumps(data)
     websocket.send_text(data)
 
-def receive_json(websocket):
-    data = websocket.receive_text()
+async def receive_json(websocket):
+    data = await websocket.receive_text()
     data = json.loads(data)
     return data
 
@@ -117,7 +117,7 @@ class TestPlay:
             )
 
             # Receive json data from the WebSocket
-            data = receive_json(websocket)
+            data = await receive_json(websocket)
                 
             assert 'leaderboard' in data
             assert 'round' in data
@@ -140,7 +140,7 @@ class TestPlay:
                 }
             )
 
-            data = receive_json(websocket)
+            data = await receive_json(websocket)
             assert 'chat' in data
 
             print(data['chat']['messages'])
@@ -158,7 +158,7 @@ class TestPlay:
                     }
                 }
             )
-            data = receive_json(websocket)
+            data = await receive_json(websocket)
 
             assert 'leaderboard' in data
             assert 'round' in data
@@ -176,11 +176,11 @@ class TestPlay:
                 }
             )
 
-            data = receive_json(websocket)
+            data = await receive_json(websocket)
 
             while True:
                 if 'feedback' in data:
-                    data = receive_json(websocket)
+                    data = await receive_json(websocket)
                 else:
                     break
             
@@ -202,7 +202,7 @@ class TestPlay:
                 }
             )
 
-            data = receive_json(websocket)
+            data = await receive_json(websocket)
             assert 'leaderboard' in data
             assert 'round' in data
             assert 'chat' in data
