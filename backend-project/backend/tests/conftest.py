@@ -1,4 +1,5 @@
 import pytest, httpx
+from pytest_asyncio import is_async_test
 
 @pytest.fixture(scope="class")
 def login(request):
@@ -56,6 +57,13 @@ def login_guest(request):
 def asyncio_default_loop_scope():
     """Sets the asyncio default event loop scope."""
     return "class"  # Change to "function", "class", "module", or "session" as needed
+
+def pytest_collection_modifyitems(items):
+    """非同期テストに loop_scope='session' を設定する"""
+    session_scope_marker = pytest.mark.asyncio(loop_scope="session")
+    for item in items:
+        if is_async_test(item):
+            item.add_marker(session_scope_marker)
 
 # Timer for each test function
 @pytest.fixture(autouse=True, scope="function")
