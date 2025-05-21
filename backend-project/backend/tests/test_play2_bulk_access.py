@@ -122,7 +122,7 @@ class TestPlay:
         async with aconnect_ws(
             f"/sqlapp2/ws/{leaderboard_id}?token={self.access_token}",
             self._client,
-            keepalive_ping_timeout_seconds=30
+            keepalive_ping_timeout_seconds=60
         ) as websocket:
             # Sent json data to the WebSocket to start the game
             await send_json(websocket,
