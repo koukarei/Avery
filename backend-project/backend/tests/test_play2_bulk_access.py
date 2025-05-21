@@ -285,10 +285,10 @@ def play(request):
 @pytest.mark.parametrize("play", [range(1, TEST_NUMBER)], indirect=True)
 async def test_users_with_login(play):
     """Test multi-user simulation with login."""
-    async_tasks = [
-            t.test_websocket()
-            for t in play.tests
-    ]
+    async_tasks = []
+    for t in play.tests:
+        await t.create()
+        async_tasks.append(t.test_websocket())
     
     awaited_results = await asyncio.gather(*async_tasks)
 
