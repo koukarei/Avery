@@ -77,7 +77,7 @@ class TestPlay:
         self.access_token = await self.get_access_token()
         
     async def test_websocket(self):
-        self.set_access_token()
+        await self.set_access_token()
         # Get leaderboard id
         response = await self._client.get("/sqlapp2/leaderboards/", headers={"Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 200, response.json()
