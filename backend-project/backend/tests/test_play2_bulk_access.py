@@ -57,10 +57,10 @@ class Test_TestAC:
             )
             assert response.status_code == 200, response.json()
 
-def send_json(websocket, data):
+async def send_json(websocket, data):
     """Send JSON data to the WebSocket."""
     data = json.dumps(data)
-    websocket.send_text(data)
+    await websocket.send_text(data)
 
 async def receive_json(websocket):
     data = await websocket.receive_text()
@@ -103,7 +103,7 @@ class TestPlay:
             self._client
         ) as websocket:
             # Sent json data to the WebSocket to start the game
-            send_json(websocket,
+            await send_json(websocket,
                 {
                     "action": "start",
                     "program": "inlab_test",
@@ -128,7 +128,7 @@ class TestPlay:
             chat = data['chat']
 
             # Ask for a hint
-            send_json(websocket,
+            await send_json(websocket,
                 {
                     "action": "hint",
                     "program": "inlab_test",
@@ -146,7 +146,7 @@ class TestPlay:
             print(data['chat']['messages'])
 
             # Submit answer
-            send_json(websocket,
+            await send_json(websocket,
                 {
                     "action": "submit",
                     "program": "inlab_test",
@@ -170,7 +170,7 @@ class TestPlay:
             print(generation['correct_sentence'])
 
             # Get evaluation result
-            send_json(websocket,
+            await send_json(websocket,
                 {
                     "action": "evaluate",
                 }
@@ -196,7 +196,7 @@ class TestPlay:
             assert 'image_similarity' in generation
 
             # end the game
-            send_json(websocket,
+            await send_json(websocket,
                 {
                     "action": "end",
                 }
