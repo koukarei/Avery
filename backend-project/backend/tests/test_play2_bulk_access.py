@@ -273,9 +273,10 @@ async def test_users_with_login():
         TestPlay(f"test_acc{i}", "hogehoge") for i in range(1, TEST_NUMBER)
     ]
     async_tasks = []
-    for i, t in enumerate(plays):
+    for i in range(1, TEST_NUMBER):
+        t = TestPlay()
         await t.create(
-            username=f"test_acc{i+1}",
+            username=f"test_acc{i}",
             password="hogehoge"
         )
         async_tasks.append(t.test_websocket())
