@@ -60,7 +60,6 @@ class Test_TestAC:
             assert response.status_code == 200, response.json()
 
 @pytest.mark.asyncio(loop_scope="session", scope="class")
-@pytest.mark.usefixtures("login")
 class TestPlay:
 
     @classmethod
