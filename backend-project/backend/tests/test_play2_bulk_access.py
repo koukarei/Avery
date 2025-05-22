@@ -62,9 +62,16 @@ class Test_TestAC:
 @pytest.mark.asyncio(loop_scope="session", scope="class")
 @pytest.mark.usefixtures("login")
 class TestPlay:
-    username = None
-    password = None
-    access_token = None
+    
+    def __init__(self):
+        self.username = None
+        self.password = None
+        self.access_token = None
+        self.leaderboard_id = None
+        self._client = None
+        self._ws_context = None
+        self.ws = None
+        self.resume_round = None
 
     @classmethod
     async def create(cls):
