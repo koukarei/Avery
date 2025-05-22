@@ -37,10 +37,6 @@
 ## test sync writing
 ```pytest tests/test_play2_bulk_access.py::test_users_with_login```
 
-## test writing one-by-one
-```pytest tests/test_play2_bulk_access.py::test_user_play```
-
-
 ## Activate test acc
 ```pytest tests/test_play2_bulk_access.py::Test_TestAC::test_activate_test_accounts```
 
