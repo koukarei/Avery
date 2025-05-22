@@ -64,8 +64,8 @@ with gr.Blocks(title="AVERY") as avery_gradio:
     async def set_image_date():
         current_time = datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo"))
         today_str = current_time.strftime("%Y-%m-%d")
-        today_plus_7 = current_time + datetime.timedelta(days=7)
-        return today_str, today_plus_7
+        today_minus_7 = current_time - datetime.timedelta(days=7)
+        return today_minus_7, today_str
 
 
     async def initialize_game(request: gr.Request, published_at_start: Optional[datetime.datetime]=None, published_at_end: Optional[datetime.datetime]=None):
