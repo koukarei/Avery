@@ -80,6 +80,9 @@ class TestPlay:
         await instance.set_access_token()
 
         # Get leaderboard id
+        assert instance.username is not None, "Username is not set."
+        assert instance.password is not None, "Password is not set."
+        
         response = await instance._client.get("/sqlapp2/leaderboards/", headers={"Authorization": f"Bearer {instance.access_token}"})
         assert response.status_code == 200, response.json()
         assert len(response.json()) > 0, "No leaderboard found."
