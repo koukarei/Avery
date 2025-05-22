@@ -64,8 +64,11 @@ class Test_TestAC:
 class TestPlay:
 
     @classmethod
-    async def create(cls):
+    async def create(cls, username, password):
         instance = cls()
+        instance.username = username
+        instance.password = password
+        instance.access_token = None
         instance._client = AsyncClient(base_url="http://localhost:8000", timeout=20)
         await instance.set_access_token()
 
@@ -83,12 +86,6 @@ class TestPlay:
         instance._ws_context = aconnect_ws(instance.url, instance._client, keepalive_ping_timeout_seconds=60)
         instance.ws = await instance._ws_context.__aenter__()
         return instance
-    
-    def __init__(self, username, password):
-        self.username = username
-        self.password = password
-        self.access_token = None
-
 
     async def send_json(self, data, max_retries=3, backoff=1):
         """Send JSON data to the WebSocket."""
@@ -276,8 +273,11 @@ async def test_users_with_login():
         TestPlay(f"test_acc{i}", "hogehoge") for i in range(1, TEST_NUMBER)
     ]
     async_tasks = []
-    for t in plays:
-        await t.create()
+    for i, t in enumerate(plays):
+        await t.create(
+            username=f"test_acc{i+1}",
+            password="hogehoge"
+        )
         async_tasks.append(t.test_websocket())
     
     awaited_results = await asyncio.gather(*async_tasks)
