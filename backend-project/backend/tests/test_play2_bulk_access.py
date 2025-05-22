@@ -269,9 +269,6 @@ class TestPlay:
 # Pytest test case
 async def test_users_with_login():
     """Test multi-user simulation with login."""
-    plays = [
-        TestPlay(f"test_acc{i}", "hogehoge") for i in range(1, TEST_NUMBER)
-    ]
     async_tasks = []
     for i in range(1, TEST_NUMBER):
         t = TestPlay()
