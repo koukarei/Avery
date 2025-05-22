@@ -172,6 +172,10 @@ async def lti_login(request: Request):
             school = "hikone"
         elif oauth_consumer_key == "lms_consumer_key":
             school = "lms"
+        elif oauth_consumer_key == "tom_consumer_key":
+            school = "tom"
+        elif oauth_consumer_key == "tomsec_consumer_key":
+            school = "tomsec"
 
         if "instructor" in form_data.get('roles', '').lower():
             role = "instructor"
@@ -228,6 +232,10 @@ async def logout(request: Request):
         return RedirectResponse(url='https://leaf02.uchida.co.jp/moodle/')
     elif school == "lms":
         return RedirectResponse(url='https://lms.let.media.kyoto-u.ac.jp/moodle/')
+    elif school == "tom":
+        return RedirectResponse(url='https://dev.leaf.ederc.jp/moodle/course/view.php?id=7')
+    elif school == "tomsec":
+        return RedirectResponse(url='https://dev.leaf.ederc.jp/moodle/course/view.php?id=8')
     else:
         return RedirectResponse(url='/avery/login')
 
