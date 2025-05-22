@@ -62,20 +62,12 @@ class Test_TestAC:
 @pytest.mark.asyncio(loop_scope="session", scope="class")
 @pytest.mark.usefixtures("login")
 class TestPlay:
-    
-    def __init__(self):
-        self.username = None
-        self.password = None
-        self.access_token = None
-        self.leaderboard_id = None
-        self._client = None
-        self._ws_context = None
-        self.ws = None
-        self.resume_round = None
 
     @classmethod
-    async def create(cls):
+    async def create(cls, username: str, password: str):
         instance = cls()
+        instance.username = username
+        instance.password = password
         instance._client = AsyncClient(base_url="http://localhost:8000", timeout=20)
         await instance.set_access_token()
 
@@ -282,9 +274,10 @@ async def test_users_with_login():
     async_tasks = []
     for i in range(1, TEST_NUMBER):
         t = TestPlay()
-        t.username = f"test_acc{i}"
-        t.password = "hogehoge"
-        await t.create()
+        await t.create(
+            username=f"test_acc{i}",
+            password="hogehoge"
+        )
         async_tasks.append(t.test_websocket())
     
     awaited_results = await asyncio.gather(*async_tasks)
