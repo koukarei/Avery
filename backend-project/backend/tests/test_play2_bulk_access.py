@@ -269,24 +269,14 @@ class TestPlay:
         assert 'round' in data
         assert 'chat' in data
 
-        
-class TestPlays:
-    def __init__(self, test_ids):
-        self.test_ids = test_ids
-        self.tests = [
-            TestPlay(f"test_acc{test_id}", "hogehoge") for test_id in test_ids
-        ]
-
-@pytest.fixture
-def play(request):
-    return TestPlays(request.param)
-
 # Pytest test case
-@pytest.mark.parametrize("play", [range(1, TEST_NUMBER)], indirect=True)
-async def test_users_with_login(play):
+async def test_users_with_login():
     """Test multi-user simulation with login."""
+    plays = [
+        TestPlay(f"test_acc{i}", "hogehoge") for i in range(1, TEST_NUMBER)
+    ]
     async_tasks = []
-    for t in play.tests:
+    for t in plays:
         await t.create()
         async_tasks.append(t.test_websocket())
     
@@ -300,12 +290,3 @@ async def test_users_with_login(play):
     # Optional: Check result format
     for i, result in enumerate(awaited_results):
         print(result)
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("test_id", list(range(1, TEST_NUMBER)))
-async def test_user_play(test_id):
-    username = f"test_acc{test_id}"
-    password = "hogehoge"
-    test_play = TestPlay(username, password)
-    await test_play.test_websocket()
