@@ -9,9 +9,10 @@ from wsproto.utilities import LocalProtocolError
 
 TEST_NUMBER = 11
 
-def test_create_test_accounts():
+@pytest.fixture(scope="session", autouse=True)
+def create_test_accounts_fixture(): # Renamed for clarity
     client = TestClient(app)
-    """Create test accounts for multi-user simulation."""
+    print("Creating test accounts...") # Added print for visibility
     for i in range(1, TEST_NUMBER):
         user_acc = {
             "username": f"test_acc{i}",
@@ -24,6 +25,12 @@ def test_create_test_accounts():
             json=user_acc.copy(), 
             headers={"Content-Type": "application/json"}
         )
+        # Asserting here is important for fixture sanity
+        if response.status_code not in [200, 201, 400]: # 400 if user already exists
+             raise AssertionError(f"Failed to create user test_acc{i}: {response.status_code} {response.text}")
+        if response.status_code == 400 and "already exists" not in response.text.lower():
+             raise AssertionError(f"Failed to create user test_acc{i} (unexpected 400): {response.status_code} {response.text}")
+    print("Test accounts creation process finished.")
 
 @pytest.mark.usefixtures("login")
 class Test_TestAC:
@@ -82,7 +89,8 @@ class TestPlay:
         leaderboard = response.json()[0]
         instance.leaderboard_id = leaderboard[0]['id']
 
-        instance.url = f"http://localhost:8000/ws/{instance.leaderboard_id}?token={await instance.get_access_token()}"
+        # Use the existing instance.access_token
+        instance.url = f"http://localhost:8000/ws/{instance.leaderboard_id}?token={instance.access_token}" # Changed line
         
         instance._ws_context = aconnect_ws(instance.url, instance._client, keepalive_ping_timeout_seconds=60)
         instance.ws = await instance._ws_context.__aenter__()
@@ -279,6 +287,7 @@ async def test_users_with_login():
             password="hogehoge"
         )
         test_instances.append(t)
+        await asyncio.sleep(0.1) # Introduce a 100ms delay
 
     # Prepare all instances
     for t_instance in test_instances:
