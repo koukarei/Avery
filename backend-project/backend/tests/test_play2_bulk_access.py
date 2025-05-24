@@ -28,7 +28,8 @@ def create_test_accounts_fixture(): # Renamed for clarity
         # Asserting here is important for fixture sanity
         if response.status_code not in [200, 201, 400]: # 400 if user already exists
              raise AssertionError(f"Failed to create user test_acc{i}: {response.status_code} {response.text}")
-        if response.status_code == 400 and "already exists" not in response.text.lower():
+        response_text_lower = response.text.lower()
+        if response.status_code == 400 and not ("already exists" in response_text_lower or "already registered" in response_text_lower):
              raise AssertionError(f"Failed to create user test_acc{i} (unexpected 400): {response.status_code} {response.text}")
     print("Test accounts creation process finished.")
 
