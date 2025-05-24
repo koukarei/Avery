@@ -90,15 +90,14 @@ class TestPlay:
         leaderboard = response.json()[0]
         instance.leaderboard_id = leaderboard[0]['id']
 
-        # URL no longer contains the token query parameter
-        instance.url = f"http://localhost:8000/ws/{instance.leaderboard_id}" 
+        # URL is relative and includes token query parameter
+        instance.url = f"/sqlapp2/ws/{instance.leaderboard_id}?token={instance.access_token}" 
         
-        # Token is passed via Authorization header
-        custom_headers = {'Authorization': f'Bearer {instance.access_token}'}
+        # No explicit custom_headers passed to aconnect_ws
         instance._ws_context = aconnect_ws(
             instance.url, 
             instance._client, 
-            headers=custom_headers, # Added headers
+            # headers=custom_headers, # This line is removed/commented
             keepalive_ping_timeout_seconds=60
         )
         instance.ws = await instance._ws_context.__aenter__()
