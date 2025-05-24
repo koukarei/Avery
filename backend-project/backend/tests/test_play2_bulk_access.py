@@ -284,24 +284,35 @@ class TestPlay:
         assert 'chat' in data
 
     async def close(self):
-        """Closes the WebSocket connection context."""
+        """Closes the WebSocket connection context and the HTTP client."""
+        # Close WebSocket context
         if hasattr(self, '_ws_context') and self._ws_context:
             try:
                 await self._ws_context.__aexit__(None, None, None)
             except Exception as e:
-                username = getattr(self, 'username', 'Unknown User') # Safely get username
+                username = getattr(self, 'username', 'Unknown User')
                 print(f"Error closing WebSocket context for {username}: {e}")
             finally:
-                self._ws_context = None # Prevent reuse
-                self.ws = None         # self.ws is now invalid
-        elif hasattr(self, 'ws') and self.ws: # Minimal fallback
+                self._ws_context = None
+                self.ws = None
+        elif hasattr(self, 'ws') and self.ws: 
              try:
                 if hasattr(self.ws, 'close'):
                     await self.ws.close()
-             except Exception: # Ignore errors on fallback close
+             except Exception:
                  pass
              finally:
                 self.ws = None
+        
+        # Close AsyncClient
+        if hasattr(self, '_client') and self._client:
+            try:
+                await self._client.aclose()
+            except Exception as e:
+                username = getattr(self, 'username', 'Unknown User')
+                print(f"Error closing AsyncClient for {username}: {e}")
+            finally:
+                self._client = None
 
 # Pytest test case
 async def test_users_with_login():
