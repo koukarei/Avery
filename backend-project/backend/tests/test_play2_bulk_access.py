@@ -147,22 +147,21 @@ class TestPlay:
     
     async def set_access_token(self):
         self.access_token = await self.get_access_token()
-        
-    async def test_websocket(self):
-        """Test WebSocket connection and interaction."""
 
+    async def prepare_for_submission(self):
+        """Initializes the round and gets a hint."""
         self.resume_round = {
-                "action": "resume",
+            "action": "resume",
+            "program": "inlab_test",
+            "obj": {
+                "leaderboard_id": self.leaderboard_id,
                 "program": "inlab_test",
-                "obj": {
-                    "leaderboard_id": self.leaderboard_id,
-                    "program": "inlab_test",
-                    "model": "gpt-4o-mini",
-                    "created_at": "2025-04-06T00:00:00Z",
-                }
+                "model": "gpt-4o-mini",
+                "created_at": "2025-04-06T00:00:00Z",
             }
+        }
 
-            # Sent json data to the WebSocket to start the game
+        # Sent json data to the WebSocket to start the game
         await self.send_json(
             {
                 "action": "start",
@@ -183,9 +182,7 @@ class TestPlay:
         assert 'round' in data
         assert 'chat' in data
 
-        leaderboard_image = data['leaderboard']['image']
-        round = data['round']
-        chat = data['chat']
+        self.round = data['round'] # Store round data
 
         # Ask for a hint
         await self.send_json(
@@ -205,15 +202,17 @@ class TestPlay:
 
         print(data['chat']['messages'])
 
+    async def submit_writing(self):
+        """Submits the writing and gets initial results."""
         # Submit answer
         await self.send_json(
             {
                 "action": "submit",
                 "program": "inlab_test",
                 "obj": {
-                    "round_id": round['id'],
+                    "round_id": self.round['id'],
                     "created_at": "2025-04-06T00:00:00Z",
-                    "generated_time": round['generated_time'],
+                    "generated_time": self.round['generated_time'],
                     "sentence": "An old man crafted a wooden duck maciliously."
                 }
             }
@@ -226,9 +225,11 @@ class TestPlay:
         assert 'generation' in data
 
         print(data['chat']['messages'])
-        generation = data['generation']
-        print(generation['correct_sentence'])
+        self.generation = data['generation'] # Store generation data
+        print(self.generation['correct_sentence'])
 
+    async def process_submission_results(self):
+        """Processes the submission results, including evaluation and ending the game."""
         # Get evaluation result
         await self.send_json(
             {
@@ -250,10 +251,10 @@ class TestPlay:
         assert 'generation' in data
 
         print(data['chat']['messages'])
-        generation = data['generation']
+        self.generation = data['generation'] # Update generation data
 
-        assert 'interpreted_image' in generation
-        assert 'image_similarity' in generation
+        assert 'interpreted_image' in self.generation
+        assert 'image_similarity' in self.generation
 
         # end the game
         await self.send_json(
@@ -269,17 +270,27 @@ class TestPlay:
 
 # Pytest test case
 async def test_users_with_login():
-    """Test multi-user simulation with login."""
-    async_tasks = []
+    """Test multi-user simulation with login for concurrent submissions."""
+    test_instances = []
     for i in range(1, TEST_NUMBER):
         t = TestPlay()
         await t.create(
             username=f"test_acc{i}",
             password="hogehoge"
         )
-        async_tasks.append(t.test_websocket())
-    
-    awaited_results = await asyncio.gather(*async_tasks)
+        test_instances.append(t)
+
+    # Prepare all instances
+    for t_instance in test_instances:
+        await t_instance.prepare_for_submission()
+
+    # Concurrently submit writing
+    submit_tasks = [t_instance.submit_writing() for t_instance in test_instances]
+    await asyncio.gather(*submit_tasks)
+
+    # Concurrently process results
+    process_tasks = [t_instance.process_submission_results() for t_instance in test_instances]
+    awaited_results = await asyncio.gather(*process_tasks)
 
 
     # Assert the number of results matches the number of users
