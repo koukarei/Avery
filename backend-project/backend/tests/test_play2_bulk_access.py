@@ -283,10 +283,31 @@ class TestPlay:
         assert 'round' in data
         assert 'chat' in data
 
+    async def close(self):
+        """Closes the WebSocket connection context."""
+        if hasattr(self, '_ws_context') and self._ws_context:
+            try:
+                await self._ws_context.__aexit__(None, None, None)
+            except Exception as e:
+                username = getattr(self, 'username', 'Unknown User') # Safely get username
+                print(f"Error closing WebSocket context for {username}: {e}")
+            finally:
+                self._ws_context = None # Prevent reuse
+                self.ws = None         # self.ws is now invalid
+        elif hasattr(self, 'ws') and self.ws: # Minimal fallback
+             try:
+                if hasattr(self.ws, 'close'):
+                    await self.ws.close()
+             except Exception: # Ignore errors on fallback close
+                 pass
+             finally:
+                self.ws = None
+
 # Pytest test case
 async def test_users_with_login():
     """Test multi-user simulation with login for concurrent submissions."""
     test_instances = []
+    # Create instances first - if this fails, finally won't have much to do, which is fine.
     for i in range(1, TEST_NUMBER):
         t = TestPlay()
         await t.create(
@@ -294,25 +315,31 @@ async def test_users_with_login():
             password="hogehoge"
         )
         test_instances.append(t)
-        await asyncio.sleep(0.1) # Introduce a 100ms delay
+        await asyncio.sleep(0.1) 
 
-    # Prepare all instances
-    for t_instance in test_instances:
-        await t_instance.prepare_for_submission()
+    try:
+        # Prepare all instances
+        for t_instance in test_instances:
+            await t_instance.prepare_for_submission()
 
-    # Concurrently submit writing
-    submit_tasks = [t_instance.submit_writing() for t_instance in test_instances]
-    await asyncio.gather(*submit_tasks)
+        # Concurrently submit writing
+        submit_tasks = [t_instance.submit_writing() for t_instance in test_instances]
+        await asyncio.gather(*submit_tasks)
 
-    # Concurrently process results
-    process_tasks = [t_instance.process_submission_results() for t_instance in test_instances]
-    awaited_results = await asyncio.gather(*process_tasks)
+        # Concurrently process results
+        process_tasks = [t_instance.process_submission_results() for t_instance in test_instances]
+        awaited_results = await asyncio.gather(*process_tasks)
 
+        # Assert the number of results matches the number of users
+        all_tests_num = len(awaited_results)
+        assert all_tests_num == TEST_NUMBER - 1, "The number of results should match the number of users."
 
-    # Assert the number of results matches the number of users
-    all_tests_num = len(awaited_results)
-    assert all_tests_num == TEST_NUMBER-1, "The number of results should match the number of users."
-
-    # Optional: Check result format
-    for i, result in enumerate(awaited_results):
-        print(result)
+        # Optional: Check result format
+        for i, result in enumerate(awaited_results):
+            print(result)
+            
+    finally:
+        print("Closing TestPlay instances...") # For visibility
+        close_tasks = [t_instance.close() for t_instance in test_instances]
+        await asyncio.gather(*close_tasks) # Concurrently close them
+        print("All TestPlay instances close attempts finished.")
