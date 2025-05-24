@@ -91,9 +91,16 @@ class TestPlay:
         instance.leaderboard_id = leaderboard[0]['id']
 
         # Use the existing instance.access_token
-        instance.url = f"http://localhost:8000/ws/{instance.leaderboard_id}?token={instance.access_token}" # Changed line
+        instance.url = f"http://localhost:8000/ws/{instance.leaderboard_id}?token={instance.access_token}" 
         
-        instance._ws_context = aconnect_ws(instance.url, instance._client, keepalive_ping_timeout_seconds=60)
+        # Pass Authorization header to aconnect_ws
+        custom_headers = {'Authorization': f'Bearer {instance.access_token}'}
+        instance._ws_context = aconnect_ws(
+            instance.url, 
+            instance._client, 
+            headers=custom_headers, # Added headers
+            keepalive_ping_timeout_seconds=60
+        )
         instance.ws = await instance._ws_context.__aenter__()
         return instance
 
