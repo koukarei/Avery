@@ -90,10 +90,10 @@ class TestPlay:
         leaderboard = response.json()[0]
         instance.leaderboard_id = leaderboard[0]['id']
 
-        # Use the existing instance.access_token
-        instance.url = f"http://localhost:8000/ws/{instance.leaderboard_id}?token={instance.access_token}" 
+        # URL no longer contains the token query parameter
+        instance.url = f"http://localhost:8000/ws/{instance.leaderboard_id}" 
         
-        # Pass Authorization header to aconnect_ws
+        # Token is passed via Authorization header
         custom_headers = {'Authorization': f'Bearer {instance.access_token}'}
         instance._ws_context = aconnect_ws(
             instance.url, 
