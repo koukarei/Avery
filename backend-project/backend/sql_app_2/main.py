@@ -2054,7 +2054,82 @@ async def get_evaluation(
         )
     )
     if "AWE" in db_round.program.feedback and db_generation.is_completed:
-        
+        if db_generation.evaluation is None:
+            # Generate evaluation if generation is completed but no evaluation exists
+            db_chat = crud.get_chat(
+                db=db,
+                chat_id=db_round.chat_history
+            )
+            prev_res_ids = [
+                msg.response_id for msg in db_chat.messages if msg.response_id is not None
+            ]
+            
+            chatbot_obj = openai_chatbot.Hint_Chatbot(
+                model_name=db_round.model,
+                vocabularies=db_round.leaderboard.vocabularies,
+                first_res_id=db_round.leaderboard.response_id,
+                prev_res_id=prev_res_ids[-1] if prev_res_ids else db_round.leaderboard.response_id,
+                prev_res_ids=prev_res_ids
+            )
+
+            descriptions = crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
+            evaluation = chatbot_obj.get_result(
+                sentence=db_generation.sentence,
+                correct_sentence=db_generation.correct_sentence,
+                base64_image=db_round.leaderboard.original_image.image,
+                grammar_errors=db_generation.grammar_errors,
+                spelling_errors=db_generation.spelling_errors,
+                descriptions=[des.content for des in descriptions]
+            )
+
+            if evaluation:
+                recommended_vocab = ""
+                if len(db_round.generations) > 2:
+                    recommended_vocabs = db_round.leaderboard.vocabularies
+                    recommended_vocabs = [vocab.word for vocab in recommended_vocabs]
+                    if recommended_vocabs:
+                        recommended_vocab = "\n\n**おすすめの単語**\n" + ", ".join(recommended_vocabs)
+
+                evaluation_message = """**文法**
+{grammar_feedback}
+**スペル**
+{spelling_feedback}
+**スタイル**
+{style_feedback}
+**内容**
+{content_feedback}
+
+**総合評価**
+{overall_feedback}{recommended_vocab}""". \
+                format(
+                    grammar_feedback=evaluation['grammar_evaluation'],
+                    spelling_feedback=evaluation['spelling_evaluation'],
+                    style_feedback=evaluation['style_evaluation'],
+                    content_feedback=evaluation['content_evaluation'],
+                    overall_feedback=evaluation['overall_evaluation'],
+                    recommended_vocab=recommended_vocab
+                )
+                db_evaluate_msg = crud.create_message(
+                    db=db,
+                    message=schemas.MessageBase(
+                        content=evaluation_message,
+                        sender="assistant",
+                        created_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+                        is_hint=False,
+                        is_evaluation=True,
+                        responses_id=chatbot_obj.prev_res_id
+                    ),
+                    chat_id=db_round.chat_history
+                )['message']
+                
+                db_generation = crud.update_generation3(
+                    db=db,
+                    generation=schemas.GenerationComplete(
+                        id=db_generation.id,
+                        is_completed=True,
+                        evaluation_id=db_evaluate_msg.id if db_evaluate_msg else None
+                    )
+                )
         return db_generation.evaluation
     
     raise HTTPException(status_code=500, detail="No evaluation message.")
