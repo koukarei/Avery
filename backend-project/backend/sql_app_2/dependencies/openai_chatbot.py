@@ -304,6 +304,49 @@ Every soldiers are exhausted and they are sleeping on the floor.
 
             return evaluation
         except Exception as e:
+            if 'Previous response with id' in str(e):
+                response = self.client.responses.create(
+                    model=self.model_name,
+                    instructions=prompt,
+                    input=self.messages,
+                    temperature=0.8,
+                    text={
+                        "format": {
+                            "type": "json_schema",
+                            "name": "Final_Evaluation",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "grammar_evaluation": {
+                                        "type": "string"
+                                    },
+                                    "spelling_evaluation": {
+                                        "type": "string"
+                                    },
+                                    "style_evaluation": {
+                                        "type": "string"
+                                    },
+                                    "content_evaluation": {
+                                        "type": "string"
+                                    },
+                                    "overall_evaluation": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": ["grammar_evaluation", "spelling_evaluation", "style_evaluation", "content_evaluation", "overall_evaluation"],
+                                "additionalProperties": False
+                            },
+                            "strict": True
+                        }
+                    }
+                )
+
+                self.prev_res_id = response.id
+                if self.first_res_id is None:
+                    self.first_res_id = response.id
+                evaluation = json.loads(response.output_text)
+
+                return evaluation
             print(f"Error: {e}")
             print(f"Messages: {self.messages}")
             return {}
