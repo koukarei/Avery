@@ -155,6 +155,24 @@ Avery、ロボット（ディズニーのベイマックスのように話すキ
             return hint
         
         except Exception as e:
+            if 'Previous response with id' in str(e):
+                response = self.client.responses.create(
+                    model=self.model_name,
+                    instructions=self.system_prompt,
+                    input=self.messages,
+                    temperature=0.5,
+                    previous_response_id=self.prev_res_id
+                )
+
+                self.prev_res_id = response.id
+                self.prev_res_ids.append(response.id)
+
+                if self.first_res_id is None:
+                    self.first_res_id = response.id
+
+                hint = response.output[0].content[0].text
+                
+                return hint
             print(f"Error: {e}")
             print(f"Messages: {self.messages}")
             return {}
