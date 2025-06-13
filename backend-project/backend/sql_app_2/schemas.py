@@ -432,6 +432,9 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: Optional[str] = None
 
+class WSToken(BaseModel):
+    ws_token: str
+
 class ImageSimilarity(BaseModel):
     semantic_score_original: float
     semantic_score_interpreted: float

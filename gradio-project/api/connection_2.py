@@ -291,10 +291,27 @@ async def read_my_generations(request: Request, leaderboard_id: int = None):
 
 class Play_Round_WS:
 
+    async def get_ws_token(self, request: Request):
+        """
+        Get the websocket token from the backend
+        """
+        if hasattr(request, "session") and "token" in request.session:
+            url = f"{BACKEND_URL}ws_token"
+            response = await http_client.post(
+                url, 
+                auth=get_auth(request)
+            )
+            response.raise_for_status()
+            ws_token = response.json()
+            return ws_token['ws_token']
+        else:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+
     @classmethod
     async def create(cls, leaderboard_id, request: Request, program: str = "none"):
         instance = cls()
-        instance.url = f"{BACKEND_URL}ws/{leaderboard_id}?token={request.session['token']['access_token']}"
+
+        instance.url = f"{BACKEND_URL}ws/{leaderboard_id}?token={await instance.get_ws_token(request)}"
         instance._ws_context = aconnect_ws(instance.url, http_client)
         instance.ws = await instance._ws_context.__aenter__()
         instance.program = program

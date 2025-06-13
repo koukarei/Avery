@@ -13,6 +13,7 @@ from . import crud
 # openssl rand -hex 32
 import os
 SECRET_KEY = os.getenv("SECRET_KEY")
+SECRET_KEY_WS = os.getenv("SECRET_KEY_WS")
 ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 REFRESH_TOKEN_EXPIRE_MINUTES = int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES"))
@@ -66,4 +67,18 @@ def create_refresh_token(username: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=REFRESH_TOKEN_EXPIRE_MINUTES)
     to_encode = {"sub": username, "exp": expire}
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def create_ws_token(
+        data: dict,
+        expires_delta: Union[timedelta, None] = None
+):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY_WS, algorithm=ALGORITHM)
+
     return encoded_jwt

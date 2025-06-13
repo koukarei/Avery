@@ -13,7 +13,7 @@ from tasks import generateDescription2, generate_interpretation2, calculate_scor
 from .database import SessionLocal2, engine2
 
 from .dependencies import sentence, score, dictionary, openai_chatbot
-from .authentication import authenticate_user, authenticate_user_2, create_access_token, oauth2_scheme, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, REFRESH_TOKEN_EXPIRE_MINUTES, JWTError, jwt
+from .authentication import authenticate_user, authenticate_user_2, create_access_token, oauth2_scheme, SECRET_KEY, SECRET_KEY_WS, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, REFRESH_TOKEN_EXPIRE_MINUTES, JWTError, jwt, create_ws_token
 from util import *
 
 from typing import Tuple, List, Annotated, Optional, Union, Literal
@@ -134,7 +134,7 @@ async def get_current_user_ws(db: Annotated[Session, Depends(get_db)],token: str
     if token:
     #if username:
         try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            payload = jwt.decode(token, SECRET_KEY_WS, algorithms=[ALGORITHM])
             username: str = payload.get("sub")
             if username is None:
                 raise credentials_exception
@@ -197,7 +197,6 @@ async def login_for_access_token(
     
     return schemas.Token(access_token=access_token,refresh_token=refresh_token, token_type="bearer")
 
-
 @app.post("/lti/token",response_model=schemas.Token)
 async def login_for_access_token_lti(
     user: schemas.UserLti,
@@ -248,7 +247,29 @@ async def refresh_token(current_user: schemas.User = Security(get_current_user, 
             headers={"WWW-Authenticate": "Bearer",
                     "Current User":current_user.username},
         )
-    
+
+@app.post("/ws_token", response_model=schemas.WSToken)
+async def obtain_ws_token(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+):
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Login to obtain WebSocket token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not current_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Inactive user",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    ws_token = create_ws_token(
+        data={"sub": current_user.username},
+        expires_delta=timedelta(minutes=1)
+    )
+    return schemas.WSToken(ws_token=ws_token)
+
 @app.post("/users/", tags=["User"], response_model=schemas.User, status_code=201)
 async def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = crud.get_user_by_email(db, email=user.email)
