@@ -32,7 +32,7 @@ class Guidance:
         with gr.Row():
             self.chat=gr.Chatbot(
                 value=None,
-                label="Chat with Avery",
+                label="Averyとの対話",
                 show_copy_button=True,
                 elem_classes="chat",
                 height="600px",

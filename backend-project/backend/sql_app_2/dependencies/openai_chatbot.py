@@ -252,7 +252,7 @@ Every soldiers are exhausted and they are sleeping on the floor.
 
         user_prompt = """# 現状
 1. ユーザーの英作文（評価対象）：{user_sentence}
-2. 修正された英作文: {correct_sentence}
+2. システムが修正された英作文: {correct_sentence}
 3. 検出された文法の誤り: {grammar_errors}
 4. 検出されたスペルミス: {spelling_errors}
 5. 参考記述: {descriptions}""".format(

@@ -53,7 +53,7 @@ class Writing:
             with gr.Row():
                 self.ai_image=gr.Image(
                     None,
-                    label="AIが生成した画像",
+                    label="あなたの文章をもとに、AIが生成した画像",
                     interactive=False,
                     visible=False,
                 )

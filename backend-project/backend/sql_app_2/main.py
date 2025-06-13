@@ -1250,7 +1250,7 @@ async def round_websocket(
         db_message = crud.create_message(
             db=db,
             message=schemas.MessageBase(
-                content="画像はシステムにインポートされました。ヒントを求めることができます。",
+                content="画像を説明する際にヒントが使えます。下の『Averyへのメッセージ🤖』に質問したい内容を入力してくださいね！",
                 sender="assistant",
                 created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
                 is_hint=False
@@ -1434,7 +1434,7 @@ async def round_websocket(
 
                     messages = [
                         schemas.MessageBase(
-                            content="""回答をシステム入力しました。📝
+                            content="""回答を記録しました。📝
 あなたの回答（画像生成に参考された）: {}\n\n修正された回答：{}""".format(db_generation.sentence, db_generation.correct_sentence),
                             sender="assistant",
                             created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),

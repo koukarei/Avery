@@ -31,7 +31,7 @@ class Gallery:
         with gr.Column(elem_classes="gallery"):
             with gr.Row():
                 with gr.Column():
-                    self.gallery = gr.Gallery(None, label="Original", interactive=False)
+                    self.gallery = gr.Gallery(None, label="ギャラリー", interactive=False)
                 with gr.Column():
                     self.info = gr.Markdown(None, line_breaks=True)
                     self.submit_btn = gr.Button("始める", scale=0, interactive=False, link="/avery/go_to_writing")
@@ -164,7 +164,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         
         leaderboard_vocabularies = ""
         
-        info = f"## {select_leaderboard.title}{leaderboard_vocabularies}"
+        info = f"## 選択した画像：{select_leaderboard.title}{leaderboard_vocabularies}"
         if hasattr(request,"session") and isinstance(request.session, dict): 
             school_name = request.session.get("school", None)
         else:
