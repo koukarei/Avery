@@ -107,7 +107,6 @@ class UserProfileBase(BaseModel):
 
 class UserProfileOut(BaseModel):
     display_name: str
-    level:int
 
 class UserExp(BaseModel):
     level: int
@@ -474,3 +473,54 @@ class UserActionUpdate(BaseModel):
 
 class UserAction(UserActionBase):
     id: int
+
+
+# classes for analysis
+class UserAnalysis(BaseModel):
+    id: int
+    profiles: UserProfileOut
+
+class MistakeItemAnalysis(BaseModel):
+    extracted_text: str
+    explanation: str
+    correction: str
+
+class GenerationItemAnalysis(BaseModel):
+    id: int
+    user: Optional[UserAnalysis]=None
+    round_id: int
+    sentence: str
+    correct_sentence: str
+    mistakes: List[MistakeItemAnalysis] = []
+
+class WordCloudItemAnalysis(BaseModel):
+    id: int
+    word: str
+    frequency: float
+    color: str
+    generations: List[GenerationItemAnalysis] = []
+
+class ChatMessageAnalysis(BaseModel):
+    id: int
+    chat_id: int
+    sender: str
+    content: str
+    created_at: datetime.datetime
+
+class ChatWordCloudAnalysis(BaseModel):
+    id: int
+    word: str
+    frequency: float
+    color: str
+    chat_messages: List[ChatMessageAnalysis] = []
+
+class LeaderboardAnalysis(BaseModel):
+    id: int
+    title: str
+    story_extract: Optional[str] = None
+    published_at: datetime.datetime
+    descriptions: List[str] = []
+    mistake_word_cloud: List[WordCloudItemAnalysis] = []
+    writing_word_cloud: List[WordCloudItemAnalysis] = []
+    user_chat_word_clouds: List[ChatWordCloudAnalysis] = []
+    assistant_chat_word_clouds: List[ChatWordCloudAnalysis] = []

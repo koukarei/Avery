@@ -189,7 +189,7 @@ class Message(Base):
     chat_id = Column(Integer, ForeignKey("chats.id"))
     response_id = Column(String(100), nullable=True)
     content = Column(MEDIUMTEXT)
-    sender = Column(String(50), index=True)
+    sender = Column(String(50), index=True) # 'user' or 'assistant'
     created_at = Column(DateTime, default=datetime.datetime.now())
     is_hint = Column(Boolean, default=False)
     is_evaluation = Column(Boolean, default=False)
@@ -295,3 +295,101 @@ class User_Action(Base):
     sent_at = Column(DateTime, nullable=True)
     received_at = Column(DateTime, default=datetime.datetime.now())
     responded_at = Column(DateTime, nullable=True)
+
+
+# Analytics related models
+# These models are used to store items for vite app
+
+class MistakeWordCloudItem(Base):
+    __tablename__ = "mistake_word_cloud_items"
+
+    id = Column(Integer, primary_key=True)
+    word = Column(String(255), index=True)
+    frequency = Column(Float(precision=10), default=0)
+    color = Column(String(6), index=True)
+    word_cloud_id = Column(Integer, ForeignKey("word_clouds.id"))
+
+    word_cloud = relationship("WordCloud", back_populates="word_cloud_items")
+
+class MistakeWordCloudItemGeneration(Base):
+    __tablename__ = "mistake_word_cloud_item_generations"
+
+    generation_id = Column(Integer, ForeignKey("generations.id"), primary_key=True)
+    word_cloud_item_id = Column(Integer, ForeignKey("mistake_word_cloud_items.id"), primary_key=True)
+
+class WritingWordCloudItem(Base):
+    __tablename__ = "writing_word_cloud_items"
+
+    id = Column(Integer, primary_key=True)
+    word = Column(String(255), index=True)
+    frequency = Column(Float(precision=10), default=0)
+    color = Column(String(6), index=True)
+    word_cloud_id = Column(Integer, ForeignKey("word_clouds.id"))
+
+    word_cloud = relationship("WordCloud", back_populates="word_cloud_items")
+
+class WritingWordCloudItemGeneration(Base):
+    __tablename__ = "writing_word_cloud_item_generations"
+
+    generation_id = Column(Integer, ForeignKey("generations.id"), primary_key=True)
+    word_cloud_item_id = Column(Integer, ForeignKey("writing_word_cloud_items.id"), primary_key=True)
+
+class UserChatWordCloudItem(Base):
+    __tablename__ = "user_chat_word_cloud_items"
+
+    id = Column(Integer, primary_key=True)
+    word = Column(String(255), index=True)
+    frequency = Column(Float(precision=10), default=0)
+    color = Column(String(6), index=True)
+    word_cloud_id = Column(Integer, ForeignKey("word_clouds.id"))
+
+    word_cloud = relationship("WordCloud", back_populates="word_cloud_items")
+
+class UserChatWordCloudItemChat(Base):
+    __tablename__ = "user_chat_word_cloud_item_chats"
+
+    message_id = Column(Integer, ForeignKey("messages.id"), primary_key=True)
+    word_cloud_item_id = Column(Integer, ForeignKey("user_chat_word_cloud_items.id"), primary_key=True)
+
+class AssistantChatWordCloudItem(Base):
+    __tablename__ = "assistant_chat_word_cloud_items"
+
+    id = Column(Integer, primary_key=True)
+    word = Column(String(255), index=True)
+    frequency = Column(Float(precision=10), default=0)
+    color = Column(String(6), index=True)
+    word_cloud_id = Column(Integer, ForeignKey("word_clouds.id"))
+
+    word_cloud = relationship("WordCloud", back_populates="word_cloud_items")
+
+class AssistantChatWordCloudItemChat(Base):
+    __tablename__ = "assistant_chat_word_cloud_item_chats"
+
+    message_id = Column(Integer, ForeignKey("messages.id"), primary_key=True)
+    word_cloud_item_id = Column(Integer, ForeignKey("assistant_chat_word_cloud_items.id"), primary_key=True)
+
+class WordCloud(Base):
+    __tablename__ = "word_clouds"
+
+    id = Column(Integer, primary_key=True)
+    leaderboard_analysis_id = Column(Integer, ForeignKey("leaderboard_analysis.id"), nullable=True)
+    type = Column(String(50), index=True)  # 'mistake', 'writing', 'user_chat', 'assistant_chat'
+    word_cloud_items = relationship("WordCloudItem", back_populates="word_cloud")
+    last_updated = Column(DateTime, default=datetime.datetime.now())
+    latest_generation_id = Column(Integer)
+
+    leaderboard_analysis = relationship("Leaderboard_Analysis", back_populates="word_cloud")
+
+class Leaderboard_Analysis(Base):
+    __tablename__ = "leaderboard_analysis"
+
+    id = Column(Integer, primary_key=True)
+    program_id = Column(Integer, ForeignKey("programs.id"), nullable=True)
+    leaderboard_id = Column(Integer, ForeignKey("leaderboards.id"))
+    mistake_word_cloud_id = Column(Integer, ForeignKey("word_clouds.id"), nullable=True)
+    writing_word_cloud_id = Column(Integer, ForeignKey("word_clouds.id"), nullable=True)
+    user_chat_word_cloud_id = Column(Integer, ForeignKey("word_clouds.id"), nullable=True)
+    assistant_chat_word_cloud_id = Column(Integer, ForeignKey("word_clouds.id"), nullable=True)
+
+    leaderboard = relationship("Leaderboard", back_populates="analysis")
+    word_cloud = relationship("WordCloud", back_populates="leaderboard_analysis")
