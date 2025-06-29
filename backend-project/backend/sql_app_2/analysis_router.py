@@ -7,7 +7,7 @@ import pandas as pd
 from . import crud, schemas
 from .database import SessionLocal2, engine2
 
-from .dependencies import sentence, score, dictionary, openai_chatbot
+from .dependencies import wordcloud
 
 from typing import Tuple, List, Annotated, Optional, Union, Literal
 from datetime import timezone, timedelta
@@ -25,6 +25,30 @@ def get_db():
 router = APIRouter(
     prefix="/analysis",
 )
+
+@router.post("/test_frequency", tags=["analysis"])
+async def test_frequency(
+    text: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Test the frequency analysis of a given text.
+    """
+    if not text:
+        raise HTTPException(status_code=400, detail="Text is required")
+    
+    # translate text if necessary
+    translated_text = wordcloud.translate_text(text, target_lang='en')
+    
+    # Calculate frequency
+    frequency = wordcloud.cal_frequency(translated_text)
+    
+    return {
+        "target_lang": 'en',
+        "original_text": text,
+        "translated_text": translated_text,
+        "frequency": frequency
+    }
 
 @router.get("/generations", tags=["analysis"], response_model=list[Tuple[schemas.GenerationAnalysis, schemas.RoundAnalysis]])
 async def read_generations(

@@ -17,3 +17,6 @@ RUN apt-get update && \
     
 # Set environment variables
 ENV TOKENIZERS_PARALLELISM false
+
+# Download Spacy English model
+RUN python -m spacy download en_core_web_sm

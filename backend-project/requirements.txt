@@ -13,7 +13,7 @@ pillow
 numpy
 openai
 google-genai
-stanza
+spacy
 pytest
 langchain
 language-tool-python

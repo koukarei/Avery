@@ -15,3 +15,5 @@ RUN apt-get update && \
     apt-get install -y ant && \
     apt-get clean
     
+# Download Spacy English model
+RUN python -m spacy download en_core_web_sm
