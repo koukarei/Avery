@@ -690,7 +690,7 @@ async def create_leaderboards(
                 img_title = str(row['id']) + ' ' + index
             else:
                 img_title = index
-            img = images.get(util.remove_special_chars(img_title), None)
+            img = images.get(remove_special_chars(img_title), None)
 
             if img is None:
                 logger1.error(f"Image not found: {img_title}")
