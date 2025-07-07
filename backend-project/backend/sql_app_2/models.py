@@ -84,6 +84,7 @@ class Leaderboard(Base):
     scene = relationship("Scene", back_populates="leaderboards",foreign_keys=[scene_id])
     story = relationship("Story", back_populates="leaderboards",foreign_keys=[story_id])
     vocabularies = relationship("Vocabulary",secondary="leaderboard_vocabulary", back_populates="leaderboards")
+    analysis = relationship("Leaderboard_Analysis", back_populates="leaderboard")
 
     rounds = relationship("Round", back_populates="leaderboard")
     descriptions = relationship("Description", back_populates="leaderboard")
@@ -309,7 +310,7 @@ class MistakeWordCloudItem(Base):
     color = Column(String(6), index=True)
     word_cloud_id = Column(Integer, ForeignKey("word_clouds.id"))
 
-    word_cloud = relationship("WordCloud", back_populates="word_cloud_items")
+    word_cloud = relationship("WordCloud", back_populates="mistake_word_cloud_items")
 
 class MistakeWordCloudItemGeneration(Base):
     __tablename__ = "mistake_word_cloud_item_generations"
@@ -326,7 +327,7 @@ class WritingWordCloudItem(Base):
     color = Column(String(6), index=True)
     word_cloud_id = Column(Integer, ForeignKey("word_clouds.id"))
 
-    word_cloud = relationship("WordCloud", back_populates="word_cloud_items")
+    word_cloud = relationship("WordCloud", back_populates="writing_word_cloud_items")
 
 class WritingWordCloudItemGeneration(Base):
     __tablename__ = "writing_word_cloud_item_generations"
@@ -343,7 +344,7 @@ class UserChatWordCloudItem(Base):
     color = Column(String(6), index=True)
     word_cloud_id = Column(Integer, ForeignKey("word_clouds.id"))
 
-    word_cloud = relationship("WordCloud", back_populates="word_cloud_items")
+    word_cloud = relationship("WordCloud", back_populates="user_chat_word_cloud_items")
 
 class UserChatWordCloudItemChat(Base):
     __tablename__ = "user_chat_word_cloud_item_chats"
@@ -360,7 +361,7 @@ class AssistantChatWordCloudItem(Base):
     color = Column(String(6), index=True)
     word_cloud_id = Column(Integer, ForeignKey("word_clouds.id"))
 
-    word_cloud = relationship("WordCloud", back_populates="word_cloud_items")
+    word_cloud = relationship("WordCloud", back_populates="assistant_chat_word_cloud_items")
 
 class AssistantChatWordCloudItemChat(Base):
     __tablename__ = "assistant_chat_word_cloud_item_chats"
@@ -372,13 +373,14 @@ class WordCloud(Base):
     __tablename__ = "word_clouds"
 
     id = Column(Integer, primary_key=True)
-    leaderboard_analysis_id = Column(Integer, ForeignKey("leaderboard_analysis.id"), nullable=True)
-    type = Column(String(50), index=True)  # 'mistake', 'writing', 'user_chat', 'assistant_chat'
-    word_cloud_items = relationship("WordCloudItem", back_populates="word_cloud")
+
+    mistake_word_cloud_items = relationship("MistakeWordCloudItem", back_populates="word_cloud")
+    writing_word_cloud_items = relationship("WritingWordCloudItem", back_populates="word_cloud")
+    user_chat_word_cloud_items = relationship("UserChatWordCloudItem", back_populates="word_cloud")
+    assistant_chat_word_cloud_items = relationship("AssistantChatWordCloudItem", back_populates="word_cloud")
+    
     last_updated = Column(DateTime, default=datetime.datetime.now())
     latest_generation_id = Column(Integer)
-
-    leaderboard_analysis = relationship("Leaderboard_Analysis", back_populates="word_cloud")
 
 class Leaderboard_Analysis(Base):
     __tablename__ = "leaderboard_analysis"
@@ -386,10 +388,14 @@ class Leaderboard_Analysis(Base):
     id = Column(Integer, primary_key=True)
     program_id = Column(Integer, ForeignKey("programs.id"), nullable=True)
     leaderboard_id = Column(Integer, ForeignKey("leaderboards.id"))
-    mistake_word_cloud_id = Column(Integer, ForeignKey("word_clouds.id"), nullable=True)
-    writing_word_cloud_id = Column(Integer, ForeignKey("word_clouds.id"), nullable=True)
-    user_chat_word_cloud_id = Column(Integer, ForeignKey("word_clouds.id"), nullable=True)
-    assistant_chat_word_cloud_id = Column(Integer, ForeignKey("word_clouds.id"), nullable=True)
 
     leaderboard = relationship("Leaderboard", back_populates="analysis")
-    word_cloud = relationship("WordCloud", back_populates="leaderboard_analysis")
+
+class LeaderboardAnalysis_WordCloud(Base):
+    __tablename__ = "leaderboard_analysis_word_clouds"
+
+    leaderboard_analysis_id = Column(Integer, ForeignKey("leaderboard_analysis.id"), primary_key=True)
+    word_cloud_id = Column(Integer, ForeignKey("word_clouds.id"), primary_key=True)
+    type = Column(String(50), index=True)  # 'mistake', 'writing', 'user_chat', 'assistant_chat'
+    lang = Column(String(5), index=True)  # 'en', 'ja', etc.
+
