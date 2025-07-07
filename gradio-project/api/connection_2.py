@@ -329,7 +329,8 @@ class Play_Round_WS:
             # send text data to websocket
             await self.ws.send_text(text_data)
         except LocalProtocolError:
-            self.ws.close()
+            print("WebSocket connection closed, attempting to reconnect...")
+            self._ws_context.__aexit__(None, None, None)
             # reconnect to websocket
             self._ws_context = aconnect_ws(self.url, http_client)
             self.ws = await self._ws_context.__aenter__()
