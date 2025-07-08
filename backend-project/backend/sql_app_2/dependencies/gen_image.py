@@ -33,18 +33,19 @@ def gen_image(sentence,size="1024x1024",quality="standard",n=1):
 def get_image_gemini(prompt):
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
-    response = client.models.generate_content(
-        model="gemini-2.0-flash-exp-image-generation",
-        contents=prompt,
-        config=types.GenerateContentConfig(
-        response_modalities=['TEXT', 'IMAGE']
+    while True:
+        response = client.models.generate_content(
+            model="gemini-2.0-flash-exp-image-generation",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+            response_modalities=['TEXT', 'IMAGE']
+            )
         )
-    )
 
-    for part in response.candidates[0].content.parts:
-        if part.inline_data is not None:
-            image = Image.open(BytesIO((part.inline_data.data)))
-            return image
+        for part in response.candidates[0].content.parts:
+            if part.inline_data is not None:
+                image = Image.open(BytesIO((part.inline_data.data)))
+                return image
 
 def generate_interpretion(sentence, style="in the style of Japanese Anime", model="dall-e-3"):
     if model == "dall-e-3":
