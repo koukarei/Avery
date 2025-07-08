@@ -149,7 +149,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
     except Exception as e:
         RedirectResponse(url="/avery/")
 
-    avery_gradio.queue(max_size=128, default_concurrency_limit=50)
+    avery_gradio.queue(max_size=128, default_concurrency_limit=16)
 
     app = gr.mount_gradio_app(
         fastapi_app, 
