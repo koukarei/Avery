@@ -524,3 +524,30 @@ class LeaderboardAnalysis(BaseModel):
     writing_word_cloud: List[WordCloudItemAnalysis] = []
     user_chat_word_clouds: List[ChatWordCloudAnalysis] = []
     assistant_chat_word_clouds: List[ChatWordCloudAnalysis] = []
+
+# class for analysis - crud operations
+class WordCloudItemCreate(BaseModel):
+    word: str
+    frequency: float
+    color: str 
+
+class WordCloudCreate(BaseModel):
+    last_updated: datetime.datetime
+    latest_generation_id: int
+    items: List[WordCloudItemCreate] = []
+
+class WordCloudUpdate(BaseModel):
+    id: int
+    last_updated: Optional[datetime.datetime] = None
+    latest_generation_id: Optional[int] = None
+    items: List[WordCloudItemCreate] = []
+
+class LeaderboardAnalysisCreate(BaseModel):
+    program_id: int
+    leaderboard_id: int
+
+class LeaderboardAnalysis_WordCloudCreate(BaseModel):
+    leaderboard_analysis_id: int
+    word_cloud_id: int
+    type: str = "writing"  # or "mistake" or 'user_chat' or 'assistant_chat'
+    lang: str = "en"

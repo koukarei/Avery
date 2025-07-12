@@ -3,7 +3,7 @@ from sqlalchemy import or_, and_
 
 from . import models, schemas
 
-from typing import Union, Optional
+from typing import List, Optional, Literal
 import datetime
 
 from .authentication import get_password_hash
@@ -1029,3 +1029,318 @@ def read_user_action(
         return db.query(models.User_Action).filter(models.User_Action.action_type == action_type).offset(skip).limit(limit).all()
     else:
         return db.query(models.User_Action).offset(skip).limit(limit).all()
+    
+# CRUD operations for analytics
+def create_word_cloud(
+        db: Session,
+        cloud_type: Literal['mistake', 'writing', 'user_chat', 'assistant_chat'],
+        word_cloud: schemas.WordCloudCreate
+):
+    db_word_cloud = models.WordCloud(
+        latest_generation_id=word_cloud.latest_generation_id,
+        last_updated=word_cloud.last_updated,
+    )
+    db.add(db_word_cloud)
+    db.commit()
+    db.refresh(db_word_cloud)
+    if cloud_type == 'mistake':
+        for item in word_cloud.items:
+            db_word_cloud_item = models.MistakeWordCloudItem(
+                word=item.word,
+                frequency=item.frequency,
+                color=item.color,
+                word_cloud_id=db_word_cloud.id,
+            )
+            db.add(db_word_cloud_item)
+            db.commit()
+    elif cloud_type == 'writing':
+        for item in word_cloud.items:
+            db_word_cloud_item = models.WritingWordCloudItem(
+                word=item.word,
+                frequency=item.frequency,
+                color=item.color,
+                word_cloud_id=db_word_cloud.id,
+            )
+            db.add(db_word_cloud_item)
+            db.commit()
+    elif cloud_type == 'user_chat':
+        for item in word_cloud.items:
+            db_word_cloud_item = models.UserChatWordCloudItem(
+                word=item.word,
+                frequency=item.frequency,
+                color=item.color,
+                word_cloud_id=db_word_cloud.id,
+            )
+            db.add(db_word_cloud_item)
+            db.commit()
+    elif cloud_type == 'assistant_chat':
+        for item in word_cloud.items:
+            db_word_cloud_item = models.AssistantChatWordCloudItem(
+                word=item.word,
+                frequency=item.frequency,
+                color=item.color,
+                word_cloud_id=db_word_cloud.id,
+            )
+            db.add(db_word_cloud_item)
+            db.commit()
+    db.refresh(db_word_cloud)
+    return db_word_cloud
+
+def create_word_cloud_item_generation(
+        db: Session,
+        cloud_type: Literal['mistake', 'writing', 'user_chat', 'assistant_chat'],
+        word_cloud_item_id: int,
+        generation_or_message_id: int
+):
+    if cloud_type == 'mistake':
+        db_word_cloud_item_generation = models.MistakeWordCloudItemGeneration(
+            word_cloud_item_id=word_cloud_item_id,
+            generation_id=generation_or_message_id
+        )
+
+        db.add(db_word_cloud_item_generation)
+        db.commit()
+        db.refresh(db_word_cloud_item_generation)
+        return db_word_cloud_item_generation
+    elif cloud_type == 'writing':
+        db_word_cloud_item_generation = models.WritingWordCloudItemGeneration(
+            word_cloud_item_id=word_cloud_item_id,
+            generation_id=generation_or_message_id
+        )
+
+        db.add(db_word_cloud_item_generation)
+        db.commit()
+        db.refresh(db_word_cloud_item_generation)
+        return db_word_cloud_item_generation
+    elif cloud_type == 'user_chat':
+        db_word_cloud_item_generation = models.UserChatWordCloudItemChat(
+            word_cloud_item_id=word_cloud_item_id,
+            message_id=generation_or_message_id
+        )
+
+        db.add(db_word_cloud_item_generation)
+        db.commit()
+        db.refresh(db_word_cloud_item_generation)
+        return db_word_cloud_item_generation
+    elif cloud_type == 'assistant_chat':
+        db_word_cloud_item_generation = models.AssistantChatWordCloudItemChat(
+            word_cloud_item_id=word_cloud_item_id,
+            message_id=generation_or_message_id
+        )
+
+        db.add(db_word_cloud_item_generation)
+        db.commit()
+        db.refresh(db_word_cloud_item_generation)
+        return db_word_cloud_item_generation
+    return None
+
+def update_word_cloud(
+        db: Session,
+        cloud_type: Literal['mistake', 'writing', 'user_chat', 'assistant_chat'],
+        word_cloud: schemas.WordCloudUpdate
+):
+    db.bulk_update_mappings(models.WordCloud, [word_cloud.model_dump(exclude_none=True)])
+    db.commit()
+    db_word_cloud = db.query(models.WordCloud).filter(models.WordCloud.id == word_cloud.id).first()
+    
+    if cloud_type == 'mistake':
+        for item in word_cloud.items:
+            db_word_cloud_item = db.query(models.MistakeWordCloudItem).filter(models.MistakeWordCloudItem.word_cloud_id == word_cloud.id).\
+            filter(models.MistakeWordCloudItem.word == item.word).first()
+            if db_word_cloud_item is None:
+                db_word_cloud_item = models.MistakeWordCloudItem(
+                    word=item.word,
+                    frequency=item.frequency,
+                    color=item.color,
+                    word_cloud_id=db_word_cloud.id,
+                )
+                db.add(db_word_cloud_item)
+                db.commit()
+            else:
+                db_word_cloud_item.frequency = item.frequency
+                db_word_cloud_item.color = item.color
+                db.commit()
+    elif cloud_type == 'writing':
+        for item in word_cloud.items:
+            db_word_cloud_item = db.query(models.WritingWordCloudItem).filter(models.WritingWordCloudItem.word_cloud_id == word_cloud.id).\
+            filter(models.WritingWordCloudItem.word == item.word).first()
+            if db_word_cloud_item is None:
+                db_word_cloud_item = models.WritingWordCloudItem(
+                    word=item.word,
+                    frequency=item.frequency,
+                    color=item.color,
+                    word_cloud_id=db_word_cloud.id,
+                )
+                db.add(db_word_cloud_item)
+                db.commit()
+            else:
+                db_word_cloud_item.frequency = item.frequency
+                db_word_cloud_item.color = item.color
+                db.commit()
+    elif cloud_type == 'user_chat':
+        for item in word_cloud.items:
+            db_word_cloud_item = db.query(models.UserChatWordCloudItem).filter(models.UserChatWordCloudItem.word_cloud_id == word_cloud.id).\
+            filter(models.UserChatWordCloudItem.word == item.word).first()
+            if db_word_cloud_item is None:
+                db_word_cloud_item = models.UserChatWordCloudItem(
+                    word=item.word,
+                    frequency=item.frequency,
+                    color=item.color,
+                    word_cloud_id=db_word_cloud.id,
+                )
+                db.add(db_word_cloud_item)
+                db.commit()
+            else:
+                db_word_cloud_item.frequency = item.frequency
+                db_word_cloud_item.color = item.color
+                db.commit()
+    elif cloud_type == 'assistant_chat':
+        for item in word_cloud.items:
+            db_word_cloud_item = db.query(models.AssistantChatWordCloudItem).filter(models.AssistantChatWordCloudItem.word_cloud_id == word_cloud.id).\
+            filter(models.AssistantChatWordCloudItem.word == item.word).first()
+            if db_word_cloud_item is None:
+                db_word_cloud_item = models.AssistantChatWordCloudItem(
+                    word=item.word,
+                    frequency=item.frequency,
+                    color=item.color,
+                    word_cloud_id=db_word_cloud.id,
+                )
+                db.add(db_word_cloud_item)
+                db.commit()
+            else:
+                db_word_cloud_item.frequency = item.frequency
+                db_word_cloud_item.color = item.color
+                db.commit()
+    db.refresh(db_word_cloud)
+    return db_word_cloud
+
+def delete_word_cloud_item_generation(
+        db: Session,
+        cloud_type: Literal['mistake', 'writing', 'user_chat', 'assistant_chat'],
+        word_cloud_item_id: int,
+        generation_or_message_id: int
+):
+    if cloud_type == 'mistake':
+        db_word_cloud_item_generation = db.query(models.MistakeWordCloudItemGeneration).\
+            filter(models.MistakeWordCloudItemGeneration.word_cloud_item_id == word_cloud_item_id).\
+            filter(models.MistakeWordCloudItemGeneration.generation_id == generation_or_message_id).first()
+    elif cloud_type == 'writing':
+        db_word_cloud_item_generation = db.query(models.WritingWordCloudItemGeneration).\
+            filter(models.WritingWordCloudItemGeneration.word_cloud_item_id == word_cloud_item_id).\
+            filter(models.WritingWordCloudItemGeneration.generation_id == generation_or_message_id).first()
+    elif cloud_type == 'user_chat':
+        db_word_cloud_item_generation = db.query(models.UserChatWordCloudItemChat).\
+            filter(models.UserChatWordCloudItemChat.word_cloud_item_id == word_cloud_item_id).\
+            filter(models.UserChatWordCloudItemChat.message_id == generation_or_message_id).first()
+    elif cloud_type == 'assistant_chat':
+        db_word_cloud_item_generation = db.query(models.AssistantChatWordCloudItemChat).\
+            filter(models.AssistantChatWordCloudItemChat.word_cloud_item_id == word_cloud_item_id).\
+            filter(models.AssistantChatWordCloudItemChat.message_id == generation_or_message_id).first()
+        
+    if db_word_cloud_item_generation:
+        db.delete(db_word_cloud_item_generation)
+        db.commit()
+        return db_word_cloud_item_generation
+    
+def read_word_cloud(
+        db: Session,
+        id: int
+):
+    db_word_cloud = db.query(models.WordCloud).filter(models.WordCloud.id == id).first()
+    return db_word_cloud
+
+def create_leaderboard_analysis(
+        db: Session, 
+        leaderboard_analysis: schemas.LeaderboardAnalysisCreate
+):
+    db_leaderboard_analysis = models.Leaderboard_Analysis(
+        **leaderboard_analysis.model_dump()
+    )
+    db.add(db_leaderboard_analysis)
+    db.commit()
+    db.refresh(db_leaderboard_analysis)
+    return db_leaderboard_analysis
+
+def create_leaderboard_analysis_word_cloud(
+        db: Session, 
+        leaderboard_analysis_word_cloud: schemas.LeaderboardAnalysis_WordCloudCreate
+):
+    db_leaderboard_analysis_word_cloud = models.LeaderboardAnalysis_WordCloud(
+        **leaderboard_analysis_word_cloud.model_dump()
+    )
+    db.add(db_leaderboard_analysis_word_cloud)
+    db.commit()
+    db.refresh(db_leaderboard_analysis_word_cloud)
+    return db_leaderboard_analysis_word_cloud
+
+def read_leaderboard_analysis(
+        db: Session,
+        leaderboard_id: int,
+        program_id: Optional[int] = None,
+):
+    db_leaderboard_analysis = db.query(models.Leaderboard_Analysis).\
+        filter(models.Leaderboard_Analysis.leaderboard_id == leaderboard_id)
+    
+    if program_id:
+        db_leaderboard_analysis = db_leaderboard_analysis.filter(models.Leaderboard_Analysis.program_id == program_id)
+    
+    return db_leaderboard_analysis.all()
+
+def read_leaderboard_analysis_word_cloud(
+        db: Session,
+        leaderboard_analysis_id: int,
+        cloud_type: Optional[Literal['mistake', 'writing', 'user_chat', 'assistant_chat']] = 'mistake',
+        lang: Optional[str] = 'en',
+):
+    db_leaderboardanalysis_wordcloud = db.query(models.LeaderboardAnalysis_WordCloud).\
+        filter(models.LeaderboardAnalysis_WordCloud.leaderboard_analysis_id == leaderboard_analysis_id)
+    if cloud_type:
+        db_leaderboardanalysis_wordcloud = db_leaderboardanalysis_wordcloud.filter(models.LeaderboardAnalysis_WordCloud.type == cloud_type)
+    if lang:
+        db_leaderboardanalysis_wordcloud = db_leaderboardanalysis_wordcloud.filter(models.LeaderboardAnalysis_WordCloud.lang == lang)
+
+    return db_leaderboardanalysis_wordcloud.all()
+    
+
+def delete_word_cloud(
+        db: Session,
+        id: int
+):
+    db_word_cloud = db.query(models.WordCloud).filter(models.WordCloud.id == id).first()
+    if db_word_cloud is None:
+        return None
+    
+    # Delete all connections to leaderboard analysis word clouds
+    db_leaderboard_analysis_word_clouds = db.query(models.LeaderboardAnalysis_WordCloud).filter(models.LeaderboardAnalysis_WordCloud.word_cloud_id == id).delete(synchronize_session=False)
+    db.commit()
+
+    # Delete all word cloud items and their connections to generations or messages
+    cloud_type = db_word_cloud.type if db_word_cloud else None
+    if cloud_type == 'mistake':
+        db_word_cloud_items = db.query(models.MistakeWordCloudItem).filter(models.MistakeWordCloudItem.word_cloud_id == id)
+    elif cloud_type == 'writing':
+        db_word_cloud_items = db.query(models.WritingWordCloudItem).filter(models.WritingWordCloudItem.word_cloud_id == id)
+    elif cloud_type == 'user_chat':
+        db_word_cloud_items = db.query(models.UserChatWordCloudItem).filter(models.UserChatWordCloudItem.word_cloud_id == id)
+    elif cloud_type == 'assistant_chat':
+        db_word_cloud_items = db.query(models.AssistantChatWordCloudItem).filter(models.AssistantChatWordCloudItem.word_cloud_id == id)
+    
+    for db_word_cloud_item in db_word_cloud_items.all():
+        if cloud_type == 'mistake':
+            db_word_cloud_item_generations = db.query(models.MistakeWordCloudItemGeneration).filter(models.MistakeWordCloudItemGeneration.word_cloud_item_id == db_word_cloud_item.id).delete(synchronize_session=False)
+        elif cloud_type == 'writing':
+            db_word_cloud_item_generations = db.query(models.WritingWordCloudItemGeneration).filter(models.WritingWordCloudItemGeneration.word_cloud_item_id == db_word_cloud_item.id).delete(synchronize_session=False)
+        elif cloud_type == 'user_chat':
+            db_word_cloud_item_generations = db.query(models.UserChatWordCloudItemChat).filter(models.UserChatWordCloudItemChat.word_cloud_item_id == db_word_cloud_item.id).delete(synchronize_session=False)
+        elif cloud_type == 'assistant_chat':
+            db_word_cloud_item_generations = db.query(models.AssistantChatWordCloudItemChat).filter(models.AssistantChatWordCloudItemChat.word_cloud_item_id == db_word_cloud_item.id).delete(synchronize_session=False)
+    
+    db_word_cloud_items.delete(synchronize_session=False)
+    db.commit()
+
+    # Finally delete the word cloud itself
+    if db_word_cloud:
+        db.delete(db_word_cloud)
+        db.commit()
+    return db_word_cloud
+
