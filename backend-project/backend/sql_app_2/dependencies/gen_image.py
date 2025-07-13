@@ -6,7 +6,7 @@ from google.genai import types
 from PIL import Image
 from io import BytesIO
 import base64, os, requests
-from util import encode_image
+from util import encode_image, logger_image
 
 def save_image(url, filename):
     urllib.request.urlretrieve(url, filename)
@@ -41,9 +41,12 @@ def get_image_gemini(prompt):
             response_modalities=['TEXT', 'IMAGE']
             )
         )
-
+        logger_image.info(f"Response: {prompt}")
         for part in response.candidates[0].content.parts:
-            if part.inline_data is not None:
+            if part.text is not None:
+                logger_image.info(f"Text part: {part.text}")
+            elif part.inline_data is not None:
+                logger_image.info(f"Image part: {part.inline_data.mime_type}")
                 image = Image.open(BytesIO((part.inline_data.data)))
                 return image
 
