@@ -1572,7 +1572,16 @@ async def round_websocket(
                         logger1.info(f"Waiting for the task to finish... {chain_result.status}")
                         await websocket.send_json({"feedback": "waiting"})
                         await asyncio.sleep(3)
-                    
+                
+                if "IMG" in db_program.feedback and db_generation.interpreted_image is None:
+                    # If the interpreted image is not generated, log an error
+                    logger1.error(f"Interpreted image not found for generation {db_generation.id}")
+                    generate_interpretation2.delay(
+                        generation_id=db_generation.id,
+                        sentence=db_generation.sentence,
+                        at=db_generation.created_at,
+                    )
+
                 if "AWS" in db_program.feedback:
                     db_score = db_generation.score
                     if db_score is not None:
@@ -1762,7 +1771,7 @@ async def round_websocket(
                     },
                     "generation": {
                         "id": db_generation.id,
-                        "interpreted_image": db_generation.interpreted_image.image if 'IMG' in db_program.feedback else None,
+                        "interpreted_image": db_generation.interpreted_image.image if db_generation.interpreted_image else None,
                         "image_similarity": image_similarity,
                         "evaluation_msg": db_evaluate_msg.content if 'AWE' in db_program.feedback else None
                     }
