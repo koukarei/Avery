@@ -5,7 +5,7 @@ from google import genai
 from google.genai import types
 from PIL import Image
 from io import BytesIO
-import base64, os, requests
+import base64, os, requests, time
 from util import encode_image, logger_image
 
 def save_image(url, filename):
@@ -34,21 +34,30 @@ def get_image_gemini(prompt):
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
     while True:
-        response = client.models.generate_content(
-            model="gemini-2.0-flash-exp-image-generation",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-            response_modalities=['TEXT', 'IMAGE']
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.0-flash-exp-image-generation",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                response_modalities=['TEXT', 'IMAGE']
+                )
             )
-        )
-        logger_image.info(f"Response: {prompt}")
-        for part in response.candidates[0].content.parts:
-            if part.text is not None:
-                logger_image.info(f"Text part: {part.text}")
-            elif part.inline_data is not None:
-                logger_image.info(f"Image part: {part.inline_data.mime_type}")
-                image = Image.open(BytesIO((part.inline_data.data)))
-                return image
+            logger_image.info(f"Response: {prompt}")
+            for part in response.candidates[0].content.parts:
+                if part.text is not None:
+                    logger_image.info(f"Text part: {part.text}")
+                elif part.inline_data is not None:
+                    logger_image.info(f"Image part: {part.inline_data.mime_type}")
+                    image = Image.open(BytesIO((part.inline_data.data)))
+                    return image
+        # Catch 429 RESOURCE_EXHAUSTED error and retry
+        except genai.errors.APIError as e:
+            logger_image.error(f"Resource exhausted: {e}")
+            details = e.response.json().get('error', {}).get('details', [])
+            for detail in details:
+                if detail.get('@type') == 'type.googleapis.com/google.rpc.RetryInfo':
+                    retry_delay = detail.get('retryDelay')
+                    time.sleep(int(retry_delay.split('s')[0]))
 
 def generate_interpretion(sentence, style="in the style of Japanese Anime", model="dall-e-3"):
     if model == "dall-e-3":
