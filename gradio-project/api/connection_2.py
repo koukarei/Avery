@@ -4,13 +4,20 @@ from httpx_ws import aconnect_ws
 import gradio as gr
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import FastAPI, Request, Depends, status, HTTPException
+from websockets.exceptions import ConnectionClosed
 from typing import Annotated, Optional
 from PIL import Image as PILImage
 import io, datetime, time, zoneinfo
-from logging import getLogger
+from logging import getLogger, FileHandler, Formatter
 from wsproto.utilities import LocalProtocolError
 
+filehandler = FileHandler("logs/connection_2.log", mode="a", encoding=None, delay=False)
+filehandler.setFormatter(
+    Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+)
 logger = getLogger(__name__)
+logger.setLevel("DEBUG")
+logger.addHandler(filehandler)
 
 from api import models
 
@@ -307,48 +314,138 @@ class Play_Round_WS:
         else:
             raise HTTPException(status_code=401, detail="Not authenticated")
 
+    async def _connect(self):
+        """Internal method to establish WebSocket connection"""
+        try:
+            self._ws_context = aconnect_ws(self.url, http_client)
+            self.ws = await self._ws_context.__aenter__()
+            self._closed = False
+        except Exception as e:
+            logger.error(f"Failed to connect to WebSocket: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to connect to WebSocket"
+            )
+
+    async def _reconnect(self):
+        """Internal method to reconnect WebSocket"""
+        logger.info("Attempting to reconnect WebSocket...")
+        
+        # Close existing connection if any
+        await self._cleanup()
+        
+        # Establish new connection
+        await self._connect()
+        
+        # Resume if needed
+        if self.resume_round:
+            await self.ws.send_text(json.dumps(self.resume_round))
+            await self.ws.receive_text()
+
+    async def _cleanup(self):
+        """Clean up the WebSocket connection"""
+        if self._ws_context and not self._closed:
+            try:
+                await self._ws_context.__aexit__(None, None, None)
+            except Exception as e:
+                logger.warning(f"Error during WebSocket cleanup: {e}")
+            finally:
+                self._closed = True
+                self.ws = None
+                self._ws_context = None
+
     @classmethod
     async def create(cls, leaderboard_id, request: Request, program: str = "none"):
         instance = cls()
-
-        instance.url = f"{BACKEND_URL}ws/{leaderboard_id}?token={await instance.get_ws_token(request)}"
-        instance._ws_context = aconnect_ws(instance.url, http_client)
-        instance.ws = await instance._ws_context.__aenter__()
         instance.program = program
+
+        # Get WebSocket token
+        instance.url = f"{BACKEND_URL}ws/{leaderboard_id}?token={await instance.get_ws_token(request)}"
+        
+        # Connect to WebSocket
+        await instance._connect()
         return instance
         
     def __init__(self):
         self.ws = None
         self.program = None
         self.resume_round = None
+        self.url = None
+        self._ws_context = None
+        self._closed = False
 
     async def send_json(self, json_data):
+        """Send JSON data to WebSocket with automatic reconnection"""
+        if self._closed:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="WebSocket connection is closed"
+            )
+        
         # convert json to text
         text_data = json.dumps(json_data)
-        try:
-            # send text data to websocket
-            await self.ws.send_text(text_data)
-        except LocalProtocolError:
-            print("WebSocket connection closed, attempting to reconnect...")
-            self._ws_context.__aexit__(None, None, None)
-            # reconnect to websocket
-            self._ws_context = aconnect_ws(self.url, http_client)
-            self.ws = await self._ws_context.__aenter__()
-            
-            await self.ws.send_text(json.dumps(self.resume_round))
-            await self.ws.receive_text()
-
-            # resend the data
-            await self.ws.send_text(text_data)
+        max_retries = 3
+        retry_count = 0
+        while retry_count < max_retries:
+            try:
+                # send text data to websocket
+                await self.ws.send_text(text_data)
+                return
+            except (LocalProtocolError, ConnectionClosed) as e:
+                retry_count += 1
+                logger.warning(f"WebSocket send failed (attempt {retry_count}): {e}")
+                
+                if retry_count < max_retries:
+                    await self._reconnect()
+            except Exception as e:
+                logger.error(f"Error sending data to websocket: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Error sending data to websocket"
+                )
 
     async def receive_json(self):
-        # receive text data from websocket
-        text_data = await self.ws.receive_text()
+        """Receive JSON data from WebSocket with automatic reconnection"""
+        if self._closed:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="WebSocket connection is closed"
+            )
+        
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            try:
+                # receive text data from websocket
+                text_data = await self.ws.receive_text()
 
-        # convert text data to json
-        json_data = json.loads(text_data)
-
-        return json_data
+                # convert text data to json
+                json_data = json.loads(text_data)
+                return json_data
+            except (LocalProtocolError, ConnectionClosed) as e:
+                retry_count += 1
+                logger.warning(f"WebSocket receive failed (attempt {retry_count}): {e}")
+                
+                if retry_count < max_retries:
+                    await self._reconnect()
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Failed to receive data after multiple reconnection attempts"
+                    )
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON received from WebSocket: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Invalid JSON received from WebSocket"
+                )
+            except Exception as e:
+                logger.error(f"Unexpected error receiving WebSocket data: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Error receiving data from WebSocket"
+                )
 
     async def start_resume(self, new_round: models.RoundStart, resume: bool = False)-> models.Response:
         leaderboard_id = new_round.leaderboard_id
