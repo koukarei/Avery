@@ -266,7 +266,7 @@ async def obtain_ws_token(
         )
     ws_token = create_ws_token(
         data={"sub": current_user.username},
-        expires_delta=timedelta(minutes=1)
+        expires_delta=timedelta(seconds=7200)  # 2 hours
     )
     return schemas.WSToken(ws_token=ws_token)
 

@@ -96,8 +96,11 @@ with gr.Blocks(title="AVERY") as avery_gradio:
 
     async def initialize_interface(request: gr.Request):
         request = request.request
+        
         leaderboard_id = request.session.get('leaderboard_id', None)
         program = request.session.get('program', None)
+        if not leaderboard_id or not program:
+            raise gr.Error(f"セッションが正しく設定されていません。ページをリロードしてください。")
         play_round_ws = await Play_Round_WS.create(request=request, leaderboard_id=leaderboard_id, program=program)
 
         # Obtain original image

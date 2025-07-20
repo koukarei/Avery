@@ -13,7 +13,7 @@ from typing import Annotated
 import datetime, zoneinfo
 
 from api import models
-from api.connection_2 import *
+from api.connection_2 import http_client, Play_Round_WS, get_access_token_from_backend, get_access_token_from_backend_lti, create_user_lti, read_leaderboard
 
 from functools import wraps
 from typing import Dict, Optional

@@ -314,46 +314,6 @@ class Play_Round_WS:
         else:
             raise HTTPException(status_code=401, detail="Not authenticated")
 
-    async def _connect(self):
-        """Internal method to establish WebSocket connection"""
-        try:
-            self._ws_context = aconnect_ws(self.url, http_client)
-            self.ws = await self._ws_context.__aenter__()
-            self._closed = False
-        except Exception as e:
-            logger.error(f"Failed to connect to WebSocket: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to connect to WebSocket"
-            )
-
-    async def _reconnect(self):
-        """Internal method to reconnect WebSocket"""
-        logger.info("Attempting to reconnect WebSocket...")
-        
-        # Close existing connection if any
-        await self._cleanup()
-        
-        # Establish new connection
-        await self._connect()
-        
-        # Resume if needed
-        if self.resume_round:
-            await self.ws.send_text(json.dumps(self.resume_round))
-            await self.ws.receive_text()
-
-    async def _cleanup(self):
-        """Clean up the WebSocket connection"""
-        if self._ws_context and not self._closed:
-            try:
-                await self._ws_context.__aexit__(None, None, None)
-            except Exception as e:
-                logger.warning(f"Error during WebSocket cleanup: {e}")
-            finally:
-                self._closed = True
-                self.ws = None
-                self._ws_context = None
-
     @classmethod
     async def create(cls, leaderboard_id, request: Request, program: str = "none"):
         instance = cls()
@@ -362,8 +322,6 @@ class Play_Round_WS:
         # Get WebSocket token
         instance.url = f"{BACKEND_URL}ws/{leaderboard_id}?token={await instance.get_ws_token(request)}"
         
-        # Connect to WebSocket
-        await instance._connect()
         return instance
         
     def __init__(self):
@@ -376,11 +334,6 @@ class Play_Round_WS:
 
     async def send_json(self, json_data):
         """Send JSON data to WebSocket with automatic reconnection"""
-        if self._closed:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="WebSocket connection is closed"
-            )
         
         # convert json to text
         text_data = json.dumps(json_data)
@@ -391,12 +344,6 @@ class Play_Round_WS:
                 # send text data to websocket
                 await self.ws.send_text(text_data)
                 return
-            except (LocalProtocolError, ConnectionClosed) as e:
-                retry_count += 1
-                logger.warning(f"WebSocket send failed (attempt {retry_count}): {e}")
-                
-                if retry_count < max_retries:
-                    await self._reconnect()
             except Exception as e:
                 logger.error(f"Error sending data to websocket: {e}")
                 raise HTTPException(
@@ -406,11 +353,6 @@ class Play_Round_WS:
 
     async def receive_json(self):
         """Receive JSON data from WebSocket with automatic reconnection"""
-        if self._closed:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="WebSocket connection is closed"
-            )
         
         max_retries = 3
         retry_count = 0
@@ -423,17 +365,6 @@ class Play_Round_WS:
                 # convert text data to json
                 json_data = json.loads(text_data)
                 return json_data
-            except (LocalProtocolError, ConnectionClosed) as e:
-                retry_count += 1
-                logger.warning(f"WebSocket receive failed (attempt {retry_count}): {e}")
-                
-                if retry_count < max_retries:
-                    await self._reconnect()
-                else:
-                    raise HTTPException(
-                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail="Failed to receive data after multiple reconnection attempts"
-                    )
             except json.JSONDecodeError as e:
                 logger.error(f"Invalid JSON received from WebSocket: {e}")
                 raise HTTPException(
@@ -463,11 +394,14 @@ class Play_Round_WS:
                     "obj": convert_json(new_round),
                 }
             
-        await self.send_json(send_data)
-        send_data["action"] = "resume"
-        self.resume_round = send_data
-            
-        response = await self.receive_json()
+        async with aconnect_ws(
+            self.url
+        ) as self.ws:
+            await self.send_json(send_data)
+            send_data["action"] = "resume"
+            self.resume_round = send_data
+                
+            response = await self.receive_json()
 
         self.original_image = PILImage.open(
             io.BytesIO(
@@ -480,56 +414,77 @@ class Play_Round_WS:
         response = models.Response(**response)
         return response
     
-    async def send_message(self, new_message:models.MessageSend)-> models.Response:
+    async def resume(self):
         await self.send_json(
-            {
-                "action": "hint",
-                "program": self.program,
-                "obj": convert_json(new_message),
-            }
+            self.resume_round
         )
-        response = await self.receive_json()
+        await self.receive_json()
+        return
+
+    async def send_message(self, new_message:models.MessageSend)-> models.Response:
+        async with aconnect_ws(
+            self.url
+        ) as self.ws:
+            await self.resume()
+
+            await self.send_json(
+                {
+                    "action": "hint",
+                    "program": self.program,
+                    "obj": convert_json(new_message),
+                }
+            )
+            response = await self.receive_json()
         response = models.Response(**response)
         return response
     
     async def send_answer(self, new_generation: models.GenerationStart)-> models.Response:
-        await self.send_json(
-            {
-                "action": "submit",
-                "program": self.program,
-                "obj": convert_json(new_generation),
-            }
-        )
-        response = await self.receive_json()
+        async with aconnect_ws(
+            self.url
+        ) as self.ws:
+            await self.resume()
+            await self.send_json(
+                {
+                    "action": "submit",
+                    "program": self.program,
+                    "obj": convert_json(new_generation),
+                }
+            )
+            response = await self.receive_json()
         response = models.Response(**response)
         return response
     
     async def evaluate(self)-> models.Response:
-        await self.send_json(
-            {
-                "action": "evaluate",
-            }
-        )
-        while True:
-            response = await self.receive_json()
-            response = models.Response(**response)
-            if not(response.feedback and response.feedback=="waiting"):
-                break
+        async with aconnect_ws(
+            self.url
+        ) as self.ws:
+            await self.resume()
+            await self.send_json(
+                {
+                    "action": "evaluate",
+                }
+            )
+            while True:
+                response = await self.receive_json()
+                response = models.Response(**response)
+                if not(response.feedback and response.feedback=="waiting"):
+                    break
         return response
     
     async def end(self)-> models.Response:
-        await self.send_json(
-            {
-                "action": "end",
-            }
-        )
-        response = await self.receive_json()
+        async with aconnect_ws(
+            self.url
+        ) as self.ws:
+            await self.resume()
+            # send end action
+            await self.send_json(
+                {
+                    "action": "end",
+                }
+            )
+            response = await self.receive_json()
         response = models.Response(**response)
         return response
-
-    async def kill(self):
-        if hasattr(self, '_ws_context') and self._ws_context:
-            await self._ws_context.__aexit__(None, None, None)
             
 async def send_message(round_id: int, new_message:models.MessageSend, request: Request, ):
     json_data = convert_json(new_message)
