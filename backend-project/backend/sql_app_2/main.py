@@ -1546,10 +1546,7 @@ async def round_websocket(
                         "correct_sentence": db_generation.correct_sentence if status == 0 else None,
                     }
                 }
-
-            elif user_action["action"] == "evaluate" and (db_generation.correct_sentence is None or db_generation.correct_sentence == ""):
-                send_data = {}
-            elif user_action["action"] == "evaluate":
+                
                 if "IMG" in db_program.feedback or "AWS" in db_program.feedback:
                     while True:
                         db_generation = crud.get_generation(
@@ -1572,6 +1569,10 @@ async def round_websocket(
                         logger1.info(f"Waiting for the task to finish... {chain_result.status}")
                         await websocket.send_json({"feedback": "waiting"})
                         await asyncio.sleep(3)
+
+            elif user_action["action"] == "evaluate" and (db_generation.correct_sentence is None or db_generation.correct_sentence == ""):
+                send_data = {}
+            elif user_action["action"] == "evaluate":
                 
                 if "IMG" in db_program.feedback and db_generation.interpreted_image is None:
                     # If the interpreted image is not generated, log an error
