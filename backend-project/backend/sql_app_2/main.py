@@ -1458,13 +1458,13 @@ async def round_websocket(
                             ),
                         )
                         chain_result = chain_interpretation.apply_async()
-                    elif "IMG" in db_program.feedback:
-                        chain_interpretation = chain(
-                            group(
-                                generate_interpretation2.s(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at),
-                            )
-                        )
-                        chain_result = chain_interpretation.apply_async()
+                    # elif "IMG" in db_program.feedback:
+                    #     chain_interpretation = chain(
+                    #         group(
+                    #             generate_interpretation2.s(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at),
+                    #         )
+                    #     )
+                    #     chain_result = chain_interpretation.apply_async()
                     elif "AWS" in db_program.feedback:
                         chain_interpretation = chain(
                             group(
@@ -1546,29 +1546,29 @@ async def round_websocket(
                         "correct_sentence": db_generation.correct_sentence if status == 0 else None,
                     }
                 }
-                
-                if "IMG" in db_program.feedback or "AWS" in db_program.feedback:
-                    while True:
-                        db_generation = crud.get_generation(
-                            db=db,
-                            generation_id=db_generation.id
-                        )
-                        if db_generation.is_completed:
-                            break
-                        elif chain_result.failed():
-                            raise HTTPException(status_code=500, detail="Error in chain result")
-                        elif chain_result.successful():
-                            break
-                        elif ("AWS" in db_program.feedback and db_generation.score is not None) and ("IMG" in db_program.feedback and db_generation.interpreted_image is not None):
-                            break
-                        elif ("AWS" in db_program.feedback and db_generation.score is not None) and ("IMG" not in db_program.feedback):
-                            break
-                        elif ("AWS" not in db_program.feedback) and ("IMG" in db_program.feedback and db_generation.interpreted_image is not None):
-                            break
+
+                # if "IMG" in db_program.feedback or "AWS" in db_program.feedback:
+                #     while True:
+                #         db_generation = crud.get_generation(
+                #             db=db,
+                #             generation_id=db_generation.id
+                #         )
+                #         if db_generation.is_completed:
+                #             break
+                #         elif chain_result.failed():
+                #             raise HTTPException(status_code=500, detail="Error in chain result")
+                #         elif chain_result.successful():
+                #             break
+                #         elif ("AWS" in db_program.feedback and db_generation.score is not None) and ("IMG" in db_program.feedback and db_generation.interpreted_image is not None):
+                #             break
+                #         elif ("AWS" in db_program.feedback and db_generation.score is not None) and ("IMG" not in db_program.feedback):
+                #             break
+                #         elif ("AWS" not in db_program.feedback) and ("IMG" in db_program.feedback and db_generation.interpreted_image is not None):
+                #             break
                         
-                        logger1.info(f"Waiting for the task to finish... {chain_result.status}")
-                        await websocket.send_json({"feedback": "waiting"})
-                        await asyncio.sleep(3)
+                #         logger1.info(f"Waiting for the task to finish... {chain_result.status}")
+                #         await websocket.send_json({"feedback": "waiting"})
+                #         await asyncio.sleep(3)
 
             elif user_action["action"] == "evaluate" and (db_generation.correct_sentence is None or db_generation.correct_sentence == ""):
                 send_data = {}
