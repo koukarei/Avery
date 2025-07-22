@@ -1576,7 +1576,7 @@ async def round_websocket(
                 
                 if "IMG" in db_program.feedback and db_generation.interpreted_image is None:
                     # If the interpreted image is not generated, log an error
-                    logger1.error(f"Interpreted image not found for generation {db_generation.id}")
+                    #logger1.error(f"Interpreted image not found for generation {db_generation.id}")
                     generate_interpretation2.delay(
                         generation_id=db_generation.id,
                         sentence=db_generation.sentence,
@@ -1746,6 +1746,16 @@ async def round_websocket(
                         db=db,
                         generation=generation_com,
                     )
+
+                if "IMG" in db_program.feedback:
+                    while True:
+                        db_generation = crud.get_generation(
+                            db=db,
+                            generation_id=db_generation.id
+                        )
+                        if db_generation.interpreted_image is not None and db_generation.interpreted_image.image is not None:
+                            break
+                        logger1.info(f"Waiting for the interpreted image to be generated... {db_generation.id}")
 
                 # prepare data to send
                 send_data = {
