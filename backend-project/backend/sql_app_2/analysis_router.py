@@ -1,7 +1,7 @@
 import logging.config
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, responses, Security, status
 from sqlalchemy.orm import Session
-import time, os, datetime, shutil, tempfile, zipfile, zoneinfo, asyncio
+import time, os, datetime, shutil, tempfile, zipfile, zoneinfo, asyncio, re
 import pandas as pd
 
 from . import crud, schemas
@@ -712,3 +712,35 @@ async def get_word_cloud_items(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid cloud type"
         )
+
+@router.post("/word_cloud/{word_cloud_item_id}/color")
+async def update_word_cloud_item_color(
+        word_cloud_item_id: int,
+        color: str,
+        cloud_type: Literal['mistake', 'writing', 'user_chat', 'assistant_chat'],
+        db: Session
+):
+    """
+    Update the color of a word cloud item.
+    """
+
+    # check whether color is 6-character hex color code
+    hex_color_pattern = re.compile(r'^#?[0-9a-fA-F]{6}$')
+
+    check_color = hex_color_pattern.match(color)
+    if check_color:
+        # Remove leading '#' if present
+        color = color.lstrip('#')
+        
+        updated_word_cloud_item = crud.update_word_cloud_item_color(
+            db=db,
+            word_cloud_item_id=word_cloud_item_id,
+            color=color
+        )
+        
+        return updated_word_cloud_item
+    
+    return HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Invalid color format"
+    )

@@ -1414,3 +1414,28 @@ def delete_word_cloud(
         db.commit()
     return db_word_cloud
 
+def update_word_cloud_item_color(
+        db: Session,
+        cloud_type: Literal['mistake', 'writing', 'user_chat', 'assistant_chat'],
+        word_cloud_item_id: int,
+        color: str
+):
+    if cloud_type == 'mistake':
+        db_word_cloud_item = db.query(models.MistakeWordCloudItem).\
+            filter(models.MistakeWordCloudItem.id == word_cloud_item_id).first()
+    elif cloud_type == 'writing':
+        db_word_cloud_item = db.query(models.WritingWordCloudItem).\
+            filter(models.WritingWordCloudItem.id == word_cloud_item_id).first()
+    elif cloud_type == 'user_chat':
+        db_word_cloud_item = db.query(models.UserChatWordCloudItem).\
+            filter(models.UserChatWordCloudItem.id == word_cloud_item_id).first()
+    elif cloud_type == 'assistant_chat':
+        db_word_cloud_item = db.query(models.AssistantChatWordCloudItem).\
+            filter(models.AssistantChatWordCloudItem.id == word_cloud_item_id).first()
+        
+    if db_word_cloud_item:
+        db_word_cloud_item.color = color
+        db.commit()
+        db.refresh(db_word_cloud_item)
+        return db_word_cloud_item
+    return None
