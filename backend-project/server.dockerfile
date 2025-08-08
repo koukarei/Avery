@@ -17,3 +17,6 @@ RUN apt-get update && \
     
 # Download Spacy English model
 RUN python -m spacy download en_core_web_sm
+
+# Download Spacy Japanese model
+RUN python -m spacy download ja_core_news_sm

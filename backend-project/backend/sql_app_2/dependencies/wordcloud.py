@@ -11,20 +11,39 @@ def detect_lang(text: str) -> str:
         return 'Unknown'
     
 def translate_text(text: str, target_lang: str = 'en') -> str:
+    if text is None or text.strip() == "":
+        return ""
     if detect_lang(text) == target_lang:
         return text
     client=OpenAI()
-    response = client.chat.completions.create(
-        model="gpt-4.1-nano-2025-04-14",
-        messages=[
-            {"role": "system", "content": f"Translate the following text to {target_lang}."},
-            {"role": "user", "content": text}
-        ]
-    )
+    if target_lang not in ['en', 'ja']:
+        raise ValueError("Target language must be either 'en' or 'ja'")
+    
+    if target_lang == 'en':
+        response = client.chat.completions.create(
+            model="gpt-4.1-nano-2025-04-14",
+            messages=[
+                {"role": "system", "content": f"Translate the following text to English."},
+                {"role": "user", "content": text}
+            ]
+        )
+    elif target_lang == 'ja':
+        response = client.chat.completions.create(
+            model="gpt-4.1-nano-2025-04-14",
+            messages=[
+                {"role": "system", "content": f"以下の内容を日本語に翻訳してください。"},
+                {"role": "user", "content": text}
+            ]
+        )
     return response.choices[0].message.content.strip()
 
-def cal_frequency(text: str) -> dict:
-    nlp = spacy.load("en_core_web_sm")
+def cal_frequency(text: str, lang: str = 'en') -> dict:
+    if lang not in ['en', 'ja']:
+        raise ValueError("Language must be either 'en' or 'ja'")
+    if lang == 'ja':
+        nlp = spacy.load("ja_core_news_sm")
+    else:
+        nlp = spacy.load("en_core_web_sm")
     doc = nlp(text)
     frequency = {}
     

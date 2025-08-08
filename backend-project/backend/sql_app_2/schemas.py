@@ -520,16 +520,16 @@ class LeaderboardAnalysis(BaseModel):
     story_extract: Optional[str] = None
     published_at: datetime.datetime
     descriptions: List[str] = []
-    mistake_word_cloud: List[WordCloudItemAnalysis] = []
-    writing_word_cloud: List[WordCloudItemAnalysis] = []
-    user_chat_word_clouds: List[ChatWordCloudAnalysis] = []
-    assistant_chat_word_clouds: List[ChatWordCloudAnalysis] = []
+    mistake_word_cloud_id: Optional[int] = None
+    writing_word_cloud_id: Optional[int] = None
+    user_chat_word_cloud_id: Optional[int] = None
+    assistant_chat_word_cloud_id: Optional[int] = None
 
 # class for analysis - crud operations
 class WordCloudItemCreate(BaseModel):
     word: str
     frequency: float
-    color: str 
+    color: Optional[str] = None
 
 class WordCloudCreate(BaseModel):
     last_updated: datetime.datetime

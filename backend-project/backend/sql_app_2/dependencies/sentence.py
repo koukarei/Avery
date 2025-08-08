@@ -20,6 +20,8 @@ class Passage(BaseModel):
    spelling_mistakes: list[SpellingMistake]
    grammar_mistakes: list[GrammarMistake]
 
+def str_to_list(s: str):
+   return eval(s)
 
 def generateSentence(base64_image,story: str=None, model_name="gpt-4o"):
   
