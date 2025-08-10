@@ -718,7 +718,7 @@ async def update_word_cloud_item_color(
         word_cloud_item_id: int,
         color: str,
         cloud_type: Literal['mistake', 'writing', 'user_chat', 'assistant_chat'],
-        db: Session
+        db: Session = Depends(get_db)
 ):
     """
     Update the color of a word cloud item.
