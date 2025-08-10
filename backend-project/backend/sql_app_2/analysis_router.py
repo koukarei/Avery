@@ -574,8 +574,8 @@ async def get_word_cloud_items(
                         ]+
                         [
                             schemas.MistakeItemAnalysis(
-                                extracted_text=mistake['word'],
-                                correction=mistake['correction'],
+                                extracted_text=mistake.word,
+                                correction=mistake.correction,
                                 explanation=''
                             ) for mistake in sentence.str_to_list(gen.spelling_errors)
                         ]
