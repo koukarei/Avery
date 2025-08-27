@@ -22,6 +22,13 @@ from contextlib import asynccontextmanager
 from celery import chain, group
 import logging
 
+from fastapi.middleware.cors import CORSMiddleware
+
+origins = [
+    "http://localhost:3000",
+    "http://localhost:5173"
+]
+
 models.Base.metadata.create_all(bind=engine2)
 # Define the directory where the images will be stored
 media_dir = Path(os.getenv("MEDIA_DIR", "/static"))
@@ -38,6 +45,14 @@ def get_db():
 app = FastAPI(
     debug=True,
     title="AVERY",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(analysis_router.router)
@@ -365,6 +380,11 @@ async def update_user(
     )
     return crud.update_user(db=db, user=user)
 
+@app.get("/users/me", tags=["User"], response_model=schemas.User)
+async def read_user_me(current_user: Annotated[schemas.User, Depends(get_current_user)], db: Session = Depends(get_db)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to read user")
+    return current_user
 
 @app.get("/users/", tags=["User"], response_model=list[schemas.User])
 async def read_users(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
@@ -2214,7 +2234,7 @@ async def get_original_image(
     )
     return responses.Response(
         content=imgdata,
-        media_type="image/jpeg"  # Adjust this based on your image type (jpeg, png, etc.)
+        media_type="image/png"  # Adjust this based on your image type (jpeg, png, etc.)
     )
     
 @app.get("/interpreted_image/{generation_id}", tags=["Image"])

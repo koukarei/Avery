@@ -400,6 +400,7 @@ class GoodRound(BaseModel):
 
 class LeaderboardOut(LeaderboardBase):
     id: int
+    title: str
     original_image: Optional[IdOnly]=None
     scene: Scene
     story: Optional[Story]=None
