@@ -298,7 +298,7 @@ async def obtain_ws_token(
         )
     ws_token = create_ws_token(
         data={"sub": current_user.username},
-        expires_delta=timedelta(minutes=1)
+        expires_delta=timedelta(seconds=7200)  # 2 hours
     )
     return schemas.WSToken(ws_token=ws_token)
 
@@ -727,7 +727,7 @@ async def create_leaderboards(
                 img_title = str(row['id']) + ' ' + index
             else:
                 img_title = index
-            img = images.get(util.remove_special_chars(img_title), None)
+            img = images.get(remove_special_chars(img_title), None)
 
             if img is None:
                 logger1.error(f"Image not found: {img_title}")
@@ -1495,13 +1495,13 @@ async def round_websocket(
                             ),
                         )
                         chain_result = chain_interpretation.apply_async()
-                    elif "IMG" in db_program.feedback:
-                        chain_interpretation = chain(
-                            group(
-                                generate_interpretation2.s(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at),
-                            )
-                        )
-                        chain_result = chain_interpretation.apply_async()
+                    # elif "IMG" in db_program.feedback:
+                    #     chain_interpretation = chain(
+                    #         group(
+                    #             generate_interpretation2.s(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at),
+                    #         )
+                    #     )
+                    #     chain_result = chain_interpretation.apply_async()
                     elif "AWS" in db_program.feedback:
                         chain_interpretation = chain(
                             group(
@@ -1584,32 +1584,38 @@ async def round_websocket(
                     }
                 }
 
+                # if "IMG" in db_program.feedback or "AWS" in db_program.feedback:
+                #     while True:
+                #         db_generation = crud.get_generation(
+                #             db=db,
+                #             generation_id=db_generation.id
+                #         )
+                #         if db_generation.is_completed:
+                #             break
+                #         elif chain_result.failed():
+                #             raise HTTPException(status_code=500, detail="Error in chain result")
+                #         elif chain_result.successful():
+                #             break
+                #         elif ("AWS" in db_program.feedback and db_generation.score is not None) and ("IMG" in db_program.feedback and db_generation.interpreted_image is not None):
+                #             break
+                #         elif ("AWS" in db_program.feedback and db_generation.score is not None) and ("IMG" not in db_program.feedback):
+                #             break
+                #         elif ("AWS" not in db_program.feedback) and ("IMG" in db_program.feedback and db_generation.interpreted_image is not None):
+                #             break
+                        
+                #         logger1.info(f"Waiting for the task to finish... {chain_result.status}")
+                #         await websocket.send_json({"feedback": "waiting"})
+                #         await asyncio.sleep(3)
+
             elif user_action["action"] == "evaluate" and (db_generation.correct_sentence is None or db_generation.correct_sentence == ""):
                 send_data = {}
             elif user_action["action"] == "evaluate":
-                if "IMG" in db_program.feedback or "AWS" in db_program.feedback:
-                    while True:
-                        db_generation = crud.get_generation(
-                            db=db,
-                            generation_id=db_generation.id
-                        )
-                        if db_generation.is_completed:
-                            break
-                        elif chain_result.failed():
-                            raise HTTPException(status_code=500, detail="Error in chain result")
-                        elif chain_result.successful():
-                            break
-                        elif ("AWS" in db_program.feedback and db_generation.score is not None) and ("IMG" in db_program.feedback and db_generation.interpreted_image is not None):
-                            break
-                        elif ("AWS" in db_program.feedback and db_generation.score is not None) and ("IMG" not in db_program.feedback):
-                            break
-                        elif ("AWS" not in db_program.feedback) and ("IMG" in db_program.feedback and db_generation.interpreted_image is not None):
-                            break
-                        
-                        logger1.info(f"Waiting for the task to finish... {chain_result.status}")
-                        await websocket.send_json({"feedback": "waiting"})
-                        await asyncio.sleep(3)
-                    
+                
+                if "IMG" in db_program.feedback and db_generation.interpreted_image is None:
+                    # If the interpreted image is not generated, log an error
+                    #logger1.error(f"Interpreted image not found for generation {db_generation.id}")
+                    generate_interpretation2(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at)
+
                 if "AWS" in db_program.feedback:
                     db_score = db_generation.score
                     if db_score is not None:
@@ -1799,7 +1805,7 @@ async def round_websocket(
                     },
                     "generation": {
                         "id": db_generation.id,
-                        "interpreted_image": db_generation.interpreted_image.image if 'IMG' in db_program.feedback else None,
+                        "interpreted_image": db_generation.interpreted_image.image if db_generation.interpreted_image else None,
                         "image_similarity": image_similarity,
                         "evaluation_msg": db_evaluate_msg.content if 'AWE' in db_program.feedback else None
                     }

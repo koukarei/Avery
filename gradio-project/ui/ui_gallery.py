@@ -41,7 +41,7 @@ class Gallery:
                 self.delete_btn = gr.Button("削除", scale=0, visible=False)
                 self.published_at = gr.DateTime(include_time=False, label="公開日", visible=False)
                 self.is_public = gr.Checkbox("is_public", label="公開", visible=False)
-                self.school_group = gr.CheckboxGroup(["saikyo", "lms", "tom","tomsec"], label="学校", info="Which school can access this leaderboard?", visible=False)
+                self.school_group = gr.CheckboxGroup(["saikyo", "lms", "tom","tomsec","newleaf"], label="学校", info="Which school can access this leaderboard?", visible=False)
                 self.word = gr.Textbox(label="word", placeholder="word", visible=False)
                 self.pos = gr.Textbox(label="pos", placeholder="pos", visible=False)
                 self.meaning = gr.Textbox(label="meaning", placeholder="meaning", visible=False)
@@ -149,7 +149,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
     except Exception as e:
         RedirectResponse(url="/avery/")
 
-    avery_gradio.queue(max_size=128, default_concurrency_limit=50)
+    avery_gradio.queue(max_size=128, default_concurrency_limit=16)
 
     app = gr.mount_gradio_app(
         fastapi_app, 

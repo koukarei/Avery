@@ -156,12 +156,24 @@ Avery、ロボット（ディズニーのベイマックスのように話すキ
         
         except Exception as e:
             if 'Previous response with id' in str(e):
+                messages = [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_image",
+                                "image_url": f"data:image/jpeg;base64,{base64_image}"
+                            }
+                        ]
+                    }
+                ]
+                messages.extend(self.messages)
+
                 response = self.client.responses.create(
                     model=self.model_name,
                     instructions=self.system_prompt,
-                    input=self.messages,
+                    input=messages,
                     temperature=0.5,
-                    previous_response_id=self.prev_res_id
                 )
 
                 self.prev_res_id = response.id

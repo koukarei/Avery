@@ -13,7 +13,7 @@ from typing import Annotated
 import datetime, zoneinfo
 
 from api import models
-from api.connection_2 import *
+from api.connection_2 import http_client, Play_Round_WS, get_access_token_from_backend, get_access_token_from_backend_lti, create_user_lti, read_leaderboard
 
 from functools import wraps
 from typing import Dict, Optional
@@ -176,6 +176,8 @@ async def lti_login(request: Request):
             school = "tom"
         elif oauth_consumer_key == "tomsec_consumer_key":
             school = "tomsec"
+        elif oauth_consumer_key == "newleaf_consumer_key":
+            school = "newleaf"
 
         if "instructor" in form_data.get('roles', '').lower():
             role = "instructor"
@@ -236,6 +238,8 @@ async def logout(request: Request):
         return RedirectResponse(url='https://dev.leaf.ederc.jp/moodle/course/view.php?id=7')
     elif school == "tomsec":
         return RedirectResponse(url='https://dev.leaf.ederc.jp/moodle/course/view.php?id=8')
+    elif school == "newleaf":
+        return RedirectResponse(url='https://newleaf.let.media.kyoto-u.ac.jp/moodle/course/view.php?id=2')
     else:
         return RedirectResponse(url='/avery/login')
 

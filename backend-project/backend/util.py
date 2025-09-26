@@ -92,6 +92,15 @@ logger1 = logging.getLogger(
 logger1.setLevel(logging.INFO)
 logger1.addHandler(file_handler)
 
+logger_image = logging.getLogger(
+    "image_logger"
+)
+
+image_handler = logging.FileHandler("logs/image_generation.log", mode="a", encoding=None, delay=False)
+image_handler.setFormatter(formatter)
+logger_image.setLevel(logging.INFO)
+logger_image.addHandler(image_handler)
+
 def remove_special_chars(text):
     cleaned_text = re.sub(r'[^\w\s]', '', text)
     return cleaned_text
