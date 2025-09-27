@@ -3,7 +3,7 @@ from sqlalchemy import or_, and_
 
 from . import models, schemas
 
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Union
 import datetime
 
 from .authentication import get_password_hash
@@ -205,7 +205,7 @@ def create_leaderboard(
 
 def update_leaderboard(
         db: Session,
-        leaderboard: schemas.LeaderboardUpdate
+        leaderboard: Union[schemas.LeaderboardUpdate , schemas.LeaderboardUpdateInternal]
 ):
     db_leaderboard = db.query(models.Leaderboard).filter(models.Leaderboard.id == leaderboard.id).first()
     if db_leaderboard is None:
@@ -272,7 +272,7 @@ def update_leaderboard(
                 db.add(db_vocab)
                 db.commit()
 
-    if leaderboard.response_id is not None:
+    if type(leaderboard) is schemas.LeaderboardUpdateInternal and leaderboard.response_id is not None:
         db_leaderboard.response_id = leaderboard.response_id
         db.commit()
         db.refresh(db_leaderboard)

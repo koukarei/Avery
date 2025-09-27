@@ -453,6 +453,8 @@ class LeaderboardUpdate(BaseModel):
     title: Optional[str]=None
     school: list[str]=[]
     vocabularies: list[VocabularyBase]=[]
+
+class LeaderboardUpdateInternal(LeaderboardUpdate):
     response_id: Optional[str]=None
 
 class Task(BaseModel):

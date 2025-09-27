@@ -78,7 +78,7 @@ def generateDescription2(
         
         db_leaderboard = crud2.update_leaderboard(
             db=db,
-            leaderboard=schemas2.LeaderboardUpdate(
+            leaderboard=schemas2.LeaderboardUpdateInternal(
                 id=leaderboard_id,
                 response_id=response_id,
             )
