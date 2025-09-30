@@ -214,10 +214,33 @@ def update_leaderboard(
         db_leaderboard.is_public = leaderboard.is_public
     if leaderboard.published_at is not None:
         db_leaderboard.published_at = leaderboard.published_at
-    
+    if leaderboard.title is not None:
+        db_leaderboard.title = leaderboard.title
+    if leaderboard.story_extract is not None:
+        db_leaderboard.story_extract = leaderboard.story_extract
+    if leaderboard.scene_id is not None:
+        db_leaderboard.scene_id = leaderboard.scene_id
+    if leaderboard.story_id is not None:
+        db_leaderboard.story_id = leaderboard.story_id
+        
     db.commit()
     db.refresh(db_leaderboard)
 
+    if type(leaderboard) is schemas.LeaderboardUpdateInternal and leaderboard.response_id is not None:
+        db_leaderboard.response_id = leaderboard.response_id
+        db.commit()
+        db.refresh(db_leaderboard)
+    
+    return db_leaderboard
+
+def add_leaderboard_school(
+        db: Session,
+        leaderboard: schemas.LeaderboardUpdate
+):
+    db_leaderboard = db.query(models.Leaderboard).filter(models.Leaderboard.id == leaderboard.id).first()
+    if db_leaderboard is None:
+        raise ValueError("Leaderboard not found")
+    
     school = leaderboard.school
     db_schools = db.query(models.School_Leaderboard).filter(models.School_Leaderboard.leaderboard_id == db_leaderboard.id).all()
 
@@ -231,53 +254,107 @@ def update_leaderboard(
                 )
                 db.add(db_school)
                 db.commit()
+    
+    return db_leaderboard
+
+def remove_leaderboard_school(
+        db: Session,
+        leaderboard: schemas.LeaderboardUpdate
+):
+    db_leaderboard = db.query(models.Leaderboard).filter(models.Leaderboard.id == leaderboard.id).first()
+    if db_leaderboard is None:
+        raise ValueError("Leaderboard not found")
+    
+    school = leaderboard.school
+    db_schools = db.query(models.School_Leaderboard).filter(models.School_Leaderboard.leaderboard_id == db_leaderboard.id).all()
+
+    if len(db_schools) != len(school):
         for db_school in db_schools:
             if db_school.school not in school:
                 db.delete(db_school)
                 db.commit()
     
-    if leaderboard.vocabularies:
-        for vocab in leaderboard.vocabularies:
-            
-            db_vocab = db.query(
-                models.Vocabulary
-            ).filter(
-                models.Vocabulary.word == vocab.word
-            ).filter(
-                models.Vocabulary.pos == vocab.pos
-            ).first()
-            if db_vocab is None:
-                db_vocab = models.Vocabulary(
-                    word=vocab.word,
-                    meaning=vocab.meaning,
-                    pos=vocab.pos
-                )
-                db.add(db_vocab)
-                db.commit()
-                db.refresh(db_vocab)
+    return db_leaderboard
 
-            db_vocab = db.query(
-                models.LeaderboardVocabulary
-            ).filter(
-                models.LeaderboardVocabulary.leaderboard_id == db_leaderboard.id
-            ).filter(
-                models.LeaderboardVocabulary.vocabulary_id == db_vocab.id
-            ).first()
 
-            if db_vocab is None:
-                db_vocab = models.LeaderboardVocabulary(
-                    leaderboard_id=db_leaderboard.id,
-                    vocabulary_id=db_vocab.id
-                )
-                db.add(db_vocab)
-                db.commit()
 
-    if type(leaderboard) is schemas.LeaderboardUpdateInternal and leaderboard.response_id is not None:
-        db_leaderboard.response_id = leaderboard.response_id
+def add_leaderboard_vocab(
+        db: Session,
+        leaderboard_id: int,
+        vocab: schemas.VocabularyBase
+):
+    db_leaderboard = db.query(models.Leaderboard).filter(models.Leaderboard.id == leaderboard_id).first()
+    if db_leaderboard is None:
+        raise ValueError("Leaderboard not found")
+    
+    db_vocab = db.query(
+        models.Vocabulary
+    ).filter(
+        models.Vocabulary.word == vocab.word
+    ).filter(
+        models.Vocabulary.pos == vocab.pos
+    ).first()
+    if db_vocab is None:
+        db_vocab = models.Vocabulary(
+            word=vocab.word,
+            meaning=vocab.meaning,
+            pos=vocab.pos
+        )
+        db.add(db_vocab)
         db.commit()
-        db.refresh(db_leaderboard)
+        db.refresh(db_vocab)
+
+    db_vocab = db.query(
+        models.LeaderboardVocabulary
+    ).filter(
+        models.LeaderboardVocabulary.leaderboard_id == db_leaderboard.id
+    ).filter(
+        models.LeaderboardVocabulary.vocabulary_id == db_vocab.id
+    ).first()
+
+    if db_vocab is None:
+        db_vocab = models.LeaderboardVocabulary(
+            leaderboard_id=db_leaderboard.id,
+            vocabulary_id=db_vocab.id
+        )
+        db.add(db_vocab)
+        db.commit()
     
     return db_leaderboard
+
+def remove_leaderboard_vocab(
+        db: Session,
+        leaderboard_id: int,
+        vocab_id: int
+):
+    db_leaderboard = db.query(models.Leaderboard).filter(models.Leaderboard.id == leaderboard_id).first()
+    if db_leaderboard is None:
+        raise ValueError("Leaderboard not found")
+    
+    db_vocab = db.query(
+        models.Vocabulary
+    ).filter(
+        models.Vocabulary.id == vocab_id
+    ).first()
+    if db_vocab is None:
+        raise ValueError("Vocabulary not found")
+
+    db_vocab = db.query(
+        models.LeaderboardVocabulary
+    ).filter(
+        models.LeaderboardVocabulary.leaderboard_id == db_leaderboard.id
+    ).filter(
+        models.LeaderboardVocabulary.vocabulary_id == db_vocab.id
+    ).first()
+
+    if db_vocab is None:
+        raise ValueError("Vocabulary not found in leaderboard")
+    
+    db.delete(db_vocab)
+    db.commit()
+
+    return db_leaderboard
+    
 
 def update_leaderboard_difficulty(
         db: Session,

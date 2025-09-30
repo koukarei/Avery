@@ -601,6 +601,8 @@ async def create_leaderboard(
         story=story, 
         model_name="gpt-4o-mini"
     )
+    if current_user.school:
+        crud.add_leaderboard_school(db=db, leaderboard=schemas.LeaderboardUpdate(id=result.id, school=[current_user.school]))
 
     crud.create_task(
         db=db,
@@ -609,6 +611,8 @@ async def create_leaderboard(
             leaderboard_id=result.id,
         )
     )
+
+
     
     crud.create_user_action(
         db=db,
@@ -911,8 +915,8 @@ async def update_leaderboard(
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to update leaderboard")
-    if not current_user.is_admin:
-        raise HTTPException(status_code=401, detail="You are not an admin")
+    if not current_user.user_type == "instructor" or not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an instructor")
     db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
     if db_leaderboard is None:
         raise HTTPException(status_code=404, detail="Leaderboard not found")
@@ -927,6 +931,110 @@ async def update_leaderboard(
         )
     )
     return crud.update_leaderboard(db=db, leaderboard=leaderboard)
+
+@app.put("/leaderboards/{leaderboard_id}/school", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
+async def update_leaderboard_school(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    leaderboard_id: int,
+    leaderboard: schemas.LeaderboardUpdate,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to update leaderboard")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
+    if db_leaderboard is None:
+        raise HTTPException(status_code=404, detail="Leaderboard not found")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="update_leaderboard_school",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+    return crud.add_leaderboard_school(db=db, leaderboard=schemas.LeaderboardUpdate(id=leaderboard_id, school=leaderboard.school))
+
+@app.delete("/leaderboards/{leaderboard_id}/school", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
+async def delete_leaderboard_school(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    leaderboard_id: int,
+    school: str,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to update leaderboard")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
+    if db_leaderboard is None:
+        raise HTTPException(status_code=404, detail="Leaderboard not found")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="delete_leaderboard_school",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+    return crud.remove_leaderboard_school(db=db, leaderboard=schemas.LeaderboardUpdate(id=leaderboard_id, school=[school]))
+
+@app.put("/leaderboards/{leaderboard_id}/vocabulary", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
+async def add_leaderboard_vocabulary(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    leaderboard_id: int,
+    vocabulary: schemas.VocabularyBase,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to update leaderboard")
+    if not current_user.is_admin or not current_user.user_type == "instructor":
+        raise HTTPException(status_code=401, detail="You are not an instructor")
+    db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
+    if db_leaderboard is None:
+        raise HTTPException(status_code=404, detail="Leaderboard not found")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="add_leaderboard_vocabulary",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+    return crud.add_leaderboard_vocab(db=db, leaderboard_id=leaderboard_id, vocabulary=vocabulary)
+
+@app.delete("/leaderboards/{leaderboard_id}/vocabulary", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
+async def delete_leaderboard_vocabulary(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    leaderboard_id: int,
+    vocabulary_id: int,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to update leaderboard")
+    if not current_user.is_admin or not current_user.user_type == "instructor":
+        raise HTTPException(status_code=401, detail="You are not an instructor")
+    db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
+    if db_leaderboard is None:
+        raise HTTPException(status_code=404, detail="Leaderboard not found")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="delete_leaderboard_vocabulary",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+    return crud.remove_leaderboard_vocab(db=db, leaderboard_id=leaderboard_id, vocab_id=vocabulary_id)
 
 @app.delete("/leaderboards/{leaderboard_id}", tags=["Leaderboard"], response_model=schemas.IdOnly)
 async def delete_leaderboard(

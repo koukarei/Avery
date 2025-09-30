@@ -451,8 +451,11 @@ class LeaderboardUpdate(BaseModel):
     is_public: Optional[bool]=None
     published_at: Optional[datetime.datetime]=None
     title: Optional[str]=None
+    scene_id: Optional[int]=None
+    story_id: Optional[int]=None
     school: list[str]=[]
     vocabularies: list[VocabularyBase]=[]
+    story_extract: Optional[str]=None
 
 class LeaderboardUpdateInternal(LeaderboardUpdate):
     response_id: Optional[str]=None
