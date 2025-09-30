@@ -20,7 +20,7 @@ def test_create_test_accounts():
             "display_name": f"Test Account {i}"
         }
         response = client.post(
-            "/sqlapp2/users/", 
+            "/avery/sqlapp2/users/", 
             json=user_acc.copy(), 
             headers={"Content-Type": "application/json"}
         )
@@ -36,7 +36,7 @@ class Test_TestAC:
         for i in range(1, TEST_NUMBER):
             user_id = 1
             response = self._client.put(
-                f"/sqlapp2/users/{user_id}", 
+                f"/avery/sqlapp2/users/{user_id}", 
                 json={
                     "username": f"test_acc{i}",
                     "is_active": False,
@@ -50,7 +50,7 @@ class Test_TestAC:
         for i in range(1, TEST_NUMBER):
             user_id = 1
             response = self._client.put(
-                f"/sqlapp2/users/{user_id}", 
+                f"/avery/sqlapp2/users/{user_id}", 
                 json={
                     "username": f"test_acc{i}",
                     "is_active": True,
@@ -74,7 +74,7 @@ class TestPlay:
         assert instance.username is not None, "Username is not set."
         assert instance.password is not None, "Password is not set."
         
-        response = await instance._client.get("/sqlapp2/leaderboards/", headers={"Authorization": f"Bearer {instance.access_token}"})
+        response = await instance._client.get("/avery/sqlapp2/leaderboards/", headers={"Authorization": f"Bearer {instance.access_token}"})
         assert response.status_code == 200, response.json()
         assert len(response.json()) > 0, "No leaderboard found."
         assert 'id' in response.json()[0][0], "No leaderboard id found."
@@ -134,7 +134,7 @@ class TestPlay:
         for attempt in range(max_retries):
             try:
                 response = await self._client.post(
-                    "/sqlapp2/token", data={"username": self.username, "password": self.password}
+                    "/avery/sqlapp2/token", data={"username": self.username, "password": self.password}
                 )
                 if response.status_code == 200:
                     return response.json().get("access_token")

@@ -107,7 +107,7 @@ services:
       - "7871:8000"
     tty: true
     healthcheck:
-      test: ["CMD", "curl", "http://localhost:8000/sqlapp2/", "-X", "GET"]
+      test: ["CMD", "curl", "http://localhost:8000/avery/sqlapp2/", "-X", "GET"]
       interval: 1m30s
       timeout: 30s
       retries: 5

@@ -8,7 +8,7 @@ app = FastAPI()
 
 # app.mount("/sqlapp", subapi)
 
-app.mount("/sqlapp2", subapi_2)
+app.mount("/avery/sqlapp2", subapi_2)
 
 
 
