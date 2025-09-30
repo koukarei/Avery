@@ -1102,6 +1102,34 @@ async def read_programs(current_user: Annotated[schemas.User, Depends(get_curren
     )
     return programs
 
+@app.get("/rounds/{round_id}", tags=["Round"], response_model=schemas.RoundOut)
+async def get_round(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    round_id: int,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view")
+    
+    
+    db_round = crud.get_round(db=db, round_id=round_id)
+    if db_round is None:
+        raise HTTPException(status_code=404, detail="Round not found")
+    if db_round.player_id != current_user.id and not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not allowed to view this round")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_round",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+
+    return db_round
+
 @app.get("/leaderboards/{leaderboard_id}/rounds/", tags=["Leaderboard", "Round"], response_model=list[schemas.RoundOut])
 async def get_rounds_by_leaderboard(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
@@ -1130,11 +1158,18 @@ async def get_rounds_by_leaderboard(
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
     )
-    return crud.get_rounds(
+
+    db_rounds = crud.get_rounds(
         db=db,
         leaderboard_id=leaderboard_id,
-        program_id=db_program.id
+        program_id=db_program.id,
     )
+
+    if current_user.user_type == "student":
+        for r in db_rounds:
+            r.player_id = None
+    
+    return db_rounds
 
 @app.get("/my_rounds/", tags=["Round"], response_model=list[schemas.RoundOut])
 async def get_my_rounds(
