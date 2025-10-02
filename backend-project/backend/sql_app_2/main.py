@@ -932,7 +932,7 @@ async def update_leaderboard(
     )
     return crud.update_leaderboard(db=db, leaderboard=leaderboard)
 
-@app.put("/leaderboards/{leaderboard_id}/school", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
+@app.put("/leaderboards/{leaderboard_id}/school", tags=["Leaderboard"], response_model=list[schemas.SchoolOut])
 async def update_leaderboard_school(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: int,
@@ -958,7 +958,7 @@ async def update_leaderboard_school(
     )
     return crud.add_leaderboard_school(db=db, leaderboard=schemas.LeaderboardUpdate(id=leaderboard_id, school=leaderboard.school))
 
-@app.delete("/leaderboards/{leaderboard_id}/school", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
+@app.delete("/leaderboards/{leaderboard_id}/school", tags=["Leaderboard"], response_model=list[schemas.SchoolOut])
 async def delete_leaderboard_school(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: int,

@@ -242,20 +242,17 @@ def add_leaderboard_school(
         raise ValueError("Leaderboard not found")
     
     school = leaderboard.school
+    for school_name in school:
+        db_school = db.query(models.School_Leaderboard).filter(models.School_Leaderboard.leaderboard_id == db_leaderboard.id).filter(models.School_Leaderboard.school == school_name).first()
+        if db_school is None:
+            db_school = models.School_Leaderboard(
+                school=school_name,
+                leaderboard_id=db_leaderboard.id
+            )
+            db.add(db_school)
+            db.commit()
     db_schools = db.query(models.School_Leaderboard).filter(models.School_Leaderboard.leaderboard_id == db_leaderboard.id).all()
-
-    if len(db_schools) != len(school):
-        for school_name in school:
-            db_school = db.query(models.School_Leaderboard).filter(models.School_Leaderboard.leaderboard_id == db_leaderboard.id).filter(models.School_Leaderboard.school == school_name).first()
-            if db_school is None:
-                db_school = models.School_Leaderboard(
-                    school=school_name,
-                    leaderboard_id=db_leaderboard.id
-                )
-                db.add(db_school)
-                db.commit()
-    
-    return db_leaderboard
+    return db_schools
 
 def remove_leaderboard_school(
         db: Session,
@@ -266,17 +263,17 @@ def remove_leaderboard_school(
         raise ValueError("Leaderboard not found")
     
     school = leaderboard.school
+
     db_schools = db.query(models.School_Leaderboard).filter(models.School_Leaderboard.leaderboard_id == db_leaderboard.id).all()
 
-    if len(db_schools) != len(school):
-        for db_school in db_schools:
-            if db_school.school not in school:
-                db.delete(db_school)
-                db.commit()
+    for db_school in db_schools:
+        if db_school.school in school:
+            db.delete(db_school)
+            db.commit()
     
-    return db_leaderboard
+    db_schools = db.query(models.School_Leaderboard).filter(models.School_Leaderboard.leaderboard_id == db_leaderboard.id).all()
 
-
+    return db_schools
 
 def add_leaderboard_vocab(
         db: Session,
