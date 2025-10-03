@@ -468,12 +468,13 @@ class Task(BaseModel):
 class UserActionBase(BaseModel):
     user_id: int
     action: str
-    
+    related_id: Optional[int]=None
     sent_at : Optional[datetime.datetime]=None
     received_at : Optional[datetime.datetime]=None
 
 class UserActionUpdate(BaseModel):
     id: int
+    related_id: Optional[int]=None
     sent_at : Optional[datetime.datetime]=None
     received_at : Optional[datetime.datetime]=None
 

@@ -293,6 +293,7 @@ class User_Action(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     action = Column(String(100))
+    related_id = Column(Integer, nullable=True)
     sent_at = Column(DateTime, nullable=True)
     received_at = Column(DateTime, default=datetime.datetime.now())
     responded_at = Column(DateTime, nullable=True)

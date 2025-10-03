@@ -619,6 +619,7 @@ async def create_leaderboard(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="create_leaderboard",
+            related_id=result.id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -880,6 +881,7 @@ async def read_leaderboard(current_user: Annotated[schemas.User, Depends(get_cur
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_leaderboard_info",
+            related_id=leaderboard_id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -900,6 +902,7 @@ async def read_schools(current_user: Annotated[schemas.User, Depends(get_current
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_schools",
+            related_id=leaderboard_id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -926,6 +929,7 @@ async def update_leaderboard(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="update_leaderboard_info",
+            related_id=leaderboard_id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -952,6 +956,7 @@ async def update_leaderboard_school(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="update_leaderboard_school",
+            related_id=leaderboard_id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -978,6 +983,7 @@ async def delete_leaderboard_school(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="delete_leaderboard_school",
+            related_id=leaderboard_id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -1004,6 +1010,7 @@ async def add_leaderboard_vocabulary(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="add_leaderboard_vocabulary",
+            related_id=leaderboard_id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -1030,6 +1037,7 @@ async def delete_leaderboard_vocabulary(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="delete_leaderboard_vocabulary",
+            related_id=leaderboard_id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -1055,6 +1063,7 @@ async def delete_leaderboard(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="delete_leaderboard",
+            related_id=leaderboard_id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -1123,6 +1132,7 @@ async def get_round(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_round",
+            related_id=round_id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -1154,6 +1164,7 @@ async def get_rounds_by_leaderboard(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_rounds_by_leaderboard",
+            related_id=leaderboard_id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -1199,6 +1210,7 @@ async def get_my_rounds(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_my_rounds",
+            related_id=leaderboard_id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -1487,6 +1499,7 @@ async def round_websocket(
         db=db,
         user_action=schemas.UserActionUpdate(
             id=db_user_action.id,
+            related_id=db_generation.id if db_generation else None,
             sent_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
         )
     )
@@ -1500,6 +1513,7 @@ async def round_websocket(
                 user_action=schemas.UserActionBase(
                     user_id=player_id,
                     action=user_action["action"],
+                    related_id=db_generation.id if db_generation else None,
                     received_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
                     sent_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
                 )
@@ -1996,6 +2010,7 @@ async def round_websocket(
                 db=db,
                 user_action=schemas.UserActionUpdate(
                     id=db_user_action.id,
+                    related_id=db_generation.id if db_generation else None,
                     sent_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
                 )
             )
@@ -2028,6 +2043,7 @@ async def read_vocabulary(current_user: Annotated[schemas.User, Depends(get_curr
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="check_vocabulary_info",
+            related_id=vocabularies[0].id if vocabularies else None,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -2173,6 +2189,7 @@ async def create_personal_dictionary(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="create_personal_dictionary",
+            related_id=vocab.id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -2202,6 +2219,7 @@ async def update_personal_dictionary(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="update_personal_dictionary",
+            related_id=personal_dictionary.id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -2223,6 +2241,7 @@ async def delete_personal_dictionary(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="delete_personal_dictionary",
+            related_id=personal_dictionary_id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -2256,6 +2275,7 @@ async def get_evaluation(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_evaluation",
+            related_id=generation_id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -2364,6 +2384,7 @@ async def read_chat(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_chat",
+            related_id=round_id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -2394,6 +2415,7 @@ async def get_original_image(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_original_image",
+            related_id=leaderboard_id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -2434,6 +2456,7 @@ async def get_interpreted_image(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_interpreted_image",
+            related_id=generation_id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -2463,6 +2486,7 @@ async def read_generation(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_generation_info",
+            related_id=generation_id,
             sent_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
             received_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
         )
@@ -2577,6 +2601,7 @@ async def get_generation_score(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_generation_score",
+            related_id=generation_id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
@@ -2603,6 +2628,7 @@ async def check_leaderboard_playable(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="check_leaderboard_playable",
+            related_id=leaderboard_id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
