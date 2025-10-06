@@ -481,6 +481,10 @@ class UserActionUpdate(BaseModel):
 class UserAction(UserActionBase):
     id: int
 
+class ChatStats(BaseModel):
+    n_messages: int
+    n_user_messages: int
+    n_assistant_messages: int
 
 # classes for analysis
 class UserAnalysis(BaseModel):
@@ -558,3 +562,5 @@ class LeaderboardAnalysis_WordCloudCreate(BaseModel):
     word_cloud_id: int
     type: str = "writing"  # or "mistake" or 'user_chat' or 'assistant_chat'
     lang: str = "en"
+
+

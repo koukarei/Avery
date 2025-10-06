@@ -425,8 +425,6 @@ async def read_user(current_user: Annotated[schemas.User, Depends(get_current_us
 async def read_scenes(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to read scenes")
-    if not current_user.is_admin:
-        raise HTTPException(status_code=401, detail="You are not an admin")
     scenes = crud.get_scenes(db, skip=skip, limit=limit)
     return scenes
 
@@ -442,8 +440,6 @@ async def create_scene(current_user: Annotated[schemas.User, Depends(get_current
 async def read_stories(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to read stories")
-    if not current_user.is_admin:
-        raise HTTPException(status_code=401, detail="You are not an admin")
     stories = crud.get_stories(db, skip=skip, limit=limit)
     return stories
         
@@ -1247,16 +1243,37 @@ async def round_websocket(
         )
     )
     await websocket.accept()
-    user_action = await websocket.receive_json()
-    db_user_action = crud.create_user_action(
-        db=db,
-        user_action=schemas.UserActionBase(
-            user_id=player_id,
-            action=user_action["action"],
-            received_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
-            sent_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+    try:
+        user_action = await websocket.receive_json()
+        db_user_action = crud.create_user_action(
+            db=db,
+            user_action=schemas.UserActionBase(
+                user_id=player_id,
+                action=user_action["action"],
+                received_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                sent_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+            )
         )
-    )
+    except WebSocketDisconnect:
+        # client disconnected immediately after connecting; record and exit gracefully
+        crud.create_user_action(
+            db=db,
+            user_action=schemas.UserActionBase(
+                user_id=player_id,
+                action="disconnect websocket",
+                sent_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                received_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+            )
+        )
+        logger1.info(f"WebSocket disconnected for user {player_id} before initial message")
+        return
+    except Exception as e:
+        logger1.error(f"Error during websocket initial receive: {str(e)}")
+        try:
+            await websocket.close(code=1011, reason=str(e))
+        except Exception:
+            pass
+        return
 
     # set program
     obj = parse_obj_as(schemas.RoundCreate, user_action['obj'])
@@ -2026,6 +2043,13 @@ async def round_websocket(
                 received_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
             )
         )
+        logger1.info(f"WebSocket disconnected for user {player_id}")
+    except Exception as e:
+        logger1.error(f"Error in websocket: {str(e)}")
+        try:
+            await websocket.close(code=1011, reason=str(e))
+        except:
+            pass
 
 @app.get("/vocabulary/{vocabulary}", tags=["Vocabulary"], response_model=list[schemas.Vocabulary])
 async def read_vocabulary(current_user: Annotated[schemas.User, Depends(get_current_user)], vocabulary: str, pos: str=None, db: Session = Depends(get_db)):
@@ -2390,6 +2414,36 @@ async def read_chat(
         )
     )
     return chat
+
+
+@app.get("/chat/{round_id}/stats", tags=["Chat"], response_model=schemas.ChatStats)
+async def read_chat_stats(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    round_id: int, 
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view chat stats")
+    db_round = crud.get_round(db, round_id)
+    if db_round is None:
+        raise HTTPException(status_code=404, detail="Round not found")
+    
+    chat_id = db_round.chat_history
+    chat_stats = crud.get_chat_stats(db, chat_id=chat_id)
+    if chat_stats is None:
+        raise HTTPException(status_code=404, detail="Chat stats not found")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_chat_stats",
+            related_id=round_id,
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+    return chat_stats
 
 @app.get("/original_image/{leaderboard_id}", tags=["Image"])
 async def get_original_image(

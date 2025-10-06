@@ -822,6 +822,16 @@ def create_message(db: Session, message: schemas.MessageBase, chat_id: int):
 def get_chat_messages_by_ids(db: Session, message_ids: List[int]):
     return db.query(models.Message).filter(models.Message.id.in_(message_ids)).all()
 
+def get_chat_stats(db: Session, chat_id: int):
+    n_messages = db.query(models.Message).filter(models.Message.chat_id == chat_id).count()
+    n_user_messages = db.query(models.Message).filter(models.Message.chat_id == chat_id).filter(models.Message.sender == "user").count()
+    n_assistant_messages = db.query(models.Message).filter(models.Message.chat_id == chat_id).filter(models.Message.sender == "assistant").count()
+    return {
+        "n_messages": n_messages,
+        "n_user_messages": n_user_messages,
+        "n_assistant_messages": n_assistant_messages
+    }
+
 def get_vocabulary(db: Session, vocabulary: str, part_of_speech: str=None):
     if part_of_speech is None:
         return db.query(models.Vocabulary).filter(models.Vocabulary.word == vocabulary).all()
