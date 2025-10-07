@@ -21,20 +21,22 @@ services:
         condition: service_healthy
 
 
-  # react_front:
-  #   container_name: react_front
-  #   build:
-  #     context: react-project
-  #     dockerfile: Dockerfile
-  #   volumes:
-  #     - ./react-project/app:/app
-  #     - ./react-project/app/node_modules:/app/node_modules
-  #   ports:
-  #     - "7873:3000"
-  #   command: npm start
-  #   tty: true
-  #   networks:
-  #     - avery-network
+  react_front:
+    container_name: react_front
+    env_file:
+      - react-project/avery_analytics_vite/.env
+    build:
+      context: react-project
+      dockerfile: Dockerfile
+    volumes:
+      - ./react-project/avery_analytics_vite:/app
+      - ./react-project/avery_analytics_vite/node_modules:/app/node_modules
+    ports:
+      - "7873:5173"
+    command: npm run dev
+    tty: true
+    networks:
+      - avery-network
       
   db:
     build:
