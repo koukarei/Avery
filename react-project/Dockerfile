@@ -9,4 +9,3 @@ WORKDIR /usr/src/avery_analytics_vite
 # 先にpackage.jsonとpackage-lock.jsonをマウントさせる
 COPY avery_analytics_vite/package.json ./
 
-CMD ["npm", "install"]
