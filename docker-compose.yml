@@ -29,8 +29,8 @@ services:
       context: react-project
       dockerfile: Dockerfile
     volumes:
-      - ./react-project/avery_analytics_vite:/app
-      - ./react-project/avery_analytics_vite/node_modules:/app/node_modules
+      - ./react-project/avery_analytics_vite:/avery_analytics_vite
+      - ./react-project/avery_analytics_vite/node_modules:/avery_analytics_vite/node_modules
     ports:
       - "7873:5173"
     command: npm run dev
