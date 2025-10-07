@@ -303,13 +303,16 @@ async def obtain_ws_token(
     return schemas.WSToken(ws_token=ws_token)
 
 @app.post("/users/", tags=["User"], response_model=schemas.User, status_code=201)
-async def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+async def create_user(user: Annotated[schemas.UserCreateIn, Form()], db: Session = Depends(get_db)):
     db_user = crud.get_user_by_email(db, email=user.email)
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     db_user = crud.get_user_by_username(db, username=user.username)
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
+    user = schemas.UserCreate(
+        **user.model_dump(exclude_none=True)
+    )
     user.is_admin=False
     user.user_type="student"
     if user.username=="admin":

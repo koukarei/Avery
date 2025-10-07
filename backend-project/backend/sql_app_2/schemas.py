@@ -92,6 +92,15 @@ class UserCreate(UserBase):
     class Config:
         orm_mode = True
 
+class UserCreateIn(BaseModel):
+    username: str
+    email: str
+    password: str
+    display_name: str
+
+    class Config:
+        orm_mode = True
+
 class UserLti(BaseModel):
     user_id: int
     username: str
