@@ -33,7 +33,7 @@ services:
       - /avery_analytics_vite/node_modules
     ports:
       - "7873:5173"
-    command: sh -c "npm install && npm run dev --host"
+    command: sh -c "npm install && npm run build"
     tty: true
     networks:
       - avery-network
