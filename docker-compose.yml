@@ -20,53 +20,6 @@ services:
       backend-project:
         condition: service_healthy
 
-
-  react_front:
-    container_name: react_front
-    env_file:
-      - react-project/avery_analytics_vite/.env
-    build:
-      context: react-project
-      dockerfile: Dockerfile
-    volumes:
-      - ./react-project/avery_analytics_vite:/avery_analytics_vite
-      - /avery_analytics_vite/node_modules
-    ports:
-      - "7873:5173"
-    command: sh -c "npm install && npm run build"
-    tty: true
-    networks:
-      - avery-network
-    depends_on:
-      backend-project:
-        condition: service_healthy
-    restart: unless-stopped
-
-  db:
-    build:
-      context: db-project
-      dockerfile: Dockerfile
-    container_name: mysql
-    command: mysqld
-    restart: always
-    env_file:
-      - db-project/.env
-    ports:
-        - 7872:3306
-    volumes:
-        - db-store:/var/lib/mysql
-        - ./db-project/conf.d:/etc/mysql/conf.d
-        # ★ ローカルのscriptディレクトリにマウントします
-        - ./db-project/init:/docker-entrypoint-initdb.d 
-    tty: true
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 1s
-      timeout: 3s
-      retries: 30
-    networks:
-      - avery-network
-      
   db2:
     build:
       context: db-project
@@ -196,14 +149,16 @@ services:
       - avery-network
 
   nginx:
+    env_file:
+      - react-project/avery_analytics_vite/.env
     depends_on: 
         - backend-project
     container_name: proxy-app
     build: 
-        context: ./react-project/
+        context: react-project
         dockerfile: Dockerfile
     ports: 
-        - "7878:80"
+        - "7873:80"
     restart: always
     networks:
       - avery-network

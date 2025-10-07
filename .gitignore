@@ -10,3 +10,7 @@ gradio-project/data/*
 typings
 typings/*
 .gpt-runner*
+*/node_modules
+virtual
+/react-project/avery_analytics_vite/node_modules
+/react-project/avery_analytics_vite/yarn.lock

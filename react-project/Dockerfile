@@ -1,11 +1,16 @@
-FROM node:23-bookworm-slim
+FROM node:22-slim AS builder
+WORKDIR /app
 
-WORKDIR /usr/src/avery_analytics_vite
+# Install dependencies using package-lock from the subproject
+COPY avery_analytics_vite/package*.json ./
+COPY avery_analytics_vite/package-lock.json ./
+RUN npm ci
 
-# RUN mkdir /app
+# Copy the subproject source and build the app
+COPY avery_analytics_vite/ ./
+RUN npm run build
 
-# WORKDIR /app
-
-# 先にpackage.jsonとpackage-lock.jsonをマウントさせる
-COPY avery_analytics_vite/package.json ./
-
+FROM nginx:1.25-alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
+RUN chmod -R 755 /usr/share/nginx/html
