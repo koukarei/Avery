@@ -40,6 +40,7 @@ services:
     depends_on:
       backend-project:
         condition: service_healthy
+    restart: unless-stopped
 
   db:
     build:
@@ -191,6 +192,19 @@ services:
     environment:
       APP_MODULE: backend.main:app
       PORT: 7871
+    networks:
+      - avery-network
+
+  nginx:
+    depends_on: 
+        - backend-project
+    container_name: proxy-app
+    build: 
+        context: ./react-project/
+        dockerfile: Dockerfile
+    ports: 
+        - "7878:80"
+    restart: always
     networks:
       - avery-network
 
