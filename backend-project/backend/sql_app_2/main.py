@@ -269,7 +269,7 @@ async def lti_login(request: Request):
                 raise HTTPException(status_code=500, detail=f"Failed to login: {str(e)}")
         else:
             # Create user
-            response = await create_user_lti(newuser=user_login)
+            response = await create_user_lti(user=user_login, db=next(get_db()))
             token = await login_for_access_token_lti(user=user_login, db=next(get_db()))
         
         return {
