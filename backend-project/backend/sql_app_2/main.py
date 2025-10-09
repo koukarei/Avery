@@ -1,5 +1,5 @@
 import logging.config
-from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, responses, Security, status, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, responses, Security, status, WebSocket, WebSocketDisconnect, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import parse_obj_as
 from sqlalchemy.orm import Session
@@ -12,7 +12,7 @@ from tasks import app as celery_app
 from tasks import generateDescription2, generate_interpretation2, calculate_score_gpt
 from .database import SessionLocal2, engine2
 
-from .dependencies import sentence, score, dictionary, openai_chatbot
+from .dependencies import sentence, score, dictionary, openai_chatbot, lti
 from .authentication import authenticate_user, authenticate_user_2, create_access_token, oauth2_scheme, SECRET_KEY, SECRET_KEY_WS, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, REFRESH_TOKEN_EXPIRE_MINUTES, JWTError, jwt, create_ws_token
 from util import *
 
@@ -212,6 +212,69 @@ async def login_for_access_token(
     refresh_token = create_refresh_token(user.username)
     
     return schemas.Token(access_token=access_token,refresh_token=refresh_token, token_type="bearer")
+
+
+@app.route('/lti/login',methods=["POST"])
+async def lti_login(request: Request):
+    valid = await lti.validate_lti_request(request)
+    if not valid:
+        return {'error': 'Invalid LTI request'} 
+    
+    # Extracting additional fields from the form data
+    form_data = await request.form()
+
+    user_id = form_data.get('user_id')
+    oauth_consumer_key = form_data.get('oauth_consumer_key')
+
+    if user_id:
+        school = "School not provided"
+        if oauth_consumer_key == "saikyo_consumer_key":
+            school = "saikyo"
+        elif oauth_consumer_key == "hikone_consumer_key":
+            school = "hikone"
+        elif oauth_consumer_key == "lms_consumer_key":
+            school = "lms"
+        elif oauth_consumer_key == "tom_consumer_key":
+            school = "tom"
+        elif oauth_consumer_key == "tomsec_consumer_key":
+            school = "tomsec"
+        elif oauth_consumer_key == "newleaf_consumer_key":
+            school = "newleaf"
+
+        if "instructor" in form_data.get('roles', '').lower():
+            role = "instructor"
+        else:
+            role = "student"
+
+        username = form_data.get('ext_user_username')
+        user_login = schemas.UserLti(
+            user_id=form_data.get('user_id'),
+            username=username,
+            display_name=form_data.get('lis_person_name_full', 'Unknown User'),
+            roles=role,
+            email=form_data.get('lis_person_contact_email_primary', ''),
+            school=school,
+        )
+        
+        response = await login_for_access_token_lti(user=user_login, db=next(get_db()))
+        
+        if not hasattr(response, 'status_code'):
+            token = response
+        elif response.status_code == 400:
+            # Create user
+            response = await create_user_lti(newuser=user_login)
+            token = await login_for_access_token_lti(user=user_login, db=next(get_db()))
+        else:
+            response.raise_for_status()
+        return {
+            "school": school,
+            "token": token.model_dump(),
+            "username": username,
+            "roles": role,
+            "program": form_data.get('custom_program', 'none')
+        }
+    raise HTTPException(status_code=500, detail="Failed to login")
+
 
 @app.post("/lti/token",response_model=schemas.Token)
 async def login_for_access_token_lti(
