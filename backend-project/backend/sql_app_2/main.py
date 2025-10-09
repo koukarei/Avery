@@ -284,7 +284,7 @@ async def login_for_access_token_lti(
     
     user = authenticate_user_2(db, lti_user_id=user.user_id, school=user.school)
     
-    if not user.lti:
+    if user == None or not user.lti:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="No LTI account found",

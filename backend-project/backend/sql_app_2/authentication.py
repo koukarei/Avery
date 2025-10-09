@@ -49,7 +49,7 @@ def authenticate_user_2(
 ):
     user = crud.get_user_by_lti(db, lti_user_id, school)
     if not user:
-        raise HTTPException(status_code=400, detail="The user does not exist.")
+        return None
     return user
 
 def create_access_token(data: dict, expires_delta: Union[timedelta, None] = None):
