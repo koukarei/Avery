@@ -1,7 +1,6 @@
 import logging.config
 from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, responses, Security, status, WebSocket, WebSocketDisconnect, Request
 
-from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import parse_obj_as
 from sqlalchemy.orm import Session
