@@ -256,16 +256,22 @@ async def lti_login(request: Request):
             school=school,
         )
         
-        response = await login_for_access_token_lti(user=user_login, db=next(get_db()))
+        user = authenticate_user_2(
+            db=next(get_db()), 
+            lti_user_id=user_login.user_id, 
+            school=school
+        )
         
-        if not hasattr(response, 'status_code'):
-            token = response
-        elif response.status_code == 400:
+        if user:
+            try:
+                token = await login_for_access_token_lti(user=user_login, db=next(get_db()))
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Failed to login: {str(e)}")
+        else:
             # Create user
             response = await create_user_lti(newuser=user_login)
             token = await login_for_access_token_lti(user=user_login, db=next(get_db()))
-        else:
-            response.raise_for_status()
+        
         return {
             "school": school,
             "token": token.model_dump(),
