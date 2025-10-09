@@ -214,7 +214,7 @@ async def login_for_access_token(
     return schemas.Token(access_token=access_token,refresh_token=refresh_token, token_type="bearer")
 
 
-@app.route('/lti/login',methods=["POST"])
+@app.post("/lti/login")
 async def lti_login(request: Request):
     valid = await lti.validate_lti_request(request)
     if not valid:
@@ -2001,6 +2001,7 @@ async def round_websocket(
                                 sender="assistant",
                                 created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
                                 is_hint=False,
+                               
                                 is_evaluation=True,
                                 responses_id=chatbot_obj.prev_res_id
                             ),

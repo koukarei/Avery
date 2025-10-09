@@ -26,6 +26,9 @@ async def validate_lti_request(request: Request):
 
     LTI_URL = os.getenv("LTI_URL")
     LTI_CONSUMERS = load_lti_credentials()
+    if not LTI_URL or not LTI_CONSUMERS:
+        logger.error("LTI_URL or LTI_CONSUMERS not properly configured in environment variables.")
+        return False
     
     try: 
         # Call verify_request_common with all the necessary parameters
