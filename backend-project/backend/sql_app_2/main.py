@@ -283,7 +283,11 @@ async def lti_login(request: Request):
             request.session['token_type'] = token.token_type
             request.session['program'] = form_data.get('custom_program', 'none')
 
-        return RedirectResponse(url="/avery_analytics/")
+        raise HTTPException(
+            status_code=status.HTTP_303_SEE_OTHER,
+            detail="Login successful, redirecting...",
+            headers={"Location": "/avery_analytics/"}
+        )
     raise HTTPException(status_code=500, detail="Failed to login")
 
 
