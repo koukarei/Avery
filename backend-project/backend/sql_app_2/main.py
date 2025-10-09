@@ -1,5 +1,7 @@
 import logging.config
 from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, responses, Security, status, WebSocket, WebSocketDisconnect, Request
+
+from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import parse_obj_as
 from sqlalchemy.orm import Session
@@ -23,6 +25,8 @@ from celery import chain, group
 import logging
 
 from fastapi.middleware.cors import CORSMiddleware
+
+from starlette.middleware.sessions import SessionMiddleware
 
 origins = [
     "http://localhost:3000",
@@ -55,6 +59,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(SessionMiddleware, secret_key=os.environ.get('SESSION_SECRET_KEY'))
 
 app.include_router(analysis_router.router)
 
@@ -240,6 +246,7 @@ async def lti_login(request: Request):
             school = "tomsec"
         elif oauth_consumer_key == "newleaf_consumer_key":
             school = "newleaf"
+        request.session['school'] = school
 
         if "instructor" in form_data.get('roles', '').lower():
             role = "instructor"
@@ -271,14 +278,12 @@ async def lti_login(request: Request):
             # Create user
             response = await create_user_lti(user=user_login, db=next(get_db()))
             token = await login_for_access_token_lti(user=user_login, db=next(get_db()))
-        
-        return {
-            "school": school,
-            "token": token.model_dump(),
-            "username": username,
-            "roles": role,
-            "program": form_data.get('custom_program', 'none')
-        }
+            request.session['access_token'] = token.access_token
+            request.session['refresh_token'] = token.refresh_token
+            request.session['token_type'] = token.token_type
+            request.session['program'] = form_data.get('custom_program', 'none')
+
+        return RedirectResponse(url=f"/avery_analytics/",)
     raise HTTPException(status_code=500, detail="Failed to login")
 
 
