@@ -1,5 +1,5 @@
 import logging.config
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, responses, Security, status
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, responses, Security, status, Request
 from sqlalchemy.orm import Session
 import time, os, datetime, shutil, tempfile, zipfile, zoneinfo, asyncio, re
 import pandas as pd
@@ -31,7 +31,7 @@ router = APIRouter(
 async def test_frequency(
     text: str = Form(...),
     lang: Literal['en', 'ja'] = Form('en'),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Test the frequency analysis of a given text.
@@ -55,8 +55,12 @@ async def test_frequency(
 @router.get("/generations", tags=["analysis"], response_model=list[Tuple[schemas.GenerationAnalysis, schemas.RoundAnalysis]])
 async def read_generations(
     program: Literal["none", "inlab_test","haga_sensei_test","student_january_experiment","student_1_sem_awe","student_1_sem_img"],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    request: Request = None
 ):
+    if current_user := getattr(request.state, 'current_user', None):
+        if not current_user.is_admin:
+            raise HTTPException(status_code=403, detail="Not enough permissions")
     if program == "none":
         generations = crud.get_generations(
             db,
@@ -78,8 +82,12 @@ def get_frequency(
         cloud_type: Literal['mistake', 'writing', 'user_chat', 'assistant_chat'],
         db_generations_rounds,
         lang: Literal['ja', 'en'] = 'en',
-        latest_generation_msg_id: int = 0
+        latest_generation_msg_id: int = 0,
+        request: Request = None
 ):
+    if current_user := getattr(request.state, 'current_user', None):
+        if not current_user.is_admin:
+            raise HTTPException(status_code=403, detail="Not enough permissions")
     max_message_id = 0
     frequencies = []
     generation_token = {}
@@ -181,8 +189,12 @@ async def read_word_cloud(
     program_name: Literal["none", "inlab_test","haga_sensei_test","student_january_experiment","student_1_sem_awe","student_1_sem_img"],
     cloud_type: Literal['mistake', 'writing', 'user_chat', 'assistant_chat'] = 'mistake',
     lang: Literal['ja', 'en'] = 'en',
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    request: Request = None
 ):
+    if current_user := getattr(request.state, 'current_user', None):
+        if not current_user.is_admin:
+            raise HTTPException(status_code=403, detail="Not enough permissions")
     """
     Get the leaderboard analysis for a specific program.
     """
@@ -527,8 +539,12 @@ async def read_word_cloud(
 @router.delete("/word_cloud/{word_cloud_id}", tags=["analysis"])
 async def delete_word_cloud(
     word_cloud_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    request: Request = None
 ):
+    if current_user := getattr(request.state, 'current_user', None):
+        if not current_user.is_admin:
+            raise HTTPException(status_code=403, detail="Not enough permissions")
     word_cloud = crud.delete_word_cloud(
         db=db,
         id=word_cloud_id
@@ -546,8 +562,12 @@ async def delete_word_cloud(
 async def get_word_cloud_items(
     word_cloud_id: int,
     cloud_type: Literal['mistake', 'writing', 'user_chat', 'assistant_chat'],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    request: Request = None
 ):
+    if current_user := getattr(request.state, 'current_user', None):
+        if not current_user.is_admin:
+            raise HTTPException(status_code=403, detail="Not enough permissions")
     if cloud_type == 'mistake':
         mistake_word_cloud_items = [
             schemas.WordCloudItemAnalysis(
@@ -718,8 +738,12 @@ async def update_word_cloud_item_color(
         word_cloud_item_id: int,
         color: str,
         cloud_type: Literal['mistake', 'writing', 'user_chat', 'assistant_chat'],
-        db: Session = Depends(get_db)
+        db: Session = Depends(get_db),
+        request: Request = None
 ):
+    if current_user := getattr(request.state, 'current_user', None):
+        if not current_user.is_admin:
+            raise HTTPException(status_code=403, detail="Not enough permissions")
     """
     Update the color of a word cloud item.
     """
