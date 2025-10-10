@@ -586,15 +586,25 @@ async def create_story(
     
     
     try:
-        story_content = story_content_file.file.read()
+        story_content_file.file.seek(0)
+        raw = story_content_file.file.read()
+        if isinstance(raw, bytes):
+            try:
+                story_content = raw.decode('utf-8')
+            except UnicodeDecodeError:
+                # fallback for Windows-1252 / unknown encodings, preserve content
+                story_content = raw.decode('cp1252', errors='replace')
+        else:
+            story_content = str(raw)
+
         storyCreate = schemas.StoryCreate(
             title=title,
             scene_id=scene_id,
             content=story_content
         )
                 
-    except Exception:
-        logger1.error(f"Error uploading file: {Exception}")
+    except Exception as e:
+        logger1.error(f"Error uploading file: {str(e)}")
         raise HTTPException(status_code=400, detail="Error uploading file")
     finally:
         story_content_file.file.close()
@@ -1830,6 +1840,7 @@ async def round_websocket(
                             is_hint=False
                         )
                     ]
+
                 elif status == 3:
                     messages = [
                         schemas.MessageBase(
@@ -2056,7 +2067,7 @@ async def round_websocket(
                             message=schemas.MessageBase(
                                 content=evaluation_message,
                                 sender="assistant",
-                                created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                                created_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
                                 is_hint=False,
                                
                                 is_evaluation=True,
@@ -2485,6 +2496,7 @@ async def get_evaluation(
                     overall_feedback=evaluation['overall_evaluation'],
                     recommended_vocab=recommended_vocab
                 )
+
                 db_evaluate_msg = crud.create_message(
                     db=db,
                     message=schemas.MessageBase(
