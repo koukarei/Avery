@@ -6,16 +6,15 @@
 </head>
 <body>
   <script>
-        const s = {{ session_data | tojson | safe }};
+      const s = {{ session_data | tojson | safe }};
 
-        // Store each key-value pair in sessionStorage
-        for (const [key, value] of Object.entries(s)) {
-        sessionStorage.setItem(key, String(value));
-        }
-    // Example: navigate to another link after 1 second
-    // setTimeout(() => {
-    //   window.location.href = "/avery_analytics";
-    // }, 1000);
+      // Store each key-value pair in sessionStorage
+      for (const [key, value] of Object.entries(s)) {
+      sessionStorage.setItem(key, String(value));
+      }
+    setTimeout(() => {
+      window.location.href = "/avery_analytics";
+    }, 1000);
   </script>
 </body>
 </html>
