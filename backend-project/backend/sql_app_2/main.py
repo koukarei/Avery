@@ -322,14 +322,14 @@ async def lti_login(request: Request):
 
 
         return templates.TemplateResponse(
-        "avery.html",
-        {"request": request, "session_data": {
-            "school": school,
-            "access_token": token.access_token,
-            "refresh_token": token.refresh_token,
-            "token_type": token.token_type,
-            "program": form_data.get('custom_program', 'none')
-        }})
+            "avery.html",
+            {"request": request, "session_data": {
+                "school": school,
+                "access_token": token.access_token,
+                "refresh_token": token.refresh_token,
+                "token_type": token.token_type,
+                "program": form_data.get('custom_program', 'none')
+            }})
     raise HTTPException(status_code=500, detail="Failed to login")
 
 
