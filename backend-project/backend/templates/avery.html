@@ -6,9 +6,9 @@
 </head>
 <body>
   <script>
-    // This object is passed from FastAPI (from session_data)
-    window.sessionData = {{ session_data | tojson }};
-
+      for (const [key, value] of Object.entries(session_data)) {
+        sessionStorage.setItem(key, String(value));
+      }
     // Example: navigate to another link after 1 second
     // setTimeout(() => {
     //   window.location.href = "/avery_analytics";
