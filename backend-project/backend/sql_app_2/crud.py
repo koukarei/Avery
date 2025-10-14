@@ -513,7 +513,7 @@ def get_rounds(db: Session, skip: int = 0, limit: int = 100, player_id: int = No
         return rounds.filter(models.Round.is_completed == is_completed).order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
 
 
-def get_rounds_full(db: Session, skip: int = 0, limit: int = 100, player_id: int = None, leaderboard_id: int = None, program_id: int = None):
+def get_rounds_full(db: Session, skip: int = 0, limit: int = 100, player_id: int = None, leaderboard_id: int = None, program_id: int = None, school_name: str = None):
     if program_id:
         rounds = db.query(
             models.Round,
@@ -523,7 +523,8 @@ def get_rounds_full(db: Session, skip: int = 0, limit: int = 100, player_id: int
         rounds = db.query(
             models.Round,
         )
-
+        
+    rounds = rounds.filter(models.Round.player.school == school_name)
     if leaderboard_id and player_id:
         return rounds.filter(models.Round.leaderboard_id == leaderboard_id).filter(models.Round.player_id==player_id).order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
     elif leaderboard_id:

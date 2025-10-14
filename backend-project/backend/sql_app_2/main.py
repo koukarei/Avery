@@ -1305,6 +1305,7 @@ async def get_rounds_by_leaderboard(
         db=db,
         leaderboard_id=leaderboard_id,
         program_id=db_program.id,
+        school_name=current_user.school
     )
 
     if current_user.user_type == "student":
