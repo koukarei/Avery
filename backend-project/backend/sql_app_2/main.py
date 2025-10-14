@@ -701,8 +701,6 @@ async def create_leaderboard(
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to create a leaderboard")
-    if not current_user.is_admin:
-        raise HTTPException(status_code=401, detail="You are not an admin")
     story_id = leaderboard.story_id
     if story_id==0:
         story_id=None
