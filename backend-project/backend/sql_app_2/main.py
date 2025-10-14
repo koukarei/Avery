@@ -1301,12 +1301,14 @@ async def get_rounds_by_leaderboard(
         )
     )
 
-    db_rounds = crud.get_rounds_full(
+    db_rounds_users = crud.get_rounds_full(
         db=db,
         leaderboard_id=leaderboard_id,
         program_id=db_program.id,
         school_name=current_user.school
     )
+
+    db_rounds = [r for r,u in db_rounds_users]
 
     if current_user.user_type == "student":
         for r in db_rounds:
@@ -2636,6 +2638,9 @@ async def get_interpreted_image(
         db=db,
         round_id=db_generation.round_id
     )
+
+    if db_generation is None or db_round is None:
+        raise HTTPException(status_code=404, detail="Generation or Round not found")
 
     # if current_user.id != db_round.player_id and not current_user.is_admin:
     #     raise HTTPException(status_code=401, detail="You are not authorized to view images")
