@@ -294,6 +294,7 @@ class RoundOut(BaseModel):
     last_generation_id: Optional[int]=None
     chat_history: int
     generations: list[IdOnly]=[]
+    is_completed: bool
 
     class Config:
         orm_mode = True

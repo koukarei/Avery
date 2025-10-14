@@ -512,6 +512,27 @@ def get_rounds(db: Session, skip: int = 0, limit: int = 100, player_id: int = No
     else:
         return rounds.filter(models.Round.is_completed == is_completed).order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
 
+
+def get_rounds_full(db: Session, skip: int = 0, limit: int = 100, player_id: int = None, leaderboard_id: int = None, program_id: int = None):
+    if program_id:
+        rounds = db.query(
+            models.Round,
+        ).\
+        filter(models.Round.program_id == program_id)
+    else:
+        rounds = db.query(
+            models.Round,
+        )
+
+    if leaderboard_id and player_id:
+        return rounds.filter(models.Round.leaderboard_id == leaderboard_id).filter(models.Round.player_id==player_id).order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
+    elif leaderboard_id:
+        return rounds.filter(models.Round.leaderboard_id == leaderboard_id).order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
+    elif player_id:
+        return rounds.filter(models.Round.player_id==player_id).order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
+    else:
+        return rounds.order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
+
 def create_round(db: Session, leaderboard_id:int, user_id: int, created_at: datetime.datetime, model_name: str="gpt-4o-mini", program_id: Optional[int]=None):
     db_chat=models.Chat()
     db.add(db_chat)
