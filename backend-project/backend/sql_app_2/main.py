@@ -757,6 +757,23 @@ async def create_leaderboard(
 
     return result
 
+@app.get("/description/{leaderboard_id}", tags=["Leaderboard"], response_model=schemas.LeaderboardDescription)
+async def get_leaderboard_description(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    leaderboard_id: int,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view leaderboard description")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+
+    leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
+    if not leaderboard:
+        raise HTTPException(status_code=404, detail="Leaderboard not found")
+
+    return leaderboard
+
 @app.post("/leaderboards/bulk_create", tags=["Leaderboard"], response_model=list[schemas.LeaderboardOut], status_code=201)
 async def create_leaderboards(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
