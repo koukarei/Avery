@@ -975,8 +975,6 @@ async def create_leaderboard_image(
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to upload image")
-    if not current_user.is_admin:
-        raise HTTPException(status_code=401, detail="You are not an admin")
 
     try:
         original_image.file.seek(0)
