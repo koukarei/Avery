@@ -178,6 +178,17 @@ class Leaderboard(LeaderboardCreate):
     class Config:
         orm_mode = True
 
+class DescriptionOut(BaseModel):
+    id: int
+    content: str
+    model: str
+
+class LeaderboardDescription(BaseModel):
+    descriptions: List[DescriptionOut] = []
+
+    class Config:
+        orm_mode = True
+
 class RoundCreate(BaseModel):
     leaderboard_id: int
     program: Optional[str]="none"
