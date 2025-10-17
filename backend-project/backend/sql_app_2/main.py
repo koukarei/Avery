@@ -53,6 +53,9 @@ def get_db():
 app = FastAPI(
     debug=True,
     title="AVERY",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
 
 app.add_middleware(
