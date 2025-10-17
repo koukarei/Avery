@@ -210,7 +210,7 @@ async def lti_login(request: Request):
         request.session["username"] = username
         request.session["roles"] = role
         request.session["program"] = form_data.get('custom_program', 'none')
-        return RedirectResponse(url='/avery_analytics/', status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url='/avery/', status_code=status.HTTP_303_SEE_OTHER)
 
     raise HTTPException(status_code=500, detail="Failed to login")
 
