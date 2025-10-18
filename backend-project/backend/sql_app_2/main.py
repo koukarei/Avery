@@ -578,8 +578,6 @@ async def create_story(
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to create story")
-    if not current_user.is_admin:
-        raise HTTPException(status_code=401, detail="You are not an admin")
     
     if not story_content_file.filename.endswith(".txt"):
         raise HTTPException(status_code=400, detail="Please upload a text file")
