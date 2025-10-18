@@ -20,7 +20,7 @@ REFRESH_TOKEN_EXPIRE_MINUTES = int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES"))
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/avery/sqlapp2/token",auto_error=False,)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/sqlapp2/token",auto_error=False,)
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
