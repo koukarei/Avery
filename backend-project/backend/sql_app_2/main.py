@@ -1320,14 +1320,12 @@ async def get_rounds_by_leaderboard(
         db_rounds_users = crud.get_rounds_full(
             db=db,
             leaderboard_id=leaderboard_id,
-            program_id=db_program.id,
             school_name=current_user.school
         )
     else:
         db_rounds_users = crud.get_rounds_full(
             db=db,
             leaderboard_id=leaderboard_id,
-            program_id=db_program.id,
             player_id=current_user.id
         )
 
