@@ -1299,13 +1299,14 @@ async def get_rounds_by_leaderboard(
         return []
     elif program == "overview":
         # check admin
-        if not current_user.is_admin and current_user.user_type != "instructor":
-            raise HTTPException(status_code=401, detail="You are not allowed to view all rounds")
-        db_rounds_users = crud.get_rounds_full(
-            db=db,
-            leaderboard_id=leaderboard_id,
-        )
-        return [r for r,u in db_rounds_users]
+        if current_user.is_admin and current_user.user_type == "instructor":
+            
+            db_rounds_users = crud.get_rounds_full(
+                db=db,
+                leaderboard_id=leaderboard_id,
+            )
+            return [r for r,u in db_rounds_users]
+        raise HTTPException(status_code=401, detail="You are not allowed to view all rounds")
     db_program = crud.get_program_by_name(db, program)
     
     crud.create_user_action(
