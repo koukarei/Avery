@@ -193,6 +193,7 @@ websockets==15.0.1
 wheel==0.40.0
 wrapt==1.17.2
 wsproto==1.2.0
+yappi
 zope.event==5.1
 zope.interface==7.2
 zstandard==0.23.0

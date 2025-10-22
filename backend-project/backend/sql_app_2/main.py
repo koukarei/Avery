@@ -8,7 +8,7 @@ templates = Jinja2Templates(directory="templates")
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import parse_obj_as
 from sqlalchemy.orm import Session
-import time, os, datetime, shutil, tempfile, zipfile, zoneinfo, asyncio, json
+import time, os, datetime, shutil, tempfile, zipfile, zoneinfo, asyncio, json, yappi
 import pandas as pd
 from pathlib import Path
 
@@ -1681,6 +1681,9 @@ async def round_websocket(
     )
 
     try:
+        yappi.clear_stats()
+        yappi.set_clock_type("wall")
+        yappi.start()
         while True:
             user_action = await websocket.receive_json()
 
@@ -2211,6 +2214,9 @@ async def round_websocket(
             await websocket.close(code=1011, reason=str(e))
         except:
             pass
+    finally:
+        yappi.get_func_stats().save(f"logs\yappi_stats_user_{player_id}.callgrind", type="callgrind")
+        
 
 @app.get("/vocabulary/{vocabulary}", tags=["Vocabulary"], response_model=list[schemas.Vocabulary])
 async def read_vocabulary(current_user: Annotated[schemas.User, Depends(get_current_user)], vocabulary: str, pos: str=None, db: Session = Depends(get_db)):
