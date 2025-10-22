@@ -46,7 +46,8 @@ def create_user(db: Session, user: schemas.UserCreate):
         is_active=True,
         profile_id=db_userprofile.id,
         is_admin=user.is_admin,
-        user_type=user.user_type
+        user_type=user.user_type,
+        school="wild"
     )
 
     db.add(db_user)
