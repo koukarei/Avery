@@ -439,7 +439,7 @@ async def create_user(user: Annotated[schemas.UserCreateIn, Form()], db: Session
     if user.username=="admin":
         user.is_admin=True
         user.user_type="instructor"
-    new_user = crud.create_user_in_wild(db=db, user=user)
+    new_user = crud.create_public_user(db=db, user=user)
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -615,6 +615,8 @@ async def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_cu
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view leaderboards")
     school_name = current_user.school
+    if school_name is None and not current_user.is_admin:
+        school_name = "public"
     
     if not published_at_start and not published_at_end:
         leaderboards = crud.get_leaderboards(db, school_name=school_name, skip=skip, limit=limit, published_at_end=datetime.datetime.now(tz=zoneinfo.ZoneInfo('Japan')))
