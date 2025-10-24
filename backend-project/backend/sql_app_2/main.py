@@ -8,11 +8,13 @@ templates = Jinja2Templates(directory="templates")
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import parse_obj_as
 from sqlalchemy.orm import Session
-import time, os, datetime, shutil, tempfile, zipfile, zoneinfo, asyncio, json, yappi
+import time, os, datetime, shutil, tempfile, zipfile, zoneinfo, asyncio, json #, yappi
 import pandas as pd
 from pathlib import Path
 
-from . import crud, models, schemas, analysis_router
+from .analysis_router import router as analysis_router
+from .admin_router import router as admin_router
+from . import crud, models, schemas
 from tasks import app as celery_app
 from tasks import generateDescription2, generate_interpretation2, calculate_score_gpt
 from .database import SessionLocal2, engine2
@@ -184,19 +186,22 @@ async def get_current_admin(db: Annotated[Session, Depends(get_db)],token: Annot
         raise credentials_exception
 
 app.include_router(
-    analysis_router.router,
+    analysis_router,
+    dependencies=[Depends(get_current_admin)]
+)
+
+app.include_router(
+    admin_router,
     dependencies=[Depends(get_current_admin)]
 )
 
 async def get_current_user_ws(db: Annotated[Session, Depends(get_db)],token: str):
-#async def get_current_user(db: Annotated[Session, Depends(get_db)],username: str):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     if token:
-    #if username:
         try:
             payload = jwt.decode(token, SECRET_KEY_WS, algorithms=[ALGORITHM])
             username: str = payload.get("sub")
@@ -771,6 +776,46 @@ async def get_leaderboard_description(
         raise HTTPException(status_code=404, detail="Leaderboard not found")
 
     return leaderboard
+
+@app.get("/description/{leaderboard_id}", tags=["Leaderboard"], response_model=schemas.LeaderboardDescription)
+async def get_leaderboard_description(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    leaderboard_id: int,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view leaderboard description")
+    if current_user.user_type != "instructor":
+        raise HTTPException(status_code=401, detail="You are not allowed to view leaderboard description")
+
+    leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
+    if not leaderboard:
+        raise HTTPException(status_code=404, detail="Leaderboard not found")
+
+    return leaderboard
+
+@app.put("/description/{leaderboard_id}", tags=["Leaderboard"], response_model=schemas.DescriptionOut)
+async def update_leaderboard_description(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    leaderboard_id: int,
+    description: schemas.LeaderboardDescriptionUpdate,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to update leaderboard description")
+    if current_user.user_type != "instructor":
+        raise HTTPException(status_code=401, detail="You are not allowed to update leaderboard description")
+
+    db_descriptions = crud.get_description(db, leaderboard_id=leaderboard_id)
+    if description.description_id not in [db_desc.id for db_desc in db_descriptions]:
+        raise HTTPException(status_code=400, detail="Description not found for the specified leaderboard")
+
+    updated_description = crud.update_description(
+        db=db,
+        description=description,
+    )
+
+    return updated_description
 
 @app.post("/leaderboards/bulk_create", tags=["Leaderboard"], response_model=list[schemas.LeaderboardOut], status_code=201)
 async def create_leaderboards(

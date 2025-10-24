@@ -40,7 +40,7 @@ Provide a detailed, line-by-line description of the image, incorporating relevan
 - Creative storytelling abilities
 
 ## Format
-1. Break the description into detailed, numbered lines.
+1. Break the description into detailed lines.
 2. Use clear and vivid language for each line.
 3. Tie in the user-provided story where relevant to enhance coherence.
 
@@ -75,29 +75,34 @@ Provide a detailed, line-by-line description of the image, incorporating relevan
         },
       ]
       }
+
+  schema = {
+    "format": {
+        "type": "json_schema",
+        "name": "description",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "details": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+            },
+            "required": ["details"],
+            "additionalProperties": False
+        },
+        "strict": True
+    }
+  }
       
   response = client.responses.create(
     model=model_name,
     instructions=system_prompt,
     input=messages,
     temperature=0.5,
-    text={
-       "format": "json_schema",
-       "name": "description",
-       "schema": {
-          "type": "object",
-          "properties": {
-            "details": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          "required": ["details"]
-        },
-        "strict": True,
-       }
+    text=schema
   )
 
   description = json.loads(response.output_text)

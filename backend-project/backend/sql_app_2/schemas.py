@@ -189,6 +189,10 @@ class LeaderboardDescription(BaseModel):
     class Config:
         orm_mode = True
 
+class LeaderboardDescriptionUpdate(BaseModel):
+    description_id: int
+    content: str
+
 class RoundCreate(BaseModel):
     leaderboard_id: int
     program: Optional[str]="none"

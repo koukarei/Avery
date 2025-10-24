@@ -470,6 +470,15 @@ def get_description(db: Session, leaderboard_id: int, model_name: str=None):
     else:
         return db.query(models.Description).filter(models.Description.leaderboard_id == leaderboard_id).all()
 
+def update_description(db: Session, description: schemas.LeaderboardDescriptionUpdate):
+    db_description = db.query(models.Description).filter(models.Description.id == description.description_id).first()
+    if db_description is None:
+        raise ValueError("Description not found")
+    db_description.content = description.content
+    db.commit()
+    db.refresh(db_description)
+    return db_description
+
 def create_description(db: Session, description: schemas.DescriptionBase):
     db_description = models.Description(**description.model_dump())
     db.add(db_description)
