@@ -439,7 +439,7 @@ async def create_user(user: Annotated[schemas.UserCreateIn, Form()], db: Session
     if user.username=="admin":
         user.is_admin=True
         user.user_type="instructor"
-    new_user = crud.create_user(db=db, user=user)
+    new_user = crud.create_user_in_wild(db=db, user=user)
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1681,9 +1681,9 @@ async def round_websocket(
     )
 
     try:
-        yappi.clear_stats()
-        yappi.set_clock_type("wall")
-        yappi.start()
+        # yappi.clear_stats()
+        # yappi.set_clock_type("wall")
+        # yappi.start()
         while True:
             user_action = await websocket.receive_json()
 
@@ -1831,13 +1831,13 @@ async def round_websocket(
                             ),
                         )
                         chain_result = chain_interpretation.apply_async()
-                    # elif "IMG" in db_program.feedback:
-                    #     chain_interpretation = chain(
-                    #         group(
-                    #             generate_interpretation2.s(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at),
-                    #         )
-                    #     )
-                    #     chain_result = chain_interpretation.apply_async()
+                    elif "IMG" in db_program.feedback:
+                        chain_interpretation = chain(
+                            group(
+                                generate_interpretation2.s(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at),
+                            )
+                        )
+                        chain_result = chain_interpretation.apply_async()
                     elif "AWS" in db_program.feedback:
                         chain_interpretation = chain(
                             group(
@@ -1921,37 +1921,13 @@ async def round_websocket(
                     }
                 }
 
-                # if "IMG" in db_program.feedback or "AWS" in db_program.feedback:
-                #     while True:
-                #         db_generation = crud.get_generation(
-                #             db=db,
-                #             generation_id=db_generation.id
-                #         )
-                #         if db_generation.is_completed:
-                #             break
-                #         elif chain_result.failed():
-                #             raise HTTPException(status_code=500, detail="Error in chain result")
-                #         elif chain_result.successful():
-                #             break
-                #         elif ("AWS" in db_program.feedback and db_generation.score is not None) and ("IMG" in db_program.feedback and db_generation.interpreted_image is not None):
-                #             break
-                #         elif ("AWS" in db_program.feedback and db_generation.score is not None) and ("IMG" not in db_program.feedback):
-                #             break
-                #         elif ("AWS" not in db_program.feedback) and ("IMG" in db_program.feedback and db_generation.interpreted_image is not None):
-                #             break
-                        
-                #         logger1.info(f"Waiting for the task to finish... {chain_result.status}")
-                #         await websocket.send_json({"feedback": "waiting"})
-                #         await asyncio.sleep(3)
-
             elif user_action["action"] == "evaluate" and (db_generation.correct_sentence is None or db_generation.correct_sentence == ""):
                 send_data = {}
             elif user_action["action"] == "evaluate":
                 
                 if "IMG" in db_program.feedback and db_generation.interpreted_image is None:
                     # If the interpreted image is not generated, log an error
-                    #logger1.error(f"Interpreted image not found for generation {db_generation.id}")
-                    generate_interpretation2(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at)
+                    logger1.error(f"Interpreted image not found for generation {db_generation.id}")
 
                 if "AWS" in db_program.feedback:
                     db_score = db_generation.score
@@ -2041,7 +2017,7 @@ async def round_websocket(
                             message=schemas.MessageBase(
                                 content=score_message,
                                 sender="assistant",
-                                created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                                created_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
                                 is_hint=False,
                                 is_evaluation=True,
                             ),
@@ -2214,8 +2190,19 @@ async def round_websocket(
             await websocket.close(code=1011, reason=str(e))
         except:
             pass
-    finally:
-        yappi.get_func_stats().save(f"logs\yappi_stats_user_{player_id}.callgrind", type="callgrind")
+    # finally:
+    #     try:
+    #         # stop profiler and ensure output directory exists
+    #         yappi.stop()
+    #         from pathlib import Path
+    #         out_dir = Path("logs")
+    #         out_dir.mkdir(parents=True, exist_ok=True)
+
+    #         out_file = out_dir / f"yappi_stats_user_{player_id}.callgrind"
+    #         yappi.get_func_stats().save(str(out_file), type="callgrind")
+    #         logger1.info(f"Saved yappi stats to {out_file.resolve()}")
+    #     except Exception as e:
+    #         logger1.exception(f"Failed to save yappi stats: {e}")
         
 
 @app.get("/vocabulary/{vocabulary}", tags=["Vocabulary"], response_model=list[schemas.Vocabulary])

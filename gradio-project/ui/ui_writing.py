@@ -282,7 +282,14 @@ with gr.Blocks(title="AVERY") as avery_gradio:
                     slider_update = gr.update(maximum=total_generations, value=total_generations, interactive=True, visible=True)
 
                     if "IMG" in feedback:
-                        ai_image = decode_image(response.generation.interpreted_image)
+                        try:
+                            ai_image = decode_image(response.generation.interpreted_image)
+                        except TypeError:
+                            ai_image = await get_interpreted_image(
+                                generation_id=generation_id,
+                                request=request
+                            )
+
                         ai_image_visible = gr.update(visible=True)
 
 

@@ -24,7 +24,7 @@ def get_user_by_lti(db: Session, lti_user_id: int, school: str):
 def get_users(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.User).offset(skip).limit(limit).all()
 
-def create_user(db: Session, user: schemas.UserCreate):
+def create_user_in_wild(db: Session, user: schemas.UserCreate):
     hashed_password = get_password_hash(user.password)
 
     db_userprofile = models.UserProfile(
