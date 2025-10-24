@@ -2258,6 +2258,23 @@ async def round_websocket(
     #     except Exception as e:
     #         logger1.exception(f"Failed to save yappi stats: {e}")
         
+@app.post("/user_actions/", tags=["User Action"], status_code=201)
+async def create_user_action(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    user_action: schemas.UserActionCreate,
+    db: Session = Depends(get_db)
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to create user action")
+    crud.create_user_action(db=db, user_action=schemas.UserActionBase(
+        user_id=current_user.id,
+        action=user_action.action,
+        related_id=user_action.related_id,
+        received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        sent_at=user_action.sent_at,
+    ))
+    
+    return {"detail": "User action created"}
 
 @app.get("/vocabulary/{vocabulary}", tags=["Vocabulary"], response_model=list[schemas.Vocabulary])
 async def read_vocabulary(current_user: Annotated[schemas.User, Depends(get_current_user)], vocabulary: str, pos: str=None, db: Session = Depends(get_db)):

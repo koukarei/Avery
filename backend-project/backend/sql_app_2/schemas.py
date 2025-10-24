@@ -497,6 +497,11 @@ class UserActionBase(BaseModel):
     sent_at : Optional[datetime.datetime]=None
     received_at : Optional[datetime.datetime]=None
 
+class UserActionCreate(BaseModel):
+    action: str
+    related_id: Optional[int]=None
+    sent_at : Optional[datetime.datetime]=None
+
 class UserActionUpdate(BaseModel):
     id: int
     related_id: Optional[int]=None
