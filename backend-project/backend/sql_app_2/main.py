@@ -1,7 +1,7 @@
 import logging.config
 from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, responses, Security, status, WebSocket, WebSocketDisconnect, Request
 from fastapi.templating import Jinja2Templates
-from fastapi import Request
+from fastapi.concurrency import run_in_threadpool
 
 templates = Jinja2Templates(directory="templates")
 
@@ -1713,10 +1713,13 @@ async def round_websocket(
                     chat_id=db_round.chat_history
                 )
 
-                hint = chatbot_obj.nextResponse(
-                    ask_for_hint=obj.content,
-                    new_messages=[],
-                    base64_image=db_round.leaderboard.original_image.image,
+                # run in threadpool to avoid blocking event loop
+                # chatbot_obj.nextResponse: ask_for_hint, new_messages, base64_image
+                hint = await run_in_threadpool(
+                    chatbot_obj.nextResponse,
+                    obj.content,
+                    [],
+                    db_round.leaderboard.original_image.image,
                 )
 
                 db_messages.append(
@@ -1777,7 +1780,10 @@ async def round_websocket(
 
                 if status != 3:
                     try:
-                        status, correct_sentence, spelling_mistakes, grammar_mistakes=sentence.checkSentence(passage=db_generation.sentence)
+                        status, correct_sentence, spelling_mistakes, grammar_mistakes=await run_in_threadpool(
+                            sentence.checkSentence,
+                            db_generation.sentence
+                        )
                     except Exception as e:
                         logger1.error(f"Error in get_user_answer: {str(e)}")
                         raise HTTPException(status_code=400, detail=str(e))
@@ -2025,14 +2031,15 @@ async def round_websocket(
                         )['message'])
 
                     if "AWE" in db_program.feedback:
-                        evaluation = chatbot_obj.get_result(
-                            sentence=db_generation.sentence,
-                            correct_sentence=db_generation.correct_sentence,
-                            base64_image=db_round.leaderboard.original_image.image,
-                            grammar_errors=db_generation.grammar_errors,
-                            spelling_errors=db_generation.spelling_errors,
-                            descriptions=descriptions
-                        )
+                        evaluation = await run_in_threadpool(
+                            chatbot_obj.get_result,
+                            db_generation.sentence,
+                            db_generation.correct_sentence,
+                            db_round.leaderboard.original_image.image,
+                            db_generation.grammar_errors,
+                            db_generation.spelling_errors,
+                            descriptions
+                        ) 
                     else:
                         evaluation = None
                         db_evaluate_msg = None
