@@ -10,6 +10,7 @@ from pydantic import parse_obj_as
 from sqlalchemy.orm import Session
 import time, os, datetime, shutil, tempfile, zipfile, zoneinfo, asyncio, json #, yappi
 import pandas as pd
+import numpy as np
 from pathlib import Path
 
 from .analysis_router import router as analysis_router
@@ -1438,14 +1439,16 @@ async def round_websocket(
     
     player_id = current_user.id
 
+    start_time = datetime.datetime.now(tz=timezone(timedelta(hours=9)))
+    duration = 0
     # accept the websocket connection and record in database
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
             user_id=player_id,
             action="connect websocket",
-            sent_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
-            received_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+            sent_at=start_time,
+            received_at=start_time,
         )
     )
     await websocket.accept()
@@ -1456,8 +1459,8 @@ async def round_websocket(
             user_action=schemas.UserActionBase(
                 user_id=player_id,
                 action=user_action["action"],
-                received_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
-                sent_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                received_at=start_time,
+                sent_at=start_time,
             )
         )
     except WebSocketDisconnect:
@@ -1527,6 +1530,20 @@ async def round_websocket(
 
             db_score = crud.get_score(db=db, generation_id=db_generation.id)
 
+            if not db_generation.is_completed:
+                duration += db_generation.duration
+            else:
+                db_generation = crud.create_generation(
+                    db=db,
+                    round_id=db_round.id,
+                    generation=schemas.GenerationCreate(
+                        round_id=db_round.id,
+                        sentence='',
+                        generated_time=generated_time,
+                        created_at=start_time,
+                    )
+                )
+
             # prepare data to send
             send_data = {
                 "feedback": db_program.feedback,
@@ -1549,6 +1566,7 @@ async def round_websocket(
                     "correct_sentence": db_generation.correct_sentence,
                     "is_completed": db_generation.is_completed,
                     "image_similarity": db_score.image_similarity if db_score else None,
+                    "duration": duration,
                 },
                 "chat": {
                     "id": db_round.chat_history,
@@ -1658,7 +1676,7 @@ async def round_websocket(
                 round_id=db_round.id,
                 sentence='',
                 generated_time=0,
-                created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                created_at=start_time,
             )
         )
 
@@ -1849,6 +1867,15 @@ async def round_websocket(
                             is_completed=False
                         )
                     )
+
+                    duration += (datetime.datetime.now(tz=timezone(timedelta(hours=9))) - start_time).total_seconds()
+
+                    crud.update_generation_duration(
+                        db=db,
+                        generation_id=db_generation.id,
+                        duration=duration
+                    )
+                    duration = 0
                     
                     db_generation = crud.update_generation1(
                         db=db,
@@ -1971,6 +1998,7 @@ async def round_websocket(
                     "generation": {
                         "id": db_generation.id,
                         "correct_sentence": db_generation.correct_sentence if status == 0 else None,
+                        "duration": duration,
                     }
                 }
 
@@ -2017,13 +2045,12 @@ async def round_websocket(
                     image_similarity = None
                 
                 if not db_generation.is_completed:
-                    generation_aware = db_generation.created_at.replace(tzinfo=timezone(timedelta(hours=9)))
-                    db_generation_aware = db_round.created_at.replace(tzinfo=timezone(timedelta(hours=9)))
-                    duration = (generation_aware - db_generation_aware).seconds
+                    # initialize start_time for duration calculation
+                    start_time = datetime.datetime.now(tz=timezone(timedelta(hours=9)))
+                    duration = 0
                     
                     generation_com = schemas.GenerationComplete(
                         id=db_generation.id,
-                        duration=duration,
                         is_completed=True
                     )
                     crud.update_generation3(
@@ -2139,7 +2166,6 @@ async def round_websocket(
                     generation_com = schemas.GenerationComplete(
                         id=db_generation.id,
                         is_completed=True,
-                        duration=duration,
                         evaluation_id=db_evaluate_msg.id if db_evaluate_msg else None
                     )
 
@@ -2181,9 +2207,7 @@ async def round_websocket(
 
             # if user requests to end the round
             elif user_action["action"] == "end":
-                now_tim = datetime.datetime.now(tz=timezone(timedelta(hours=9)))
-                start_round = db_round.created_at.replace(tzinfo=timezone(timedelta(hours=9)))
-                duration = (now_tim - start_round).seconds
+                duration = np.sum([g.duration for g in db_round.generations if g.is_completed])
 
                 db_round = crud.complete_round(
                     db=db,
@@ -2227,14 +2251,16 @@ async def round_websocket(
             )
 
     except WebSocketDisconnect:
+        disconnect_time = datetime.datetime.now(tz=timezone(timedelta(hours=9)))
+
         # record disconnect time
         crud.create_user_action(
             db=db,
             user_action=schemas.UserActionBase(
                 user_id=player_id,
                 action="disconnect websocket",
-                sent_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
-                received_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                sent_at=disconnect_time,
+                received_at=disconnect_time,
             )
         )
         logger1.info(f"WebSocket disconnected for user {player_id}")
@@ -2244,19 +2270,15 @@ async def round_websocket(
             await websocket.close(code=1011, reason=str(e))
         except:
             pass
-    # finally:
-    #     try:
-    #         # stop profiler and ensure output directory exists
-    #         yappi.stop()
-    #         from pathlib import Path
-    #         out_dir = Path("logs")
-    #         out_dir.mkdir(parents=True, exist_ok=True)
-
-    #         out_file = out_dir / f"yappi_stats_user_{player_id}.callgrind"
-    #         yappi.get_func_stats().save(str(out_file), type="callgrind")
-    #         logger1.info(f"Saved yappi stats to {out_file.resolve()}")
-    #     except Exception as e:
-    #         logger1.exception(f"Failed to save yappi stats: {e}")
+    finally:
+        disconnect_time = datetime.datetime.now(tz=timezone(timedelta(hours=9)))
+        if start_time and db_generation and not db_generation.is_completed:
+            duration += (disconnect_time - start_time).total_seconds()
+            crud.update_generation_duration(
+                db=db,
+                generation_id=db_generation.id,
+                duration=duration
+            )
         
 @app.post("/user_actions/", tags=["User Action"], status_code=201)
 async def create_user_action(

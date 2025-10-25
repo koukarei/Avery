@@ -805,6 +805,13 @@ def update_generation3(db: Session, generation: schemas.GenerationComplete):
     db_generation = db.query(models.Generation).filter(models.Generation.id == generation.id).first()
     return db_generation
 
+def update_generation_duration(db: Session, generation_id: int, duration: int):
+    db_generation = db.query(models.Generation).filter(models.Generation.id == generation_id).first()
+    db_generation.duration = duration
+    db.commit()
+    db.refresh(db_generation)
+    return db_generation
+
 def create_score(db: Session, score: schemas.ScoreCreate, generation_id: int):
     db_score = models.Score(
         **score.model_dump()

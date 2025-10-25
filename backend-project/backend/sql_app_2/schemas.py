@@ -296,6 +296,11 @@ class GenerationScore(BaseModel):
     total_score: int
     rank: str
 
+class GenerationBrief(BaseModel):
+    id: int
+    duration: int
+    is_completed: bool
+
 class RoundComplete(BaseModel):
     id: int
     last_generation_id: int
@@ -308,7 +313,7 @@ class RoundOut(BaseModel):
     created_at: datetime.datetime
     last_generation_id: Optional[int]=None
     chat_history: int
-    generations: list[IdOnly]=[]
+    generations: list[GenerationBrief]=[]
     is_completed: bool
 
     class Config:
