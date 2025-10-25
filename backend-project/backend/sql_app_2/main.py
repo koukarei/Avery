@@ -2896,8 +2896,8 @@ async def get_generation_score(
     )
     return score
 
-@app.get("/leaderboards/{leaderboard_id}/playable", tags=["Leaderboard"], response_model=schemas.LeaderboardPlayable)
-async def check_leaderboard_playable(
+@app.get("/leaderboards/{leaderboard_id}/check_ok_to_start_new", tags=["Leaderboard"], response_model=schemas.LeaderboardStartNew)
+async def check_leaderboard_playrecord(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: int, 
     program: Optional[str] = "none",
@@ -2910,7 +2910,7 @@ async def check_leaderboard_playable(
         db=db,
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
-            action="check_leaderboard_playable",
+            action="check_leaderboard_no_play_record",
             related_id=leaderboard_id,
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
@@ -2928,9 +2928,9 @@ async def check_leaderboard_playable(
                 player_id=current_user.id
             )
             if db_rounds:
-                return schemas.LeaderboardPlayable(
+                return schemas.LeaderboardStartNew(
                     id=leaderboard_id,
-                    is_playable=False
+                    start_new=True
                 )
 
     if not current_user.is_admin:
@@ -2941,14 +2941,14 @@ async def check_leaderboard_playable(
         )
 
         if db_rounds:
-            return schemas.LeaderboardPlayable(
+            return schemas.LeaderboardStartNew(
                 id=leaderboard_id,
-                is_playable=False
+                start_new=False
             )
-    
-    return schemas.LeaderboardPlayable(
+
+    return schemas.LeaderboardStartNew(
         id=leaderboard_id,
-        is_playable=True
+        start_new=True
     )
 
 @app.get("/generations/fix_error", tags=["Task"], response_model=list[Union[schemas.GenerationOut, schemas.Score, schemas.InterpretedImage]])

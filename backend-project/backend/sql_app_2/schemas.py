@@ -467,9 +467,9 @@ class ImageSimilarity(BaseModel):
     ssim: float
     similarity: float
 
-class LeaderboardPlayable(BaseModel):
+class LeaderboardStartNew(BaseModel):
     id: int
-    is_playable: bool
+    start_new: bool
 
 class LeaderboardUpdate(BaseModel):
     id: int
