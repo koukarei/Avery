@@ -117,6 +117,7 @@ class Round(Base):
     leaderboard_id=Column(Integer,ForeignKey("leaderboards.id"))
     player_id = Column(Integer, ForeignKey("user_profiles.id"))
     program_id = Column(Integer, ForeignKey("programs.id"), nullable=True)
+    display_name = Column(String(100), index=True, nullable=True)
 
     model=Column(String(100), index=True)
 

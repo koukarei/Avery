@@ -307,8 +307,13 @@ class RoundComplete(BaseModel):
     duration: int
     is_completed: bool
 
+class RoundUpdateName(BaseModel):
+    id: int
+    display_name: Optional[str]=None
+
 class RoundOut(BaseModel):
     id: int
+    display_name: Optional[str]=None
     player: Optional[UserOut]=None
     created_at: datetime.datetime
     last_generation_id: Optional[int]=None

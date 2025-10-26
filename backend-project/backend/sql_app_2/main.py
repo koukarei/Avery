@@ -737,6 +737,8 @@ async def create_leaderboard(
     )
     if current_user.school:
         crud.add_leaderboard_school(db=db, leaderboard=schemas.LeaderboardUpdate(id=result.id, school=[current_user.school]))
+    else:
+        crud.add_leaderboard_school(db=db, leaderboard=schemas.LeaderboardUpdate(id=result.id, school=["public"]))
 
     crud.create_task(
         db=db,
@@ -1329,6 +1331,35 @@ async def get_round(
 
     return db_round
 
+@app.put("/rounds/{round_id}/display_name", tags=["Round"], response_model=schemas.RoundOut)
+async def update_round_display_name(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    round: schemas.RoundUpdateName,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to update")
+    
+
+    db_round = crud.get_round(db=db, round_id=round.id)
+    if db_round is None:
+        raise HTTPException(status_code=404, detail="Round not found")
+    if db_round.player_id != current_user.id and not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not allowed to update this round")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="update_round_display_name",
+            related_id=round.id,
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+
+    return crud.update_round_display_name(db=db, round_update=round)
+
 @app.get("/leaderboards/{leaderboard_id}/rounds/", tags=["Leaderboard", "Round"], response_model=list[schemas.RoundOut])
 async def get_rounds_by_leaderboard(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
@@ -1381,7 +1412,8 @@ async def get_rounds_by_leaderboard(
 
     if current_user.user_type == "student":
         for r in db_rounds:
-            r.player_id = None
+            if r.player_id != current_user.id:
+                r.player_id = None
     
     return db_rounds
 
@@ -1526,13 +1558,14 @@ async def round_websocket(
                 prev_res_id=prev_res_ids[-1] if prev_res_ids else db_leaderboard.response_id,
                 prev_res_ids=prev_res_ids
             )
-            generated_time = db_generation.generated_time
 
             db_score = crud.get_score(db=db, generation_id=db_generation.id)
 
             if not db_generation.is_completed:
+                generated_time = db_generation.generated_time
                 duration += db_generation.duration
             else:
+                generated_time = db_generation.generated_time + 1
                 db_generation = crud.create_generation(
                     db=db,
                     round_id=db_round.id,
@@ -1553,6 +1586,7 @@ async def round_websocket(
                 },
                 "round": {
                     "id": db_round.id,
+                    "display_name": db_round.display_name,
                     "generated_time":generated_time,
                     "generations": [
                         g.id for g in db_round.generations if g.is_completed
@@ -1614,6 +1648,7 @@ async def round_websocket(
                 },
                 "round": {
                     "id": db_round.id,
+                    "display_name": db_round.display_name,
                     "generated_time":generated_time,
                     "generations": [
                         g.id for g in db_round.generations if g.is_completed
@@ -1709,6 +1744,7 @@ async def round_websocket(
             },
             "round": {
                 "id": db_round.id,
+                "display_name": db_round.display_name,
                 "generated_time":generated_time,
                 "generations": []
             },
@@ -1817,6 +1853,21 @@ async def round_websocket(
                     },
                 }
 
+            elif user_action["action"] == "change_display_name":
+                obj = parse_obj_as(schemas.RoundUpdateName, user_action['obj'])
+                db_round = crud.update_round_display_name(
+                    db=db,
+                    round_update=obj
+                )
+
+                send_data = {
+                    "round": {
+                        "id": db_round.id,
+                        "display_name": db_round.display_name,
+                        "generated_time":generated_time,
+                    },
+                }
+
             # if user submits the answer
             elif user_action["action"] == "submit":
                 obj = parse_obj_as(schemas.GenerationCreate, user_action['obj'])
@@ -1835,7 +1886,7 @@ async def round_websocket(
                     db_generation = crud.get_generation(db=db, generation_id=db_generation.id)
                     status = 3
                 else: 
-                    generated_time = generated_time + 1 
+                    generated_time += 1
                     obj.generated_time = generated_time
                     db_generation = crud.create_generation(
                         db=db,
@@ -1980,6 +2031,7 @@ async def round_websocket(
                     },
                     "round": {
                         "id": db_round.id,
+                        "display_name": db_round.display_name,
                         "generated_time":generated_time,
                     },
                     "chat": {
@@ -2182,6 +2234,7 @@ async def round_websocket(
                     },
                     "round": {
                         "id": db_round.id,
+                        "display_name": db_round.display_name,
                         "generated_time":generated_time,
                     },
                     "chat": {

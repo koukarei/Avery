@@ -502,6 +502,17 @@ def get_program_by_name(db: Session, program_name: str):
 def get_round(db: Session, round_id: int):
     return db.query(models.Round).filter(models.Round.id == round_id).first()
 
+def update_round_display_name(db: Session, round_update: schemas.RoundUpdateName):
+    db_round = db.query(models.Round).filter(models.Round.id == round_update.id).first()
+    if db_round is None:
+        raise ValueError("Round not found")
+    
+    db_round.display_name = round_update.display_name
+        
+    db.commit()
+    db.refresh(db_round)
+    return db_round
+
 def get_rounds(db: Session, skip: int = 0, limit: int = 100, player_id: int = None,is_completed: bool = True, leaderboard_id: int = None, program_id: int = None):
     if program_id:
         rounds = db.query(
