@@ -617,7 +617,7 @@ async def create_story(
 
 
 @app.get("/leaderboards/", tags=["Leaderboard"], response_model=list[Tuple[schemas.LeaderboardOut, schemas.SchoolOut]])
-async def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_current_user)],skip: int = 0, limit: int = 100, published_at_start: str=None, published_at_end: str=None, db: Session = Depends(get_db)):
+async def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_current_user)],skip: int = 0, limit: int = 100, published_at_start: str=None, published_at_end: str=None, is_public: bool = True, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view leaderboards")
     school_name = current_user.school
@@ -625,6 +625,16 @@ async def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_cu
         school_name = "public"
     
     if not published_at_start and not published_at_end:
+        if not is_public:
+            leaderboards = crud.get_leaderboards(
+                db=db,
+                school_name=school_name,
+                skip=skip,
+                limit=limit,
+                published_at_end=datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo')),
+                is_public=False,
+            )
+            return [lb for lb in leaderboards if lb[0].created_by_id == current_user.id]
         leaderboards = crud.get_leaderboards(db, school_name=school_name, skip=skip, limit=limit, published_at_end=datetime.datetime.now(tz=zoneinfo.ZoneInfo('Japan')))
         return leaderboards
     
@@ -632,22 +642,33 @@ async def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_cu
 
 
     if published_at_start:
-        published_at_start = datetime.datetime.strptime(published_at_start, "%d%m%Y").replace(tzinfo=zoneinfo.ZoneInfo('Japan'))
+        published_at_start = datetime.datetime.strptime(published_at_start, "%d%m%Y").replace(tzinfo=zoneinfo.ZoneInfo('Asia/Tokyo'))
     if published_at_end:
-        published_at_end = datetime.datetime.strptime(published_at_end, "%d%m%Y").replace(tzinfo=zoneinfo.ZoneInfo('Japan'))
-    
+        published_at_end = datetime.datetime.strptime(published_at_end, "%d%m%Y").replace(tzinfo=zoneinfo.ZoneInfo('Asia/Tokyo'))
+
     # print("after convert",published_at_start, published_at_end)
 
     if current_user.user_type == "student":
-        if published_at_start and published_at_start > datetime.datetime.now(tz=zoneinfo.ZoneInfo('Japan')):
-            published_at_start = datetime.datetime.now(tz=zoneinfo.ZoneInfo('Japan'))
-        if published_at_end and published_at_end > datetime.datetime.now(tz=zoneinfo.ZoneInfo('Japan')):
-            published_at_end = datetime.datetime.now(tz=zoneinfo.ZoneInfo('Japan'))
-    
-    # print("after check",published_at_start, published_at_end)
+        if published_at_start and published_at_start > datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo')):
+            published_at_start = datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo'))
+        if published_at_end and published_at_end > datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo')):
+            published_at_end = datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo'))
 
-    leaderboards = crud.get_leaderboards(db, school_name=school_name, skip=skip, limit=limit, published_at_start=published_at_start, published_at_end=published_at_end)
-    
+    # print("after check",published_at_start, published_at_end)
+    if is_public:
+        leaderboards = crud.get_leaderboards(db, school_name=school_name, skip=skip, limit=limit, published_at_start=published_at_start, published_at_end=published_at_end)
+    else:
+        leaderboards = crud.get_leaderboards(
+            db=db,
+            school_name=school_name,
+            skip=skip,
+            limit=limit,
+            published_at_start=published_at_start,
+            published_at_end=published_at_end,
+            is_public=False,
+        )
+        leaderboards = [lb for lb in leaderboards if lb[0].created_by_id == current_user.id]
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -667,17 +688,18 @@ async def read_leaderboards_admin(
         limit: int = 100,
         published_at_start: str = None,
         published_at_end: str = None,
+        is_public: bool = True,
         db: Session = Depends(get_db),
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view leaderboards")
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
-    
+    jst = zoneinfo.ZoneInfo('Asia/Tokyo')
     if published_at_start:
-        published_at_start = datetime.datetime.strptime(published_at_start, "%d%m%Y").replace(tzinfo=timezone.utc)
+        published_at_start = datetime.datetime.strptime(published_at_start, "%d%m%Y").replace(tzinfo=jst)
     if published_at_end:
-        published_at_end = datetime.datetime.strptime(published_at_end, "%d%m%Y").replace(tzinfo=timezone.utc)
+        published_at_end = datetime.datetime.strptime(published_at_end, "%d%m%Y").replace(tzinfo=jst)
 
     leaderboards = crud.get_leaderboards_admin(
         db=db,
@@ -685,6 +707,7 @@ async def read_leaderboards_admin(
         limit=limit,
         published_at_start=published_at_start,
         published_at_end=published_at_end,
+        is_public=is_public,
     )
     
     crud.create_user_action(
@@ -692,8 +715,8 @@ async def read_leaderboards_admin(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_leaderboards_admin",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=jst),
+            received_at=datetime.datetime.now(tz=jst),
         )
     )
 
