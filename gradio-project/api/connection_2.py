@@ -777,13 +777,13 @@ async def check_playable(
 ):
     program = request.session.get("program", 'none')
     response = await http_client.get(
-        f"{BACKEND_URL}leaderboards/{leaderboard_id}/playable/?program={program}",
+        f"{BACKEND_URL}leaderboards/{leaderboard_id}/check_ok_to_start_new/?program={program}",
         auth=get_auth(request),
         follow_redirects=True
     )
     
     response.raise_for_status()
-    return response.json()['is_playable']
+    return response.json()['start_new']
 
 async def get_users(request: Request):
     response = await http_client.get(
