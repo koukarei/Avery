@@ -1422,13 +1422,15 @@ async def get_rounds_by_leaderboard(
         db_rounds_users = crud.get_rounds_full(
             db=db,
             leaderboard_id=leaderboard_id,
-            school_name=current_user.school
+            school_name=current_user.school,
+            user_type=current_user.user_type,
         )
     else:
         db_rounds_users = crud.get_rounds_full(
             db=db,
             leaderboard_id=leaderboard_id,
-            player_id=current_user.id
+            player_id=current_user.id,
+            user_type=current_user.user_type,
         )
 
     db_rounds = [r for r,u in db_rounds_users]
