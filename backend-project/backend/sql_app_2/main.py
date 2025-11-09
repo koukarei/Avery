@@ -537,9 +537,19 @@ async def read_user_me(current_user: Annotated[schemas.User, Depends(get_current
 async def read_users(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to delete user")
+        
     if current_user.user_type == "student":
-        raise HTTPException(status_code=401, detail="You are not allowed to view users")
-    users = crud.get_users(db, skip=skip, limit=limit)
+        raise HTTPException(status_code=401, detail="You are not authorized to view users")
+    
+    if current_user.is_admin:
+        users = crud.get_users(db, skip=skip, limit=limit)
+    else:
+        if current_user.school:
+            school_name = current_user.school
+        else:
+            school_name = "public"
+        users = crud.get_users_by_school(db, school=school_name, skip=skip, limit=limit)    
+    
     return users
 
 @app.get("/users/{user_id}", tags=["User"], response_model=schemas.User)
@@ -1310,9 +1320,28 @@ async def create_program(
 async def read_programs(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to read programs")
-    if not current_user.is_admin:
-        raise HTTPException(status_code=401, detail="You are not an admin")
-    programs = crud.get_programs(db, skip=skip, limit=limit)
+    if current_user.is_admin:
+        programs = crud.get_programs(db, skip=skip, limit=limit)
+    elif current_user.user_type == "instructor":
+        programSchool = crud.get_programs_by_school(
+            db=db,
+            school_name=current_user.school,
+            skip=skip,
+            limit=limit,
+        )
+        programs = [p.program for p in programSchool]
+    else:
+        programUser = crud.get_programs_by_user(
+            db=db,
+            user_id=current_user.id,
+            skip=skip,
+            limit=limit,
+        )
+        programs = [p.program for p in programUser]
+
+
+    if not programs:
+        return [crud.get_program_by_name(db, "inlab_test")]
     
     crud.create_user_action(
         db=db,
@@ -1324,6 +1353,189 @@ async def read_programs(current_user: Annotated[schemas.User, Depends(get_curren
         )
     )
     return programs
+
+@app.get("/school/programs/", tags=["Program"], response_model=list[schemas.Program])
+async def read_school_programs(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    school: str,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to read programs")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_school_programs",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+    programSchool = crud.get_programs_by_school(
+        db=db,
+        school_name=school,
+    )
+    return [p.program for p in programSchool]
+
+@app.post("/school/program", tags=["Program"], response_model=schemas.Program)
+async def add_program_to_school(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    program_school: schemas.ProgramSchoolUpdate,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to update program")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="update_school_program",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+    add_program = crud.add_program_school(db=db, program_school_update=program_school)
+    return add_program.program if add_program else None
+
+@app.delete("/school/program", tags=["Program"], response_model=schemas.ProgramSchoolUpdate)
+async def remove_program_from_school(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    program_school: schemas.ProgramSchoolUpdate,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to update program")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="remove_school_program",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+    return crud.delete_program_school(db=db, program_school_update=program_school)
+
+@app.get("/users/{user_id}/program", tags=["Program"], response_model=list[schemas.Program])
+async def get_user_program(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    user_id: int,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view program")
+    if current_user.id != user_id and not current_user.user_type == "instructor":
+        raise HTTPException(status_code=401, detail="You are not allowed to view this user's program")
+    
+    checking_user = crud.get_user(db=db, user_id=user_id)
+    if checking_user and checking_user.school != current_user.school and not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not allowed to view this user's program")
+
+    db_program_user = crud.get_programs_by_user(
+        db=db,
+        user_id=user_id,
+    )
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_user_program",
+            related_id=user_id,
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+
+    return [p.program for p in db_program_user]
+
+@app.post("/users/{user_id}/program", tags=["Program"], response_model=schemas.Program)
+async def add_program_to_user(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    programUserUpdate: schemas.ProgramUserUpdate,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to update program")
+    if not current_user.user_type == "instructor":
+        raise HTTPException(status_code=401, detail="You are not an instructor")
+    
+    updating_user = crud.get_user(db=db, user_id=programUserUpdate.user_id)
+    if updating_user and updating_user.school != current_user.school and not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not allowed to update this user's program")
+    
+    if updating_user.school:
+        school = updating_user.school
+    else:
+        school = "public"
+
+    school_programs = crud.get_programs_by_school(
+        db=db,
+        school_name=school,
+    )
+    
+    if programUserUpdate.program_id not in [sp.program_id for sp in school_programs]:
+        raise HTTPException(status_code=401, detail="This program not available for your school")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="update_user_program",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+    add_program = crud.add_program_user(db=db, program_id=programUserUpdate.program_id, user_id=programUserUpdate.user_id)
+    return add_program.program if add_program else None
+
+@app.delete("/users/{user_id}/program", tags=["Program"], response_model=schemas.ProgramUserUpdate)
+async def remove_program_from_user(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    programUserUpdate: schemas.ProgramUserUpdate,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to update program")
+    if not current_user.user_type == "instructor":
+        raise HTTPException(status_code=401, detail="You are not an instructor")
+    
+    updating_user = crud.get_user(db=db, user_id=programUserUpdate.user_id)
+    if updating_user and updating_user.school != current_user.school and not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not allowed to update this user's program")
+    
+    if updating_user.school:
+        school = updating_user.school
+    else:
+        school = "public"
+
+    school_programs = crud.get_programs_by_school(
+        db=db,
+        school_name=school,
+    )
+    
+    if programUserUpdate.program_id not in [sp.program_id for sp in school_programs]:
+        raise HTTPException(status_code=401, detail="This program not available for your school")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="remove_user_program",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+    return crud.delete_program_user(db=db, program_id=programUserUpdate.program_id, user_id=programUserUpdate.user_id)
 
 @app.get("/rounds/{round_id}", tags=["Round"], response_model=schemas.RoundOut)
 async def get_round(
@@ -1419,18 +1631,18 @@ async def get_rounds_by_leaderboard(
         )
     )
 
-    if current_user.school:
+    if current_user.school is None or current_user.school == "public":
         db_rounds_users = crud.get_rounds_full(
             db=db,
             leaderboard_id=leaderboard_id,
-            school_name=current_user.school,
+            player_id=current_user.id,
             user_type=current_user.user_type,
         )
     else:
         db_rounds_users = crud.get_rounds_full(
             db=db,
             leaderboard_id=leaderboard_id,
-            player_id=current_user.id,
+            school_name=current_user.school,
             user_type=current_user.user_type,
         )
 

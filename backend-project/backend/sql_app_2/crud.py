@@ -24,6 +24,9 @@ def get_user_by_lti(db: Session, lti_user_id: int, school: str):
 def get_users(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.User).offset(skip).limit(limit).all()
 
+def get_users_by_school(db: Session, school: str = "public", skip: int = 0, limit: int = 100):
+    return db.query(models.User).filter(models.User.school == school).offset(skip).limit(limit).all()
+
 def create_public_user(db: Session, user: schemas.UserCreate):
     hashed_password = get_password_hash(user.password)
 
@@ -500,11 +503,52 @@ def create_program(db: Session, program: schemas.ProgramBase):
 def get_programs(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Program).offset(skip).limit(limit).all()
 
+def get_programs_by_school(db: Session, school_name: str, skip: int = 0, limit: int = 50):
+    return db.query(models.ProgramSchool).filter(models.ProgramSchool.school == school_name).offset(skip).limit(limit).all()
+
+def get_programs_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 50):
+    return db.query(models.ProgramUser).filter(models.ProgramUser.user_id == user_id).offset(skip).limit(limit).all()
+
 def get_program_by_name(db: Session, program_name: str):
     return db.query(models.Program).filter(models.Program.name == program_name).first()
 
 def get_round(db: Session, round_id: int):
     return db.query(models.Round).filter(models.Round.id == round_id).first()
+
+def add_program_school(db: Session, program_school_update: schemas.ProgramSchoolUpdate):
+    db_program_school = db.query(models.ProgramSchool).filter(models.ProgramSchool.program_id == program_school_update.program_id).filter(models.ProgramSchool.school == program_school_update.school).first()
+    if db_program_school is None:
+        db_program_school = models.ProgramSchool(**program_school_update.model_dump())
+        db.add(db_program_school)
+        db.commit()
+        db.refresh(db_program_school)
+    return db_program_school
+
+def delete_program_school(db: Session, program_school_update: schemas.ProgramSchoolUpdate):
+    db_program_school = db.query(models.ProgramSchool).filter(models.ProgramSchool.program_id == program_school_update.program_id).filter(models.ProgramSchool.school == program_school_update.school).first()
+    if db_program_school:
+        db.delete(db_program_school)
+        db.commit()
+    return db_program_school
+
+def add_program_user(db: Session, program_id: int, user_id: int):
+    db_program_user = db.query(models.ProgramUser).filter(models.ProgramUser.program_id == program_id).filter(models.ProgramUser.user_id == user_id).first()
+    if db_program_user is None:
+        db_program_user = models.ProgramUser(
+            program_id=program_id,
+            user_id=user_id
+        )
+        db.add(db_program_user)
+        db.commit()
+        db.refresh(db_program_user)
+    return db_program_user
+
+def delete_program_user(db: Session, program_id: int, user_id: int):
+    db_program_user = db.query(models.ProgramUser).filter(models.ProgramUser.program_id == program_id).filter(models.ProgramUser.user_id == user_id).first()
+    if db_program_user:
+        db.delete(db_program_user)
+        db.commit()
+    return db_program_user
 
 def update_round_display_name(db: Session, round_update: schemas.RoundUpdateName):
     db_round = db.query(models.Round).filter(models.Round.id == round_update.id).first()

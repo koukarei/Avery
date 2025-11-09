@@ -108,6 +108,26 @@ class Program(Base):
     feedback = Column(String(100), index=True)
 
     rounds = relationship("Round", back_populates="program")
+    schools = relationship("ProgramSchool", back_populates="program")
+    users = relationship("ProgramUser", back_populates="program")
+
+class ProgramSchool(Base):
+    __tablename__ = "program_schools"
+
+    id = Column(Integer, primary_key=True)
+    program_id = Column(Integer, ForeignKey("programs.id"))
+    school = Column(String(100), index=True)
+
+    program = relationship("Program", back_populates="schools", foreign_keys=[program_id])
+
+class ProgramUser(Base):
+    __tablename__ = "program_users"
+
+    id = Column(Integer, primary_key=True)
+    program_id = Column(Integer, ForeignKey("programs.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+
+    program = relationship("Program", back_populates="users", foreign_keys=[program_id])
 
 class Round(Base): 
     __tablename__ = "rounds"

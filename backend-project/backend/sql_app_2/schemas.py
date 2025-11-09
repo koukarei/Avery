@@ -69,6 +69,14 @@ class Program(ProgramBase):
     class Config:
         orm_mode = True
 
+class ProgramSchoolUpdate(BaseModel):
+    program_id: int
+    school: str
+
+class ProgramUserUpdate(BaseModel):
+    program_id: int
+    user_id: int
+
 class SceneBase(BaseModel):
     name: str
     prompt: str
