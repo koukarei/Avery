@@ -534,6 +534,12 @@ class ChatStats(BaseModel):
     n_user_messages: int
     n_assistant_messages: int
 
+class LeaderboardStats(BaseModel):
+    n_rounds: int
+
+class LeaderboardsStats(BaseModel):
+    n_leaderboards: int
+
 # classes for analysis
 class UserAnalysis(BaseModel):
     id: int

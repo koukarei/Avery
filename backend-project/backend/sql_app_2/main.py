@@ -691,6 +691,70 @@ async def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_cu
 
     return leaderboards
 
+
+@app.get("/leaderboards/stats", tags=["Leaderboard", "Stats"], response_model=schemas.LeaderboardsStats)
+async def read_leaderboards_stats(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    published_at_start: str=None, 
+    published_at_end: str=None, 
+    is_public: bool = True, 
+    db: Session = Depends(get_db)
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view leaderboards")
+    school_name = current_user.school
+    if school_name is None and not current_user.is_admin:
+        school_name = "public"
+    
+    if not published_at_start and not published_at_end:
+        if not is_public:
+            stats = crud.get_leaderboards_stats(
+                db=db,
+                school_name=school_name,
+                published_at_end=datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo')),
+                user_id=current_user.id,
+                is_public=False,
+            )
+            return stats
+        stats = crud.get_leaderboards_stats(db, school_name=school_name, published_at_end=datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo')))
+        return stats
+
+    if published_at_start:
+        published_at_start = datetime.datetime.strptime(published_at_start, "%d%m%Y").replace(tzinfo=zoneinfo.ZoneInfo('Asia/Tokyo'))
+    if published_at_end:
+        published_at_end = datetime.datetime.strptime(published_at_end, "%d%m%Y").replace(tzinfo=zoneinfo.ZoneInfo('Asia/Tokyo'))
+
+    if current_user.user_type == "student":
+        if published_at_start and published_at_start > datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo')):
+            published_at_start = datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo'))
+        if published_at_end and published_at_end > datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo')):
+            published_at_end = datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo'))
+
+    # print("after check",published_at_start, published_at_end)
+    if is_public:
+        stats = crud.get_leaderboards_stats(db, school_name=school_name, published_at_start=published_at_start, published_at_end=published_at_end)
+    else:
+        stats = crud.get_leaderboards_stats(
+            db=db,
+            school_name=school_name,
+            published_at_start=published_at_start,
+            published_at_end=published_at_end,
+            is_public=False,
+            user_id=current_user.id
+        )
+
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_leaderboards_stats",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+
+    return stats
+
 @app.get("/leaderboards/admin/", tags=["Leaderboard"], response_model=list[schemas.LeaderboardOut])
 async def read_leaderboards_admin(
         current_user: Annotated[schemas.User, Depends(get_current_user)],
@@ -731,6 +795,43 @@ async def read_leaderboards_admin(
     )
 
     return leaderboards
+
+@app.get("/leaderboards/admin/stats", tags=["Leaderboard", "Stats"], response_model=schemas.LeaderboardsStats)
+async def read_leaderboards_admin_stats(
+        current_user: Annotated[schemas.User, Depends(get_current_user)],
+        published_at_start: str = None,
+        published_at_end: str = None,
+        is_public: bool = True,
+        db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view leaderboards stats")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    jst = zoneinfo.ZoneInfo('Asia/Tokyo')
+    if published_at_start:
+        published_at_start = datetime.datetime.strptime(published_at_start, "%d%m%Y").replace(tzinfo=jst)
+    if published_at_end:
+        published_at_end = datetime.datetime.strptime(published_at_end, "%d%m%Y").replace(tzinfo=jst)
+
+    n_leaderboards = crud.get_leaderboards_admin_stats(
+        db=db,
+        published_at_start=published_at_start,
+        published_at_end=published_at_end,
+        is_public=is_public,
+    )
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_leaderboards_admin_stats",
+            sent_at=datetime.datetime.now(tz=jst),
+            received_at=datetime.datetime.now(tz=jst),
+        )
+    )
+
+    return {"n_leaderboards": n_leaderboards}
 
 @app.post("/leaderboards/", tags=["Leaderboard"], response_model=schemas.LeaderboardOut, status_code=201)
 async def create_leaderboard(
@@ -1655,6 +1756,59 @@ async def get_rounds_by_leaderboard(
     
     return db_rounds
 
+@app.get("/leaderboards/{leaderboard_id}/rounds/stats", tags=["Leaderboard", "Round", "Stats"], response_model=schemas.LeaderboardStats)
+async def get_rounds_stats_by_leaderboard(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    leaderboard_id: int,
+    program: Optional[str] = "none",
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view")
+    
+    if program == "none":
+        return {"n_rounds": 0}
+    elif program == "overview":
+        # check admin
+        if current_user.is_admin and current_user.user_type == "instructor":
+            
+            n_rounds = crud.get_rounds_full_count(
+                db=db,
+                leaderboard_id=leaderboard_id,
+                user_type=current_user.user_type
+            )
+            return {"n_rounds": n_rounds}
+        raise HTTPException(status_code=401, detail="You are not allowed to view all rounds")
+    db_program = crud.get_program_by_name(db, program)
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_rounds_stats_by_leaderboard",
+            related_id=leaderboard_id,
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+
+    if current_user.school is None or current_user.school == "public":
+        n_rounds = crud.get_rounds_full_count(
+            db=db,
+            leaderboard_id=leaderboard_id,
+            player_id=current_user.id,
+            user_type=current_user.user_type,
+        )
+    else:
+        n_rounds = crud.get_rounds_full_count(
+            db=db,
+            leaderboard_id=leaderboard_id,
+            school_name=current_user.school,
+            user_type=current_user.user_type,
+        )
+    
+    return {"n_rounds": n_rounds}
+
 @app.get("/my_rounds/", tags=["Round"], response_model=list[schemas.RoundOut])
 async def get_my_rounds(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
@@ -1756,7 +1910,16 @@ async def round_websocket(
 
     # set program
     obj = parse_obj_as(schemas.RoundCreate, user_action['obj'])
-    db_program = crud.get_program_by_name(db, obj.program)
+    db_program_user = crud.get_programs_by_user(
+        db=db,
+        user_id=player_id,
+    )
+    if db_program_user:
+        db_program = crud.get_program_by_name(db, obj.program)
+        if db_program and db_program.id in [pu.program_id for pu in db_program_user]:
+            pass
+        else:
+            db_program = crud.get_program_by_name(db, "inlab_test")
 
     # if user resumes the round
     if user_action["action"] == "resume":
@@ -2955,7 +3118,7 @@ async def read_chat(
     return chat
 
 
-@app.get("/chat/{round_id}/stats", tags=["Chat"], response_model=schemas.ChatStats)
+@app.get("/chat/{round_id}/stats", tags=["Chat", "Stats"], response_model=schemas.ChatStats)
 async def read_chat_stats(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     round_id: int, 

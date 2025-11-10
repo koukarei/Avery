@@ -166,6 +166,60 @@ def get_leaderboards(
         filter(models.Leaderboard.published_at <= published_at_end).\
                 offset(skip).limit(limit).all()
 
+
+def get_leaderboards_stats(
+        db: Session, 
+        school_name: str = None,
+        published_at_start: datetime.datetime = None,
+        published_at_end: datetime.datetime = None,
+        user_id: int = None,
+        is_public: bool = True
+    ):
+    if school_name:
+        school_leaderboards = db.query(
+            models.Leaderboard,
+            models.School_Leaderboard
+        ).\
+        filter(models.School_Leaderboard.school == school_name).\
+        join(
+            models.Leaderboard,
+            models.Leaderboard.id == models.School_Leaderboard.leaderboard_id
+        )
+    else:
+        school_leaderboards = db.query(
+            models.Leaderboard,
+            models.School_Leaderboard
+        ).join(
+            models.Leaderboard,
+            models.Leaderboard.id == models.School_Leaderboard.leaderboard_id
+        )
+    if user_id is not None:
+        school_leaderboards = school_leaderboards.\
+            filter(models.Leaderboard.created_by_id == user_id)
+
+    if published_at_start is None and published_at_end is None:
+        n_leaderboards = school_leaderboards.\
+            filter(models.Leaderboard.is_public == is_public).\
+            filter(models.Leaderboard.published_at <= datetime.datetime.now()).\
+                count()
+    elif published_at_start is None:
+        n_leaderboards =  school_leaderboards.\
+            filter(models.Leaderboard.is_public == is_public).\
+            filter(models.Leaderboard.published_at <= published_at_end).\
+                count()
+    else:
+        if published_at_end is None:
+            published_at_end = datetime.datetime.now()
+        n_leaderboards =  school_leaderboards.\
+            filter(models.Leaderboard.is_public == is_public).\
+            filter(models.Leaderboard.published_at >= published_at_start).\
+            filter(models.Leaderboard.published_at <= published_at_end).\
+                    count()
+    
+    return {
+        "n_leaderboards": n_leaderboards
+    }
+
 def get_leaderboards_admin(
         db: Session, 
         skip: int = 0, 
@@ -191,6 +245,30 @@ def get_leaderboards_admin(
             filter(models.Leaderboard.published_at <= published_at_end).\
                 filter(models.Leaderboard.is_public == is_public).\
                 offset(skip).limit(limit).all()
+
+def get_leaderboards_admin_stats(
+        db: Session, 
+        published_at_start: datetime.datetime = None,
+        published_at_end: datetime.datetime = None,
+        is_public: bool = True
+):
+    if published_at_start is None and published_at_end is None:
+        return db.query(models.Leaderboard).\
+            filter(models.Leaderboard.published_at <= datetime.datetime.now()).\
+            filter(models.Leaderboard.is_public == is_public).\
+                count()
+    elif published_at_start is None:
+        return db.query(models.Leaderboard).\
+            filter(models.Leaderboard.published_at <= published_at_end).\
+            filter(models.Leaderboard.is_public == is_public).\
+                count()
+    elif published_at_end is None:
+        published_at_end = datetime.datetime.now()
+    return db.query(models.Leaderboard).\
+        filter(models.Leaderboard.published_at >= published_at_start).\
+            filter(models.Leaderboard.published_at <= published_at_end).\
+                filter(models.Leaderboard.is_public == is_public).\
+                count()
 
 def get_leaderboard(db: Session, leaderboard_id: int):
     return db.query(models.Leaderboard).filter(models.Leaderboard.id == leaderboard_id).first()
@@ -629,6 +707,52 @@ def get_rounds_full(
         return rounds.filter(models.Round.player_id==player_id).order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
     else:
         return rounds.order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
+
+def get_rounds_full_count(
+        db: Session, 
+        player_id: int = None, 
+        leaderboard_id: int = None, 
+        program_id: int = None, 
+        school_name: str = None,
+        user_type: str = "student"
+):
+    
+    if school_name:
+        school_rounds = db.query(
+            models.Round,
+            models.User
+        ).\
+        filter(models.User.school == school_name).\
+        join(
+            models.Round,
+            models.Round.player_id == models.User.id
+        )
+    else:
+        school_rounds = db.query(
+            models.Round,
+            models.User
+        ).join(
+            models.Round,
+            models.Round.player_id == models.User.id
+        )
+
+    if program_id:
+        rounds = school_rounds.\
+        filter(models.Round.program_id == program_id)
+    else:
+        rounds = school_rounds
+
+    if user_type == "student":
+        rounds = rounds.filter(models.User.user_type == "student")
+
+    if leaderboard_id and player_id:
+        return rounds.filter(models.Round.leaderboard_id == leaderboard_id).filter(models.Round.player_id==player_id).count()
+    elif leaderboard_id:
+        return rounds.filter(models.Round.leaderboard_id == leaderboard_id).count()
+    elif player_id:
+        return rounds.filter(models.Round.player_id==player_id).count()
+    else:
+        return rounds.count()
 
 def create_round(db: Session, leaderboard_id:int, user_id: int, created_at: datetime.datetime, model_name: str="gpt-4o-mini", program_id: Optional[int]=None):
     db_chat=models.Chat()
