@@ -32,8 +32,6 @@ import logging
 
 from fastapi.middleware.cors import CORSMiddleware
 
-from starlette.middleware.sessions import SessionMiddleware
-
 origins = [
     "http://localhost:3000",
     "http://localhost:5173",
@@ -65,8 +63,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-app.add_middleware(SessionMiddleware, secret_key=os.environ.get('SESSION_SECRET_KEY'))
 
 @app.get("/")
 def hello_world():
@@ -1914,12 +1910,13 @@ async def round_websocket(
         db=db,
         user_id=player_id,
     )
-    if db_program_user:
-        db_program = crud.get_program_by_name(db, obj.program)
-        if db_program and db_program.id in [pu.program_id for pu in db_program_user]:
-            pass
-        else:
-            db_program = crud.get_program_by_name(db, "inlab_test")
+    
+    db_program = crud.get_program_by_name(db, obj.program)
+
+    if db_program and db_program_user and db_program.id in [pu.program_id for pu in db_program_user]:
+        pass
+    else:
+        db_program = crud.get_program_by_name(db, "inlab_test")
 
     # if user resumes the round
     if user_action["action"] == "resume":

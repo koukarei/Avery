@@ -34,7 +34,7 @@ email_validator==2.2.0
 emoji==2.14.1
 # en_core_web_sm==3.8.0  # spaCy model - install separately
 exceptiongroup==1.3.0
-fastapi==0.115.14
+fastapi==0.121.1
 fastapi-cli==0.0.7
 filelock==3.18.0
 flower==2.0.1
@@ -162,7 +162,7 @@ spacy-loggers==1.0.5
 SQLAlchemy==2.0.41
 srsly==2.5.1
 stanza==1.10.1
-starlette==0.46.2
+starlette>=0.49.1
 streamlit==1.46.1
 sympy==1.14.0
 tenacity==8.5.0
