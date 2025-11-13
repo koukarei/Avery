@@ -349,9 +349,7 @@ class Round_id(BaseModel):
 
 class UserProfile(UserProfileBase):
     id: int
-
-    rounds: list[IdOnly]=[]
-
+    
     class Config:
         orm_mode = True
 
