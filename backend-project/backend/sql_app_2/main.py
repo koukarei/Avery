@@ -8,7 +8,7 @@ templates = Jinja2Templates(directory="templates")
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import parse_obj_as
 from sqlalchemy.orm import Session
-import time, os, datetime, shutil, tempfile, zipfile, zoneinfo, asyncio, json #, yappi
+import time, os, datetime, shutil, tempfile, zipfile, zoneinfo, random, json #, yappi
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -442,6 +442,17 @@ async def create_user(user: Annotated[schemas.UserCreateIn, Form()], db: Session
         user.is_admin=True
         user.user_type="instructor"
     new_user = crud.create_public_user(db=db, user=user)
+    random_programs = ["student_1_sem_awe", "student_1_sem_img"]
+    assigned_program = random.choice(random_programs)
+    db_program = crud.get_program_by_name(db, program_name=assigned_program)
+
+    if db_program:
+        crud.add_program_user(
+            db=db,
+            program_id=db_program.id,
+            user_id=new_user.id,
+        )
+    
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
