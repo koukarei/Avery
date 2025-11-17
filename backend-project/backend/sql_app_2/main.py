@@ -529,6 +529,25 @@ async def read_user_me(current_user: Annotated[schemas.User, Depends(get_current
         raise HTTPException(status_code=401, detail="Login to read user")
     return current_user
 
+@app.get("/users/stats", tags=["User", "Stats"], response_model=schemas.UsersStats)
+async def read_users_stats(current_user: Annotated[schemas.User, Depends(get_current_user)], db: Session = Depends(get_db)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to delete user")
+        
+    if current_user.user_type == "student":
+        raise HTTPException(status_code=401, detail="You are not authorized to view users")
+    
+    if current_user.is_admin:
+        stats = crud.get_users_stats(db)
+    else:
+        if current_user.school:
+            school_name = current_user.school
+        else:
+            school_name = "public"
+        stats = crud.get_users_stats_by_school(db, school=school_name)    
+    
+    return stats
+
 @app.get("/users/", tags=["User"], response_model=list[schemas.User])
 async def read_users(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     if not current_user:
@@ -568,10 +587,99 @@ async def read_scenes(current_user: Annotated[schemas.User, Depends(get_current_
 async def create_scene(current_user: Annotated[schemas.User, Depends(get_current_user)], scene: schemas.SceneBase, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to create scene")
+    if current_user.user_type == "student":
+        raise HTTPException(status_code=401, detail="You are not authorized to create scenes")
+    
+    scene = crud.create_scene(db=db, scene=scene)
+    if current_user.school:
+        crud.add_scene_school(
+            db=db,
+            scene_school_update=schemas.SceneSchoolUpdate(
+                scene_id=scene.id,
+                school=current_user.school
+            )
+        )
+    else:
+        crud.add_scene_school(
+            db=db,
+            scene_school_update=schemas.SceneSchoolUpdate(
+                scene_id=scene.id,
+                school="public"
+            )
+        )
+    return scene
+
+@app.get("/scene/schools/", tags=["Scene"], response_model=list[schemas.Scene])
+async def read_scene_schools(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    school: str,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to read programs")
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
-    return crud.create_scene(db=db, scene=scene)
     
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_scene_schools",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+    sceneSchool = crud.get_scenes_by_school(
+        db=db,
+        school_name=school,
+    )
+    return [p.scene for p in sceneSchool]
+
+@app.post("/scene/school", tags=["Scene"], response_model=schemas.Scene)
+async def add_scene_to_school(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    scene_school: schemas.SceneSchoolUpdate,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to update program")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="update_school_scene",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+    add_scene = crud.add_scene_school(db=db, scene_school_update=scene_school)
+    return add_scene.scene if add_scene else None
+
+@app.delete("/scene/school", tags=["Scene"], response_model=schemas.SceneSchoolUpdate)
+async def remove_scene_from_school(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    scene_school: schemas.SceneSchoolUpdate,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to update program")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="remove_school_scene",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+    return crud.delete_scene_school(db=db, scene_school_update=scene_school)
+
 @app.get("/stories/", tags=["Story"], response_model=list[schemas.StoryOut])
 async def read_stories(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     if not current_user:
@@ -618,9 +726,96 @@ async def create_story(
         raise HTTPException(status_code=400, detail="Error uploading file")
     finally:
         story_content_file.file.close()
+    story = crud.create_story(db=db, story=storyCreate)
 
-    return crud.create_story(db=db, story=storyCreate)
+    if current_user.school:
+        crud.add_story_school(
+            db=db,
+            story_school_update=schemas.StorySchoolUpdate(
+                story_id=story.id,
+                school=current_user.school
+            )
+        )
+    else:
+        crud.add_story_school(
+            db=db,
+            story_school_update=schemas.StorySchoolUpdate(
+                story_id=story.id,
+                school="public"
+            )
+        )
+    return story
 
+@app.get("/story/schools/", tags=["Story"], response_model=list[schemas.StoryOut])
+async def read_story_schools(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    school: str,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to read programs")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_story_schools",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+    storySchool = crud.get_story_by_school(
+        db=db,
+        school_name=school,
+    )
+    return [p.story for p in storySchool]
+
+@app.post("/story/school", tags=["Story"], response_model=schemas.Story)
+async def add_story_to_school(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    story_school: schemas.StorySchoolUpdate,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to update program")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="update_school_story",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+    add_story = crud.add_story_school(db=db, story_school_update=story_school)
+    return add_story.story if add_story else None
+
+@app.delete("/story/school", tags=["Story"], response_model=schemas.StorySchoolUpdate)
+async def remove_story_from_school(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    story_school: schemas.StorySchoolUpdate,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to update program")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=401, detail="You are not an admin")
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="remove_school_story",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+    return crud.delete_story_school(db=db, story_school_update=story_school)
 
 @app.get("/leaderboards/", tags=["Leaderboard"], response_model=list[Tuple[schemas.LeaderboardOut, schemas.SchoolOut]])
 async def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_current_user)],skip: int = 0, limit: int = 100, published_at_start: str=None, published_at_end: str=None, is_public: bool = True, db: Session = Depends(get_db)):
@@ -1913,9 +2108,7 @@ async def round_websocket(
     
     db_program = crud.get_program_by_name(db, obj.program)
 
-    if db_program and db_program_user and db_program.id in [pu.program_id for pu in db_program_user]:
-        pass
-    else:
+    if not (db_program and db_program_user and db_program.id in [pu.program_id for pu in db_program_user]):
         db_program = crud.get_program_by_name(db, "inlab_test")
 
     # if user resumes the round

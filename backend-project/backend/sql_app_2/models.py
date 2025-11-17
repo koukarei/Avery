@@ -49,6 +49,16 @@ class Scene(Base):
 
     stories = relationship("Story", back_populates="scene")
     leaderboards = relationship("Leaderboard", back_populates="scene")
+    schools = relationship("SceneSchool", back_populates="scene")
+
+class SceneSchool(Base):
+    __tablename__ = "scene_schools"
+
+    id = Column(Integer, primary_key=True)
+    scene_id = Column(Integer, ForeignKey("scenes.id"))
+    school = Column(String(100), index=True)
+
+    scene = relationship("Scene", back_populates="schools", foreign_keys=[scene_id])
 
 class Story(Base):
     __tablename__ = "stories"
@@ -62,6 +72,16 @@ class Story(Base):
 
     vocabularies = relationship("Vocabulary",secondary="story_vocabulary", back_populates="stories")
     leaderboards = relationship("Leaderboard", back_populates="story")
+    schools = relationship("StorySchool", back_populates="story")
+
+class StorySchool(Base):
+    __tablename__ = "story_schools"
+
+    id = Column(Integer, primary_key=True)
+    story_id = Column(Integer, ForeignKey("stories.id"))
+    school = Column(String(100), index=True)
+
+    story = relationship("Story", back_populates="schools", foreign_keys=[story_id])
 
 class Leaderboard(Base):
     __tablename__ = "leaderboards"

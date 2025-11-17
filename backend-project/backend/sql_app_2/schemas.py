@@ -87,6 +87,10 @@ class Scene(SceneBase):
     class Config:
         orm_mode = True
 
+class SceneSchoolUpdate(BaseModel):
+    scene_id: int
+    school: str
+
 class UserBase(BaseModel):
     username: str
     email: str
@@ -385,6 +389,11 @@ class StoryOut(BaseModel):
     class Config:
         orm_mode = True
 
+
+class StorySchoolUpdate(BaseModel):
+    story_id: int
+    school: str
+
 class PersonalDictionaryId(BaseModel):
     player: int
     vocabulary: int
@@ -526,6 +535,10 @@ class UserActionUpdate(BaseModel):
 
 class UserAction(UserActionBase):
     id: int
+
+class UsersStats(BaseModel):
+    n_users: int
+    n_active_users: int
 
 class ChatStats(BaseModel):
     n_messages: int

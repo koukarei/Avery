@@ -21,6 +21,22 @@ def get_user_by_username(db: Session, username: str):
 def get_user_by_lti(db: Session, lti_user_id: int, school: str):
     return db.query(models.User).filter(models.User.lti_user_id == lti_user_id).filter(models.User.school == school).first()
 
+def get_users_stats(db: Session):
+    n_users = db.query(models.User).count()
+    n_active_users = db.query(models.User).filter(models.User.is_active == True).count()
+    return {
+        "n_users": n_users,
+        "n_active_users": n_active_users
+    }
+
+def get_users_stats_by_school(db: Session, school: str):
+    n_users = db.query(models.User).filter(models.User.school == school).count()
+    n_active_users = db.query(models.User).filter(models.User.school == school).filter(models.User.is_active == True).count()
+    return {
+        "n_users": n_users,
+        "n_active_users": n_active_users
+    }
+
 def get_users(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.User).offset(skip).limit(limit).all()
 
@@ -533,6 +549,25 @@ def create_story(db: Session, story: schemas.StoryCreate):
     db.refresh(db_story)
     return db_story
 
+def get_story_by_school(db: Session, school_name: str, skip: int = 0, limit: int = 50):
+    return db.query(models.StorySchool).filter(models.StorySchool.school == school_name).offset(skip).limit(limit).all()
+
+def add_story_school(db: Session, story_school_update: schemas.StorySchoolUpdate):
+    db_story_school = db.query(models.StorySchool).filter(models.StorySchool.story_id == story_school_update.story_id).filter(models.StorySchool.school == story_school_update.school).first()
+    if db_story_school is None:
+        db_story_school = models.StorySchool(**story_school_update.model_dump())
+        db.add(db_story_school)
+        db.commit()
+        db.refresh(db_story_school)
+    return db_story_school
+
+def delete_story_school(db: Session, story_school_update: schemas.StorySchoolUpdate):
+    db_story_school = db.query(models.StorySchool).filter(models.StorySchool.story_id == story_school_update.story_id).filter(models.StorySchool.school == story_school_update.school).first()
+    if db_story_school:
+        db.delete(db_story_school)
+        db.commit()
+    return db_story_school
+
 def get_scenes(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Scene).offset(skip).limit(limit).all()
 
@@ -548,6 +583,25 @@ def create_scene(db: Session, scene: schemas.SceneBase):
     db.commit()
     db.refresh(db_scene)
     return db_scene
+
+def get_scene_by_school(db: Session, school_name: str, skip: int = 0, limit: int = 50):
+    return db.query(models.SceneSchool).filter(models.SceneSchool.school == school_name).offset(skip).limit(limit).all()
+
+def add_scene_school(db: Session, scene_school_update: schemas.SceneSchoolUpdate):
+    db_scene_school = db.query(models.SceneSchool).filter(models.SceneSchool.scene_id == scene_school_update.scene_id).filter(models.SceneSchool.school == scene_school_update.school).first()
+    if db_scene_school is None:
+        db_scene_school = models.SceneSchool(**scene_school_update.model_dump())
+        db.add(db_scene_school)
+        db.commit()
+        db.refresh(db_scene_school)
+    return db_scene_school
+
+def delete_scene_school(db: Session, scene_school_update: schemas.SceneSchoolUpdate):
+    db_scene_school = db.query(models.SceneSchool).filter(models.SceneSchool.scene_id == scene_school_update.scene_id).filter(models.SceneSchool.school == scene_school_update.school).first()
+    if db_scene_school:
+        db.delete(db_scene_school)
+        db.commit()
+    return db_scene_school
 
 def get_description(db: Session, leaderboard_id: int, model_name: str=None):
     if model_name:
