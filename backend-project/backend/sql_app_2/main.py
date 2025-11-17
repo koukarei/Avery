@@ -2281,6 +2281,9 @@ async def round_websocket(
             }
         else:
             user_action["action"] = "start"
+    elif user_action["action"] not in ["start", "resume"]:
+        logger1.error(f"Unknown initial action '{user_action['action']}' from user {player_id}")
+        send_data = {}
 
     if user_action["action"] == "start":
 
@@ -2892,7 +2895,9 @@ async def round_websocket(
                 }
 
                 chatbot_obj.kill()
-
+            else:
+                send_data = {}
+                logger1.error(f"Unknown action received: {user_action['action']}")
             # send details to the user
             await websocket.send_json(send_data)
 
