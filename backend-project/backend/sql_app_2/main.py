@@ -280,16 +280,22 @@ async def lti_login(request: Request):
         school = "School not provided"
         if oauth_consumer_key == "saikyo_consumer_key":
             school = "saikyo"
+            program = "saikyo_open_tutorial"
         elif oauth_consumer_key == "hikone_consumer_key":
             school = "hikone"
+            program = "student_2_sem"
         elif oauth_consumer_key == "lms_consumer_key":
             school = "lms"
+            program = "inlab_test"
         elif oauth_consumer_key == "tom_consumer_key":
             school = "tom"
+            program = "student_2_sem"
         elif oauth_consumer_key == "tomsec_consumer_key":
             school = "tomsec"
+            program = "student_2_sem"
         elif oauth_consumer_key == "newleaf_consumer_key":
             school = "newleaf"
+            program = "inlab_test"
 
         if "instructor" in form_data.get('roles', '').lower():
             role = "instructor"
@@ -321,6 +327,18 @@ async def lti_login(request: Request):
             # Create user
             response = await create_user_lti(user=user_login, db=next(get_db()))
             token = await login_for_access_token_lti(user=user_login, db=next(get_db()))
+            db_program = crud.get_program_by_name(next(get_db()), program_name=program)
+            if db_program:
+                db_user = crud.get_user_by_lti(
+                    db=next(get_db()),
+                    lti_user_id=user_login.user_id,
+                    school=school,
+                )
+                crud.add_program_user(
+                    db=next(get_db()),
+                    program_id=db_program.id,
+                    user_id=db_user.id,
+                )
 
 
         return templates.TemplateResponse(
