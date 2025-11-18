@@ -278,6 +278,7 @@ async def lti_login(request: Request):
 
     if user_id:
         school = "School not provided"
+        program = form_data.get('custom_program', 'none')
         if oauth_consumer_key == "saikyo_consumer_key":
             school = "saikyo"
             program = "saikyo_open_tutorial"
@@ -348,7 +349,7 @@ async def lti_login(request: Request):
                 "access_token": token.access_token,
                 "refresh_token": token.refresh_token,
                 "token_type": token.token_type,
-                "program": form_data.get('custom_program', 'none')
+                "program": program
             }})
     raise HTTPException(status_code=500, detail="Failed to login")
 
