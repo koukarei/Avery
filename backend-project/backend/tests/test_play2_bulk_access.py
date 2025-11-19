@@ -21,7 +21,12 @@ def test_create_test_accounts():
         }
         response = client.post(
             "/sqlapp2/users/", 
+<<<<<<< HEAD
             data=user_acc.copy(),
+=======
+            json=user_acc.copy(), 
+            headers={"Content-Type": "application/json"}
+>>>>>>> dde0c41 (update pytest)
         )
         assert response.status_code == 201 or (response.status_code == 400 and (response.json()["detail"] == "Username already registered" or response.json()["detail"] == "Email already registered")), response.json()
 
