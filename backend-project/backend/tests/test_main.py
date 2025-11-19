@@ -27,13 +27,13 @@ def test_start_data():
     }
 
     response = client.post(
-        "/avery/sqlapp2/users/", 
+        "/sqlapp2/users/", 
         json=user_acc.copy(), 
         headers={"Content-Type": "application/json"}
     )
 
     response = client.post(
-        "/avery/sqlapp2/users/",
+        "/sqlapp2/users/",
         json=user_acc2.copy(),
         headers={"Content-Type": "application/json"}
     )
@@ -48,7 +48,7 @@ class TestAdmin:
         
         # Test read all scenes
         response = client.get(
-            "/avery/sqlapp2/scenes/",
+            "/sqlapp2/scenes/",
             headers={"Authorization": f"Bearer {self.access_token}"}
         )
         assert response.status_code == 200, response.json()
@@ -59,7 +59,7 @@ class TestAdmin:
             "prompt": "in the style of Beatrix Potter"
         }
 
-        response = client.post("/avery/sqlapp2/scene/", json=new_scene.copy(),headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"})
+        response = client.post("/sqlapp2/scene/", json=new_scene.copy(),headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 201, response.json()
         scene_id = response.json()['id']
         assert scene_id > 0
@@ -75,7 +75,7 @@ class TestAdmin:
         ]
 
         for scene in scenes:
-            response = client.post("/avery/sqlapp2/scene/", json=scene.copy(),headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"})
+            response = client.post("/sqlapp2/scene/", json=scene.copy(),headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"})
             assert response.status_code == 201, response.json()
 
     def test_add_programs(self):
@@ -108,13 +108,13 @@ class TestAdmin:
         ]
 
         for program in programs:
-            response = client.post("/avery/sqlapp2/program", json=program.copy(),headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"})
+            response = client.post("/sqlapp2/program", json=program.copy(),headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"})
             assert response.status_code == 201, response.json()
 
     def test_read_stories(self):
 
         # Test read all stories
-        response = client.get("/avery/sqlapp2/stories/", headers={"Authorization": f"Bearer {self.access_token}"})
+        response = client.get("/sqlapp2/stories/", headers={"Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 200, response.json()
         num_stories = len(response.json())
 
@@ -122,7 +122,7 @@ class TestAdmin:
         test_file_path = "tests/mice_story_for_test.txt"
         with open(test_file_path, "rb") as f:
             response = client.post(
-                "/avery/sqlapp2/story/",
+                "/sqlapp2/story/",
                 files={"story_content_file": ("mice_story_for_test.txt", f, "text/plain")},
                 data={
                     "title": "The Tale of Two Bad Mice",
@@ -134,7 +134,7 @@ class TestAdmin:
         assert response.status_code == 201, response.json()
 
         # Test whether story is created
-        response = client.get("/avery/sqlapp2/stories/", headers={"Authorization": f"Bearer {self.access_token}"})
+        response = client.get("/sqlapp2/stories/", headers={"Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 200, response.json()
         assert len(response.json()) == num_stories + 1
 

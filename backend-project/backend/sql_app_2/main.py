@@ -570,7 +570,7 @@ async def update_user_password(
     user_id = current_user.id
     return crud.update_user_password(db=db, user_id=user_id, new_password=user.new_password)
 
-@app.put("/users/{user_id}", tags=["User"], response_model=schemas.User)
+@app.put("/users/", tags=["User"], response_model=schemas.User)
 async def update_user(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     user: schemas.UserUpdateIn,
@@ -644,6 +644,15 @@ async def read_users(current_user: Annotated[schemas.User, Depends(get_current_u
         users = crud.get_users_by_school(db, school=school_name, skip=skip, limit=limit)    
     
     return users
+
+@app.get("/users/by_username/{username}", tags=["User"], response_model=schemas.User)
+async def read_user_by_username(current_user: Annotated[schemas.User, Depends(get_current_user)], username: str, db: Session = Depends(get_db)):
+    if current_user.username != username and not current_user.is_admin:
+            raise HTTPException(status_code=401, detail="You are not an admin")
+    db_user = crud.get_user_by_username(db, username=username)
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return db_user
 
 @app.get("/users/{user_id}", tags=["User"], response_model=schemas.User)
 async def read_user(current_user: Annotated[schemas.User, Depends(get_current_user)], user_id: int, db: Session = Depends(get_db)):
@@ -1828,7 +1837,7 @@ async def get_user_program(
 
     return [p.program for p in db_program_user]
 
-@app.post("/users/{user_id}/program", tags=["Program"], response_model=schemas.Program)
+@app.post("/users/{user_id}/program", tags=["Program"], response_model=schemas.Program, status_code=201)
 async def add_program_to_user(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     programUserUpdate: schemas.ProgramUserUpdate,
