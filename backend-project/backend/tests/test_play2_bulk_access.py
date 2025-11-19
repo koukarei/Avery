@@ -20,7 +20,7 @@ def test_create_test_accounts():
             "display_name": f"Test Account {i}"
         }
         response = client.post(
-            "/avery/sqlapp2/users/", 
+            "/sqlapp2/users/", 
             json=user_acc.copy(), 
             headers={"Content-Type": "application/json"}
         )
@@ -36,7 +36,7 @@ class Test_TestAC:
         for i in range(1, TEST_NUMBER):
             user_id = 1
             response = self._client.put(
-                f"/avery/sqlapp2/users/{user_id}", 
+                f"/sqlapp2/users/", 
                 json={
                     "username": f"test_acc{i}",
                     "is_active": False,
@@ -50,7 +50,7 @@ class Test_TestAC:
         for i in range(1, TEST_NUMBER):
             user_id = 1
             response = self._client.put(
-                f"/avery/sqlapp2/users/{user_id}", 
+                f"/sqlapp2/users/", 
                 json={
                     "username": f"test_acc{i}",
                     "is_active": True,
@@ -58,6 +58,25 @@ class Test_TestAC:
                 headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"}
             )
             assert response.status_code == 200, response.json()
+
+    async def test_add_programs_to_test_accounts(self):
+        """Add programs to test accounts after multi-user simulation."""
+        for i in range(1, TEST_NUMBER):
+            test_account = self._client.get(
+                f"/sqlapp2/users/by_username/test_acc{i}",
+                headers={"Authorization": f"Bearer {self.access_token}"}
+            )
+            assert test_account.status_code == 200, test_account.json()
+            user_id = test_account.json()["id"]
+            response = self._client.post(
+                f"/sqlapp2/users/{user_id}/program", 
+                json={
+                    "user_id": user_id,
+                    "program_id": 1
+                }, 
+                headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.access_token}"}
+            )
+            assert response.status_code == 201, response.json()
 
 @pytest.mark.asyncio(loop_scope="session", scope="class")
 class TestPlay:
@@ -74,7 +93,7 @@ class TestPlay:
         assert instance.username is not None, "Username is not set."
         assert instance.password is not None, "Password is not set."
         
-        response = await instance._client.get("/avery/sqlapp2/leaderboards/", headers={"Authorization": f"Bearer {instance.access_token}"})
+        response = await instance._client.get("/sqlapp2/leaderboards/", headers={"Authorization": f"Bearer {instance.access_token}"})
         assert response.status_code == 200, response.json()
         assert len(response.json()) > 0, "No leaderboard found."
         assert 'id' in response.json()[0][0], "No leaderboard id found."
@@ -134,7 +153,7 @@ class TestPlay:
         for attempt in range(max_retries):
             try:
                 response = await self._client.post(
-                    "/avery/sqlapp2/token", data={"username": self.username, "password": self.password}
+                    "/sqlapp2/token", data={"username": self.username, "password": self.password}
                 )
                 if response.status_code == 200:
                     return response.json().get("access_token")
@@ -158,7 +177,7 @@ class TestPlay:
                     "leaderboard_id": self.leaderboard_id,
                     "program": "inlab_test",
                     "model": "gpt-4o-mini",
-                    "created_at": "2025-04-06T00:00:00Z",
+                    "created_at": "2025-11-20T00:00:00Z",
                 }
             }
 
@@ -171,7 +190,7 @@ class TestPlay:
                     "leaderboard_id": self.leaderboard_id,
                     "program": "inlab_test",
                     "model": "gpt-4o-mini",
-                    "created_at": "2025-04-06T00:00:00Z",
+                    "created_at": "2025-11-20T00:00:00Z",
                 }
             }
         )
@@ -195,7 +214,7 @@ class TestPlay:
                 "obj": {
                     "is_hint": True,
                     "content": "ヒントをちょうだい",
-                    "created_at": "2025-04-06T00:00:00Z",
+                    "created_at": "2025-11-20T00:00:00Z",
                 }
             }
         )
@@ -212,9 +231,9 @@ class TestPlay:
                 "program": "inlab_test",
                 "obj": {
                     "round_id": round['id'],
-                    "created_at": "2025-04-06T00:00:00Z",
+                    "created_at": "2025-11-20T00:00:00Z",
                     "generated_time": round['generated_time'],
-                    "sentence": "An old man crafted a wooden duck maciliously."
+                    "sentence": "A beautiful panoramic view of Osaka Castle on a clear, sunny day. The magnificent white and green castle stand proudly atop its massive stone walls, surrounded by a moat. A group of friends seen in the foreground, looking up at the castle in awe. The golden decorations on the castle roof are gleam in the sun. "
                 }
             }
         )
@@ -239,7 +258,7 @@ class TestPlay:
         data = await self.receive_json()
 
         while True:
-            if 'feedback' in data:
+            if data == {}:
                 data = await self.receive_json()
             else:
                 break

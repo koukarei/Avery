@@ -14,7 +14,7 @@ class TestPlay:
         
     async def test_websocket(self):
         # Get leaderboard id
-        response = self._client.get("/avery/sqlapp2/leaderboards/admin/", headers={"Authorization": f"Bearer {self.access_token}"})
+        response = self._client.get("/sqlapp2/leaderboards/admin/", headers={"Authorization": f"Bearer {self.access_token}"})
         assert response.status_code == 200, response.json()
         assert len(response.json()) > 0, "No leaderboard found."
         assert 'id' in response.json()[0], "No leaderboard id found."
@@ -24,7 +24,7 @@ class TestPlay:
 
 
         with self._client.websocket_connect(
-            f"/avery/sqlapp2/ws/{leaderboard_id}?token={self.access_token}",
+            f"/sqlapp2/ws/{leaderboard_id}?token={self.access_token}",
         ) as websocket:
             # Sent json data to the WebSocket to start the game
             websocket.send_json(
