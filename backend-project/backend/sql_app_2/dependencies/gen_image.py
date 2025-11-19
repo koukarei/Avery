@@ -36,14 +36,14 @@ def get_image_gemini(prompt):
     while True:
         try:
             response = client.models.generate_content(
-                model="gemini-2.0-flash-exp-image-generation",
-                contents=prompt,
+                model="gemini-2.5-flash-image",
+                contents=[prompt],
                 config=types.GenerateContentConfig(
                 response_modalities=['TEXT', 'IMAGE']
                 )
             )
             logger_image.info(f"Response: {prompt}")
-            for part in response.candidates[0].content.parts:
+            for part in response.parts:
                 if part.text is not None:
                     logger_image.info(f"Text part: {part.text}")
                 elif part.inline_data is not None:
@@ -59,7 +59,7 @@ def get_image_gemini(prompt):
                     retry_delay = detail.get('retryDelay')
                     time.sleep(int(retry_delay.split('s')[0]))
 
-def generate_interpretion(sentence, style="in the style of Japanese Anime", model="dall-e-3"):
+def generate_interpretion(sentence, style="in the style of Japanese Anime", model="gemini"):
     if model == "dall-e-3":
         prompt="""
                 I NEED to test how the tool works with extremely simple prompts. DO NOT add any detail, just use it AS-IS:
