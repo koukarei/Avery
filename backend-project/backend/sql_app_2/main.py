@@ -461,6 +461,54 @@ async def create_user(user: Annotated[schemas.UserCreateIn, Form()], db: Session
         user.is_admin=True
         user.user_type="instructor"
     new_user = crud.create_public_user(db=db, user=user)
+    db_program = crud.get_program_by_name(db, program_name="inlab_test")
+
+    if db_program:
+        crud.add_program_user(
+            db=db,
+            program_id=db_program.id,
+            user_id=new_user.id,
+        )
+    
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=new_user.id,
+            action="create_user",
+            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        )
+    )
+    return new_user
+
+@app.get("/users/random_username", tags=["User"], response_model=schemas.UserRandomCreate)
+async def get_random_username(db: Session = Depends(get_db)):
+    while True:
+        random_username = "a" + ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=8))
+        db_user = crud.get_user_by_username(db, username=random_username)
+        if not db_user:
+            break
+    return schemas.UserRandomCreate(username=random_username)
+
+@app.post("/users/random_username", tags=["User"], response_model=schemas.User, status_code=201)
+async def create_user_w_random_username(user: Annotated[schemas.UserRandomCreateIn, Form()], db: Session = Depends(get_db)):
+    db_user = crud.get_user_by_username(db, username=user.username)
+    if db_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    user = schemas.UserCreate(
+        username=user.username,
+        email=user.username + "@randomuser.com",
+        password=user.password,
+        is_admin=False,
+        user_type="student",
+        display_name=user.username,  
+    )
+    user.is_admin=False
+    user.user_type="student"
+    if user.username=="admin":
+        user.is_admin=True
+        user.user_type="instructor"
+    new_user = crud.create_random_user(db=db, user=user)
     random_programs = ["student_1_sem_awe", "student_1_sem_img"]
     assigned_program = random.choice(random_programs)
     db_program = crud.get_program_by_name(db, program_name=assigned_program)
@@ -476,7 +524,7 @@ async def create_user(user: Annotated[schemas.UserCreateIn, Form()], db: Session
         db=db,
         user_action=schemas.UserActionBase(
             user_id=new_user.id,
-            action="create_user",
+            action="create_random_user",
             sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )

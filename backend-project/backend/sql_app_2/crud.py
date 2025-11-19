@@ -43,6 +43,38 @@ def get_users(db: Session, skip: int = 0, limit: int = 100):
 def get_users_by_school(db: Session, school: str = "public", skip: int = 0, limit: int = 100):
     return db.query(models.User).filter(models.User.school == school).offset(skip).limit(limit).all()
 
+def create_random_user(db: Session, user: schemas.UserCreate):
+    hashed_password = get_password_hash(user.password)
+
+    db_userprofile = models.UserProfile(
+        display_name=user.display_name,
+        bio="",
+        avatar="",
+        level=1,
+        xp=0
+    )
+
+    db.add(db_userprofile)
+    db.commit()
+    db.refresh(db_userprofile)
+
+    db_user = models.User(
+        email=user.email,
+        username=user.username, 
+        hashed_password=hashed_password,
+        is_active=True,
+        profile_id=db_userprofile.id,
+        is_admin=user.is_admin,
+        user_type=user.user_type,
+        school="random"
+    )
+
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+
+    return db_user
+
 def create_public_user(db: Session, user: schemas.UserCreate):
     hashed_password = get_password_hash(user.password)
 
