@@ -113,6 +113,13 @@ class UserCreateIn(BaseModel):
     class Config:
         orm_mode = True
 
+class UserRandomCreate(BaseModel):
+    username: str
+
+class UserRandomCreateIn(BaseModel):
+    username: str
+    password: str
+
 class UserLti(BaseModel):
     user_id: int
     username: str
