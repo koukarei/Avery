@@ -163,6 +163,23 @@ class TestPlay:
                     backoff *= 2
                 else:
                     raise e
+                
+
+    async def get_ws_token(self, access_token, max_retries=3, backoff=1):
+        """Fetch access token for the user."""
+        for attempt in range(max_retries):
+            try:
+                response = await self._client.post(
+                    "/sqlapp2/ws_token", headers={"Authorization": f"Bearer {access_token}"}
+                )
+                if response.status_code == 200:
+                    return response.json().get("ws_token")
+            except ReadTimeout as e:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(backoff)
+                    backoff *= 2
+                else:
+                    raise e
     
     async def set_access_token(self):
         self.access_token = await self.get_access_token()
