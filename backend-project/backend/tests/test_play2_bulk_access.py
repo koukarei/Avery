@@ -101,7 +101,9 @@ class TestPlay:
         leaderboard = response.json()[0]
         instance.leaderboard_id = leaderboard[0]['id']
 
-        instance.url = f"ws://localhost:8000/sqlapp2/ws/{instance.leaderboard_id}?token={await instance.get_ws_token(instance.access_token)}"
+        ws_token = await instance.get_ws_token(instance.access_token)
+
+        instance.url = f"ws://localhost:8000/sqlapp2/ws/{instance.leaderboard_id}?token={ws_token}"
         
         instance._ws_context = aconnect_ws(instance.url, instance._client, keepalive_ping_timeout_seconds=60)
         instance.ws = await instance._ws_context.__aenter__()
