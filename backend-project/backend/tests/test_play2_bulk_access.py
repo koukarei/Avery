@@ -295,6 +295,8 @@ class TestPlay:
 
     async def test_websocket_no_ask_hint(self):
         """Test WebSocket connection and interaction."""
+        if self.url is None:
+            self.url = f"ws://localhost:8000/sqlapp2/ws/{self.leaderboard_id}?token={await self._client.post('/sqlapp2/ws_token', headers={'Authorization': f'Bearer {self.access_token}'}).json()['ws_token']}"
         async with aconnect_ws(self.url, self._client, keepalive_ping_timeout_seconds=60) as ws:
             self.ws = ws
             try:
