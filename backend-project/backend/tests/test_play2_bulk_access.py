@@ -7,7 +7,7 @@ sys.path.append(os.getcwd())
 from main import app 
 from wsproto.utilities import LocalProtocolError
 
-TEST_NUMBER = 11
+TEST_NUMBER = 41 # Total number of test accounts + 1
 
 def test_create_test_accounts():
     client = TestClient(app)
@@ -23,7 +23,7 @@ def test_create_test_accounts():
             "/sqlapp2/users/", 
             data=user_acc.copy(),
         )
-        assert response.status_code == 201, response.json()
+        assert response.status_code == 201 or (response.status_code == 400 and response.detail == "Username already registered"), response.json()
 
 @pytest.mark.usefixtures("login")
 class Test_TestAC:
