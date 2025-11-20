@@ -101,7 +101,7 @@ class TestPlay:
         leaderboard = response.json()[0]
         instance.leaderboard_id = leaderboard[0]['id']
 
-        instance.url = f"ws://localhost:8000/ws/{instance.leaderboard_id}?token={await instance.get_access_token()}"
+        instance.url = f"ws://localhost:8000/ws/{instance.leaderboard_id}?token={await instance.get_ws_token(instance.access_token)}"
         
         instance._ws_context = aconnect_ws(instance.url, instance._client, keepalive_ping_timeout_seconds=60)
         instance.ws = await instance._ws_context.__aenter__()
@@ -157,6 +157,23 @@ class TestPlay:
                 )
                 if response.status_code == 200:
                     return response.json().get("access_token")
+            except ReadTimeout as e:
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(backoff)
+                    backoff *= 2
+                else:
+                    raise e
+                
+
+    async def get_ws_token(self, access_token, max_retries=3, backoff=1):
+        """Fetch access token for the user."""
+        for attempt in range(max_retries):
+            try:
+                response = await self._client.post(
+                    "/sqlapp2/ws_token", headers={"Authorization": f"Bearer {access_token}"}
+                )
+                if response.status_code == 200:
+                    return response.json().get("ws_token")
             except ReadTimeout as e:
                 if attempt < max_retries - 1:
                     await asyncio.sleep(backoff)
