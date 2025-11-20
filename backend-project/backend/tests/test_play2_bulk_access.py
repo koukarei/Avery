@@ -86,7 +86,7 @@ class TestPlay:
         instance = cls()
         instance.username = username
         instance.password = password
-        instance._client = AsyncClient(base_url="ws://localhost:8000", timeout=20)
+        instance._client = AsyncClient(base_url="http://localhost:8000", timeout=20)
         await instance.set_access_token()
 
         # Get leaderboard id
