@@ -21,8 +21,9 @@ def test_create_test_accounts():
         }
         response = client.post(
             "/sqlapp2/users/", 
-            json=user_acc.copy(), 
-            headers={"Content-Type": "application/json"}
+            user_acc.copy(),
+            headers={"Content-Type": "multipart/form-data"},
+            with_credentials=True
         )
         assert response.status_code == 201 or response.status_code == 400, response.json()
 
