@@ -24,6 +24,7 @@ def test_create_test_accounts():
             json=user_acc.copy(), 
             headers={"Content-Type": "application/json"}
         )
+        assert response.status_code == 201 or response.status_code == 400, response.json()
 
 @pytest.mark.usefixtures("login")
 class Test_TestAC:
