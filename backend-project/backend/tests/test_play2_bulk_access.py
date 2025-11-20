@@ -103,7 +103,7 @@ class TestPlay:
 
         ws_token = await instance._client.post("/sqlapp2/ws_token", headers={"Authorization": f"Bearer {instance.access_token}"})
 
-        instance.url = f"ws://localhost:8000/sqlapp2/ws/{instance.leaderboard_id}?token={ws_token}"
+        instance.url = f"ws://localhost:8000/sqlapp2/ws/{instance.leaderboard_id}?token={ws_token.json()['ws_token']}"
         
         instance._ws_context = aconnect_ws(instance.url, instance._client, keepalive_ping_timeout_seconds=60)
         instance.ws = await instance._ws_context.__aenter__()
