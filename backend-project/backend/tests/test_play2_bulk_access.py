@@ -237,7 +237,7 @@ class TestPlay:
                             "round_id": round['id'],
                             "created_at": "2025-11-20T00:00:00Z",
                             "generated_time": round['generated_time'],
-                            "sentence": "A beautiful panoramic view of Osaka Castle on a clear, sunny day. The magnificent white and green castle stand proudly atop its massive stone walls, surrounded by a moat. A group of friends seen in the foreground, looking up at the castle in awe. The golden decorations on the castle roof are gleam in the sun. "
+                            "sentence": "A friendly-looking suburban house at night, decorated for Halloween with a smiling jack-o'-lantern and paper bats. The door is open, and a kind-looking adult is holding out a big bowl filled with candy. Two children, dressed as a cute black cat and a small superhero, are standing at the door holding up their pumpkin-shaped candy buckets with excitement."
                         }
                     }
                 )
@@ -344,7 +344,7 @@ class TestPlay:
                             "round_id": round['id'],
                             "created_at": "2025-11-20T00:00:00Z",
                             "generated_time": round['generated_time'],
-                            "sentence": "A beautiful panoramic view of Osaka Castle on a clear, sunny day. The magnificent white and green castle stand proudly atop its massive stone walls, surrounded by a moat. A group of friends seen in the foreground, looking up at the castle in awe. The golden decorations on the castle roof are gleam in the sun. "
+                            "sentence": "A friendly-looking suburban house at night, decorated for Halloween with a scary jack-o'-lantern and paper bats. The door is open, and a old witch is holding out a big bowl filled with candy. Two children, dressed as a cute black cat and a small superhero, is standing at the door holding up their pumpkin-shaped candy buckets with excitement."
                         }
                     }
                 )
@@ -451,7 +451,7 @@ class TestPlay:
                             "round_id": round['id'],
                             "created_at": "2025-11-20T00:00:00Z",
                             "generated_time": round['generated_time'],
-                            "sentence": "A beautiful panoramic view of Osaka Castle on a clear, sunny day. The magnificent white and green castle stand proudly atop its massive stone walls, surrounded by a moat. A group of friends seen in the foreground, looking up at the castle in awe. The golden decorations on the castle roof are gleam in the sun. "
+                            "sentence": "A friendly-looking suburban house at night, decorated for Halloween with a smiling jack-o'-lantern and paper bats. The door is open, and a kind-looking adult is holding out a big bowl filled with candy. Two children, dressed as a cute black cat and a small superhero, are standing at the door holding up their pumpkin-shaped candy buckets with excitement."
                         }
                     }
                 )
