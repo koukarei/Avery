@@ -24,7 +24,7 @@ def test_create_test_accounts():
             data=user_acc.copy(),
             headers={"Content-Type": "multipart/form-data"}
         )
-        assert response.status_code == 201 or response.status_code == 400, response.json()
+        assert response.status_code == 201, response.json()
 
 @pytest.mark.usefixtures("login")
 class Test_TestAC:
