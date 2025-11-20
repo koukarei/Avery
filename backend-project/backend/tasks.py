@@ -9,17 +9,60 @@ from sql_app_2 import crud as crud2, schemas as schemas2, database as database2
 from util import computing_time_tracker , encode_image
 from sql_app_2.database import SessionLocal2, engine2
 
-import torch
+import torch, asyncio
 
 import os, time, json, io, requests
 from celery import Celery
 from celery.schedules import crontab
+from celery import chain, group
 
-app = Celery(__name__)
-app.conf.broker_url = os.environ.get('BROKER_URL',
-                                        'redis://localhost:7876')
-app.conf.result_backend = os.environ.get('RESULT_BACKEND',
-                                            'redis://localhost:7876')
+def create_celery_app(broker_url: str, backend_url: str | None = None) -> Celery:
+    celery_app = Celery("tasks", broker=broker_url, backend=backend_url or broker_url)
+
+    class PatchedTask(celery_app.Task):  # type: ignore[name-defined]
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+
+        async def apply_asyncx(self, args=None, kwargs=None, **options):
+            result = await asyncio.to_thread(
+                super().apply_async, args, kwargs, **options
+            )
+            return result
+
+        async def delayx(self, *args, **kwargs):
+            result = await self.apply_asyncx(args, kwargs)
+            return result
+        
+    class PatchedChain(chain):  
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+
+        async def apply_asyncx(self, *args, **kwargs):
+            result = await asyncio.to_thread(
+                super().apply_async, *args, **kwargs
+            )
+            return result
+        
+    class PatchedGroup(group):  # type: ignore[name-defined]
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+
+        async def apply_asyncx(self, *args, **kwargs):
+            result = await asyncio.to_thread(
+                super().apply_async, *args, **kwargs
+            )
+            return result
+
+    celery_app.Task = PatchedTask  # type: ignore[name-defined]
+    celery_app.chain = PatchedChain  # type: ignore[attr-defined]
+    celery_app.group = PatchedGroup  # type: ignore[attr-defined]
+
+    return celery_app
+
+app = create_celery_app(
+    broker_url=os.environ.get('BROKER_URL', 'redis://localhost:7876'),
+    backend_url=os.environ.get('RESULT_BACKEND', 'redis://localhost:7876'),
+)
 
 app.conf.timezone = 'Asia/Tokyo'
 
