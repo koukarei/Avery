@@ -103,7 +103,7 @@ class TestPlay:
 
         ws_token = await instance._client.post("/sqlapp2/ws_token", headers={"Authorization": f"Bearer {instance.access_token}"})
 
-        instance._url = f"ws://localhost:8000/sqlapp2/ws/{instance.leaderboard_id}?token={ws_token.json()['ws_token']}"
+        instance.url = f"ws://localhost:8000/sqlapp2/ws/{instance.leaderboard_id}?token={ws_token.json()['ws_token']}"
         
         return instance
 
@@ -560,7 +560,7 @@ class TestPlay:
     async def test_websocket_no_ask_hint(self):
         """Test WebSocket connection and interaction."""
         
-        async with aconnect_ws(self._url, self._client, keepalive_ping_timeout_seconds=60) as ws:
+        async with aconnect_ws(self.url, self._client, keepalive_ping_timeout_seconds=60) as ws:
             self.ws = ws
             try:
                 self.resume_round = {
