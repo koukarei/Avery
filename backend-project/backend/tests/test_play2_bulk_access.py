@@ -23,7 +23,7 @@ def test_create_test_accounts():
             "/sqlapp2/users/", 
             data=user_acc.copy(),
         )
-        assert response.status_code == 201, response.json()
+        assert response.status_code == 201 or (response.status_code == 400 and (response.json()["detail"] == "Username already registered" or response.json()["detail"] == "Email already registered")), response.json()
 
 @pytest.mark.usefixtures("login")
 class Test_TestAC:

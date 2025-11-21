@@ -72,7 +72,7 @@ def generate_interpretion(sentence, style="in the style of Japanese Anime", mode
         image = encode_image(image_file=b_interpreted_image)
         return image
     elif model == "gemini":
-        prompt="Hi, please create a image {style} to show that {passage}".format(passage=sentence, style=style)
+        prompt="Hi, please create an image {style} to show that {passage}".format(passage=sentence, style=style)
         pil_interpreted_image = get_image_gemini(prompt)
         buffer = BytesIO()
         pil_interpreted_image.save(buffer, format="PNG")

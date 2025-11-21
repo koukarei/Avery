@@ -1,14 +1,13 @@
 import logging.config
 from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, responses, Security, status, WebSocket, WebSocketDisconnect, Request
 from fastapi.templating import Jinja2Templates
-from fastapi.concurrency import run_in_threadpool
 
 templates = Jinja2Templates(directory="templates")
 
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import parse_obj_as
 from sqlalchemy.orm import Session
-import time, os, datetime, shutil, tempfile, zipfile, zoneinfo, random, json #, yappi
+import time, os, datetime, shutil, tempfile, zipfile, zoneinfo, random, json, asyncio #, yappi
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -27,7 +26,7 @@ from util import *
 from typing import Tuple, List, Annotated, Optional, Union, Literal
 from datetime import timezone, timedelta
 from contextlib import asynccontextmanager
-from celery import chain, group
+
 import logging
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -1141,7 +1140,7 @@ async def create_leaderboard(
 
     db_original_image = crud.get_original_image(db, image_id=leaderboard.original_image_id)
 
-    t = generateDescription2.delay(
+    t =  await generateDescription2.delayx(
         leaderboard_id=result.id, 
         image=db_original_image.image, 
         story=story, 
@@ -1410,7 +1409,7 @@ async def create_leaderboards(
             leaderboard_list.append(db_leaderboard)
 
             # Generate description
-            t = generateDescription2.delay(
+            t = await generateDescription2.delayx(
                 leaderboard_id=db_leaderboard.id, 
                 image=img.image, 
                 story=story_extract, 
@@ -2016,6 +2015,7 @@ async def get_rounds_by_leaderboard(
             leaderboard_id=leaderboard_id,
             player_id=current_user.id,
             user_type=current_user.user_type,
+            program_id=db_program.id,
         )
     else:
         db_rounds_users = crud.get_rounds_full(
@@ -2023,6 +2023,7 @@ async def get_rounds_by_leaderboard(
             leaderboard_id=leaderboard_id,
             school_name=current_user.school,
             user_type=current_user.user_type,
+            program_id=db_program.id,
         )
 
     db_rounds = [r for r,u in db_rounds_users]
@@ -2497,7 +2498,7 @@ async def round_websocket(
 
                 # run in threadpool to avoid blocking event loop
                 # chatbot_obj.nextResponse: ask_for_hint, new_messages, base64_image
-                hint = await run_in_threadpool(
+                hint = await asyncio.to_thread(
                     chatbot_obj.nextResponse,
                     obj.content,
                     [],
@@ -2577,7 +2578,7 @@ async def round_websocket(
 
                 if status != 3:
                     try:
-                        status, correct_sentence, spelling_mistakes, grammar_mistakes=await run_in_threadpool(
+                        status, correct_sentence, spelling_mistakes, grammar_mistakes=await asyncio.to_thread(
                             sentence.checkSentence,
                             db_generation.sentence
                         )
@@ -2634,29 +2635,29 @@ async def round_websocket(
                     }
     
                     if "IMG" in db_program.feedback and "AWS" in db_program.feedback:
-                        chain_interpretation = chain(
-                            group(
+                        chain_interpretation = celery_app.chain(
+                            celery_app.group(
                                 generate_interpretation2.s(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at),
                             ),
-                            group(
+                            celery_app.group(
                                 calculate_score_gpt.s(),
                             ),
                         )
-                        chain_result = chain_interpretation.apply_async()
+                        chain_result = await chain_interpretation.apply_asyncx()
                     elif "IMG" in db_program.feedback:
-                        chain_interpretation = chain(
-                            group(
+                        chain_interpretation = celery_app.chain(
+                            celery_app.group(
                                 generate_interpretation2.s(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at),
                             )
                         )
-                        chain_result = chain_interpretation.apply_async()
+                        chain_result = await chain_interpretation.apply_asyncx()
                     elif "AWS" in db_program.feedback:
-                        chain_interpretation = chain(
-                            group(
+                        chain_interpretation = celery_app.chain(
+                            celery_app.group(
                                 calculate_score_gpt.s(items=generation_dict),
                             ),
                         )
-                        chain_result = chain_interpretation.apply_async()
+                        chain_result = await chain_interpretation.apply_asyncx()
                     else:
                         chain_result = None
                     
@@ -2838,7 +2839,7 @@ async def round_websocket(
                         )['message'])
 
                     if "AWE" in db_program.feedback:
-                        evaluation = await run_in_threadpool(
+                        evaluation = await asyncio.to_thread(
                             chatbot_obj.get_result,
                             db_generation.sentence,
                             db_generation.correct_sentence,
@@ -3757,15 +3758,16 @@ async def fix_error_task(
                     "id": db_generation.id,
                     "at": db_generation.created_at,
                 }
-                chain_interpretation = chain(
-                    group(
+
+                chain_interpretation = celery_app.chain(
+                    celery_app.group(
                         generate_interpretation2.s(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at),
                     ),
-                    group(
+                    celery_app.group(
                         calculate_score_gpt.s()
                     ),
                 )
-                chain_interpretation.apply_async()
+                await chain_interpretation.apply_asyncx()
                 chain_interpretations.append(chain_interpretation)
 
         db_generations = crud.get_error_task(
