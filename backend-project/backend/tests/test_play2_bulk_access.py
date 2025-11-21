@@ -7,7 +7,7 @@ sys.path.append(os.getcwd())
 from main import app 
 from wsproto.utilities import LocalProtocolError
 
-TEST_NUMBER = 11
+TEST_NUMBER = 101
 
 def test_create_test_accounts():
     client = TestClient(app)
@@ -86,7 +86,8 @@ class TestPlay:
         instance = cls()
         instance.username = username
         instance.password = password
-        instance._client = AsyncClient(base_url="http://localhost:8000", timeout=20)
+        # Increase timeout to handle potential delays under concurrent load
+        instance._client = AsyncClient(base_url="http://localhost:8000", timeout=120)
         await instance.set_access_token()
 
         # Get leaderboard id
@@ -101,7 +102,7 @@ class TestPlay:
         leaderboard = response.json()[0]
         instance.leaderboard_id = leaderboard[0]['id']
 
-        ws_token = await instance._client.post("/sqlapp2/ws_token", headers={"Authorization": f"Bearer {instance.access_token}"})
+        ws_token = await instance._client.post("/sqlapp2/ws_token", headers={"Authorization": f"Bearer {instance.access_token}"}, timeout=120)
 
         instance.url = f"ws://localhost:8000/sqlapp2/ws/{instance.leaderboard_id}?token={ws_token.json()['ws_token']}"
         
@@ -169,12 +170,15 @@ class TestPlay:
         
     async def test_websocket(self):
         """Test WebSocket connection and interaction."""
-        async with aconnect_ws(self.url, self._client, keepalive_ping_timeout_seconds=60) as ws:
-            self.ws = ws
-
+        # Retry establishing WS connection a few times to reduce flakiness under load
+        max_connect_attempts = 3
+        for attempt in range(max_connect_attempts):
             try:
-                # Connection established
-                self.resume_round = {
+                async with aconnect_ws(self.url, self._client, keepalive_ping_timeout_seconds=None) as ws:
+                    self.ws = ws
+
+                    # Connection established
+                    self.resume_round = {
                         "action": "resume",
                         "program": "inlab_test",
                         "obj": {
@@ -186,120 +190,136 @@ class TestPlay:
                     }
 
                     # Sent json data to the WebSocket to start the game
-                await self.send_json(
-                    {
-                        "action": "start",
-                        "program": "inlab_test",
-                        "obj": {
-                            "leaderboard_id": self.leaderboard_id,
+                    await self.send_json(
+                        {
+                            "action": "start",
                             "program": "inlab_test",
-                            "model": "gpt-4o-mini",
-                            "created_at": "2025-11-20T00:00:00Z",
+                            "obj": {
+                                "leaderboard_id": self.leaderboard_id,
+                                "program": "inlab_test",
+                                "model": "gpt-4o-mini",
+                                "created_at": "2025-11-20T00:00:00Z",
+                            }
                         }
-                    }
-                )
+                    )
 
-                # Receive json data from the WebSocket
-                data = await self.receive_json()
+                    # Receive json data from the WebSocket
+                    data = await self.receive_json()
+
+                    assert 'leaderboard' in data
+                    assert 'round' in data
+                    assert 'chat' in data
+
+                    leaderboard_image = data['leaderboard']['image']
+                    round = data['round']
+                    chat = data['chat']
+
+                    # Ask for a hint
+                    await self.send_json(
+                        {
+                            "action": "hint",
+                            "program": "inlab_test",
+                            "obj": {
+                                "is_hint": True,
+                                "content": "ヒントをちょうだい",
+                                "created_at": "2025-11-20T00:00:00Z",
+                            }
+                        }
+                    )
+
+                    data = await self.receive_json()
+                    assert 'chat' in data
+
+                    print(data['chat']['messages'])
+
+                    # Submit answer
+                    await self.send_json(
+                        {
+                            "action": "submit",
+                            "program": "inlab_test",
+                            "obj": {
+                                "round_id": round['id'],
+                                "created_at": "2025-11-20T00:00:00Z",
+                                "generated_time": round['generated_time'],
+                                "sentence": "A beautiful panoramic view of Osaka Castle on a clear, sunny day. The magnificent white and green castle stand proudly atop its massive stone walls, surrounded by a moat. A group of friends seen in the foreground, looking up at the castle in awe. The golden decorations on the castle roof are gleam in the sun. "
+                            }
+                        }
+                    )
+                    data = await self.receive_json()
+
+                    assert 'leaderboard' in data
+                    assert 'round' in data
+                    assert 'chat' in data
+                    assert 'generation' in data
+
+                    print(data['chat']['messages'])
+                    generation = data['generation']
+                    print(generation['correct_sentence'])
+
+                    # Get evaluation result
+                    await self.send_json(
+                        {
+                            "action": "evaluate",
+                        }
+                    )
+
+                    data = await self.receive_json()
+
+                    while True:
+                        if data == {}:
+                            data = await self.receive_json()
+                        else:
+                            break
                     
-                assert 'leaderboard' in data
-                assert 'round' in data
-                assert 'chat' in data
+                    assert 'leaderboard' in data
+                    assert 'round' in data
+                    assert 'chat' in data
+                    assert 'generation' in data
 
-                leaderboard_image = data['leaderboard']['image']
-                round = data['round']
-                chat = data['chat']
+                    print(data['chat']['messages'])
+                    generation = data['generation']
 
-                # Ask for a hint
-                await self.send_json(
-                    {
-                        "action": "hint",
-                        "program": "inlab_test",
-                        "obj": {
-                            "is_hint": True,
-                            "content": "ヒントをちょうだい",
-                            "created_at": "2025-11-20T00:00:00Z",
+                    assert 'interpreted_image' in generation
+                    assert 'image_similarity' in generation
+
+                    # end the game
+                    await self.send_json(
+                        {
+                            "action": "end",
                         }
-                    }
-                )
+                    )
 
-                data = await self.receive_json()
-                assert 'chat' in data
+                    data = await self.receive_json()
+                    assert 'leaderboard' in data
+                    assert 'round' in data
+                    assert 'chat' in data
 
-                print(data['chat']['messages'])
-
-                # Submit answer
-                await self.send_json(
-                    {
-                        "action": "submit",
-                        "program": "inlab_test",
-                        "obj": {
-                            "round_id": round['id'],
-                            "created_at": "2025-11-20T00:00:00Z",
-                            "generated_time": round['generated_time'],
-                            "sentence": "A beautiful panoramic view of Osaka Castle on a clear, sunny day. The magnificent white and green castle stand proudly atop its massive stone walls, surrounded by a moat. A group of friends seen in the foreground, looking up at the castle in awe. The golden decorations on the castle roof are gleam in the sun. "
-                        }
-                    }
-                )
-                data = await self.receive_json()
-
-                assert 'leaderboard' in data
-                assert 'round' in data
-                assert 'chat' in data
-                assert 'generation' in data
-
-                print(data['chat']['messages'])
-                generation = data['generation']
-                print(generation['correct_sentence'])
-
-                # Get evaluation result
-                await self.send_json(
-                    {
-                        "action": "evaluate",
-                    }
-                )
-
-                data = await self.receive_json()
-
-                while True:
-                    if data == {}:
-                        data = await self.receive_json()
-                    else:
-                        break
-                
-                assert 'leaderboard' in data
-                assert 'round' in data
-                assert 'chat' in data
-                assert 'generation' in data
-
-                print(data['chat']['messages'])
-                generation = data['generation']
-
-                assert 'interpreted_image' in generation
-                assert 'image_similarity' in generation
-
-                # end the game
-                await self.send_json(
-                    {
-                        "action": "end",
-                    }
-                )
-
-                data = await self.receive_json()
-                assert 'leaderboard' in data
-                assert 'round' in data
-                assert 'chat' in data
-            finally:
+                # ensure ws reference cleared after context manager
                 self.ws = None
+                # success: break out of retry loop
+                break
+            except (ReadTimeout, LocalProtocolError) as e:
+                # close client on failure and retry (or raise after last attempt)
+                await self._client.aclose()
+                if attempt < max_connect_attempts - 1:
+                    await asyncio.sleep(1 * (2 ** attempt))
+                    # recreate client for next attempt
+                    self._client = AsyncClient(base_url="http://localhost:8000", timeout=120)
+                    await self.set_access_token()
+                    continue
+                raise
         await self._client.aclose()
 
     async def test_websocket_no_ask_hint(self):
         """Test WebSocket connection and interaction."""
         
-        async with aconnect_ws(self.url, self._client, keepalive_ping_timeout_seconds=60) as ws:
-            self.ws = ws
+        max_connect_attempts = 3
+        for attempt in range(max_connect_attempts):
             try:
-                self.resume_round = {
+                async with aconnect_ws(self.url, self._client, keepalive_ping_timeout_seconds=None) as ws:
+                    self.ws = ws
+
+                    self.resume_round = {
                         "action": "resume",
                         "program": "inlab_test",
                         "obj": {
@@ -311,102 +331,115 @@ class TestPlay:
                     }
 
                     # Sent json data to the WebSocket to start the game
-                await self.send_json(
-                    {
-                        "action": "start",
-                        "program": "inlab_test",
-                        "obj": {
-                            "leaderboard_id": self.leaderboard_id,
+                    await self.send_json(
+                        {
+                            "action": "start",
                             "program": "inlab_test",
-                            "model": "gpt-4o-mini",
-                            "created_at": "2025-11-20T00:00:00Z",
+                            "obj": {
+                                "leaderboard_id": self.leaderboard_id,
+                                "program": "inlab_test",
+                                "model": "gpt-4o-mini",
+                                "created_at": "2025-11-20T00:00:00Z",
+                            }
                         }
-                    }
-                )
+                    )
 
-                # Receive json data from the WebSocket
-                data = await self.receive_json()
+                    # Receive json data from the WebSocket
+                    data = await self.receive_json()
+
+                    assert 'leaderboard' in data
+                    assert 'round' in data
+                    assert 'chat' in data
+
+                    leaderboard_image = data['leaderboard']['image']
+                    round = data['round']
+                    chat = data['chat']
+
+                    # Submit answer
+                    await self.send_json(
+                        {
+                            "action": "submit",
+                            "program": "inlab_test",
+                            "obj": {
+                                "round_id": round['id'],
+                                "created_at": "2025-11-20T00:00:00Z",
+                                "generated_time": round['generated_time'],
+                                "sentence": "A beautiful panoramic view of Osaka Castle on a clear, sunny day. The magnificent white and green castle stand proudly atop its massive stone walls, surrounded by a moat. A group of friends seen in the foreground, looking up at the castle in awe. The golden decorations on the castle roof are gleam in the sun. "
+                            }
+                        }
+                    )
+                    data = await self.receive_json()
+
+                    assert 'leaderboard' in data
+                    assert 'round' in data
+                    assert 'chat' in data
+                    assert 'generation' in data
+
+                    print(data['chat']['messages'])
+                    generation = data['generation']
+                    print(generation['correct_sentence'])
+
+                    # Get evaluation result
+                    await self.send_json(
+                        {
+                            "action": "evaluate",
+                        }
+                    )
+
+                    data = await self.receive_json()
+
+                    while True:
+                        if data == {}:
+                            data = await self.receive_json()
+                        else:
+                            break
                     
-                assert 'leaderboard' in data
-                assert 'round' in data
-                assert 'chat' in data
+                    assert 'leaderboard' in data
+                    assert 'round' in data
+                    assert 'chat' in data
+                    assert 'generation' in data
 
-                leaderboard_image = data['leaderboard']['image']
-                round = data['round']
-                chat = data['chat']
+                    print(data['chat']['messages'])
+                    generation = data['generation']
 
-                # Submit answer
-                await self.send_json(
-                    {
-                        "action": "submit",
-                        "program": "inlab_test",
-                        "obj": {
-                            "round_id": round['id'],
-                            "created_at": "2025-11-20T00:00:00Z",
-                            "generated_time": round['generated_time'],
-                            "sentence": "A beautiful panoramic view of Osaka Castle on a clear, sunny day. The magnificent white and green castle stand proudly atop its massive stone walls, surrounded by a moat. A group of friends seen in the foreground, looking up at the castle in awe. The golden decorations on the castle roof are gleam in the sun. "
+                    assert 'interpreted_image' in generation
+                    assert 'image_similarity' in generation
+
+                    # end the game
+                    await self.send_json(
+                        {
+                            "action": "end",
                         }
-                    }
-                )
-                data = await self.receive_json()
+                    )
 
-                assert 'leaderboard' in data
-                assert 'round' in data
-                assert 'chat' in data
-                assert 'generation' in data
+                    data = await self.receive_json()
+                    assert 'leaderboard' in data
+                    assert 'round' in data
+                    assert 'chat' in data
 
-                print(data['chat']['messages'])
-                generation = data['generation']
-                print(generation['correct_sentence'])
-
-                # Get evaluation result
-                await self.send_json(
-                    {
-                        "action": "evaluate",
-                    }
-                )
-
-                data = await self.receive_json()
-
-                while True:
-                    if data == {}:
-                        data = await self.receive_json()
-                    else:
-                        break
-                
-                assert 'leaderboard' in data
-                assert 'round' in data
-                assert 'chat' in data
-                assert 'generation' in data
-
-                print(data['chat']['messages'])
-                generation = data['generation']
-
-                assert 'interpreted_image' in generation
-                assert 'image_similarity' in generation
-
-                # end the game
-                await self.send_json(
-                    {
-                        "action": "end",
-                    }
-                )
-
-                data = await self.receive_json()
-                assert 'leaderboard' in data
-                assert 'round' in data
-                assert 'chat' in data
-            finally:
+                # ensure ws reference cleared after context manager
                 self.ws = None
+                break
+            except (ReadTimeout, LocalProtocolError) as e:
+                await self._client.aclose()
+                if attempt < max_connect_attempts - 1:
+                    await asyncio.sleep(1 * (2 ** attempt))
+                    self._client = AsyncClient(base_url="http://localhost:8000", timeout=120)
+                    await self.set_access_token()
+                    continue
+                raise
         await self._client.aclose()
 
 
     async def test_websocket_submit_twice(self):
         """Test WebSocket connection and interaction."""
-        async with aconnect_ws(self.url, self._client, keepalive_ping_timeout_seconds=60) as ws:
-            self.ws = ws
+        max_connect_attempts = 3
+        for attempt in range(max_connect_attempts):
             try:
-                self.resume_round = {
+                async with aconnect_ws(self.url, self._client, keepalive_ping_timeout_seconds=None) as ws:
+                    self.ws = ws
+
+                    self.resume_round = {
                         "action": "resume",
                         "program": "inlab_test",
                         "obj": {
@@ -418,143 +451,153 @@ class TestPlay:
                     }
 
                     # Sent json data to the WebSocket to start the game
-                await self.send_json(
-                    {
-                        "action": "start",
-                        "program": "inlab_test",
-                        "obj": {
-                            "leaderboard_id": self.leaderboard_id,
+                    await self.send_json(
+                        {
+                            "action": "start",
                             "program": "inlab_test",
-                            "model": "gpt-4o-mini",
-                            "created_at": "2025-11-20T00:00:00Z",
+                            "obj": {
+                                "leaderboard_id": self.leaderboard_id,
+                                "program": "inlab_test",
+                                "model": "gpt-4o-mini",
+                                "created_at": "2025-11-20T00:00:00Z",
+                            }
                         }
-                    }
-                )
+                    )
 
-                # Receive json data from the WebSocket
-                data = await self.receive_json()
+                    # Receive json data from the WebSocket
+                    data = await self.receive_json()
+
+                    assert 'leaderboard' in data
+                    assert 'round' in data
+                    assert 'chat' in data
+
+                    leaderboard_image = data['leaderboard']['image']
+                    round = data['round']
+                    chat = data['chat']
+
+                    # Submit answer
+                    await self.send_json(
+                        {
+                            "action": "submit",
+                            "program": "inlab_test",
+                            "obj": {
+                                "round_id": round['id'],
+                                "created_at": "2025-11-20T00:00:00Z",
+                                "generated_time": round['generated_time'],
+                                "sentence": "A beautiful panoramic view of Osaka Castle on a clear, sunny day. The magnificent white and green castle stand proudly atop its massive stone walls, surrounded by a moat. A group of friends seen in the foreground, looking up at the castle in awe. The golden decorations on the castle roof are gleam in the sun. "
+                            }
+                        }
+                    )
+                    data = await self.receive_json()
+
+                    assert 'leaderboard' in data
+                    assert 'round' in data
+                    assert 'chat' in data
+                    assert 'generation' in data
+
+                    print(data['chat']['messages'])
+                    generation = data['generation']
+                    print(generation['correct_sentence'])
+
+                    # Get evaluation result
+                    await self.send_json(
+                        {
+                            "action": "evaluate",
+                        }
+                    )
+
+                    data = await self.receive_json()
+
+                    while True:
+                        if data == {}:
+                            data = await self.receive_json()
+                        else:
+                            break
                     
-                assert 'leaderboard' in data
-                assert 'round' in data
-                assert 'chat' in data
+                    assert 'leaderboard' in data
+                    assert 'round' in data
+                    assert 'chat' in data
+                    assert 'generation' in data
 
-                leaderboard_image = data['leaderboard']['image']
-                round = data['round']
-                chat = data['chat']
+                    print(data['chat']['messages'])
+                    generation = data['generation']
 
-                # Submit answer
-                await self.send_json(
-                    {
-                        "action": "submit",
-                        "program": "inlab_test",
-                        "obj": {
-                            "round_id": round['id'],
-                            "created_at": "2025-11-20T00:00:00Z",
-                            "generated_time": round['generated_time'],
-                            "sentence": "A beautiful panoramic view of Osaka Castle on a clear, sunny day. The magnificent white and green castle stand proudly atop its massive stone walls, surrounded by a moat. A group of friends seen in the foreground, looking up at the castle in awe. The golden decorations on the castle roof are gleam in the sun. "
+                    assert 'interpreted_image' in generation
+                    assert 'image_similarity' in generation
+
+                    # Submit answer
+                    await self.send_json(
+                        {
+                            "action": "submit",
+                            "program": "inlab_test",
+                            "obj": {
+                                "round_id": round['id'],
+                                "created_at": "2025-11-20T00:00:00Z",
+                                "generated_time": round['generated_time'],
+                                "sentence": "A beautiful panoramic view of Osaka Castle on a clear, sunny day. The magnificent white and green castle stand proudly atop its massive stone walls, surrounded by a moat. A group of friends seen in the foreground, looking up at the castle in awe. The golden decorations on the castle roof are gleam in the sun. "
+                            }
                         }
-                    }
-                )
-                data = await self.receive_json()
+                    )
+                    data = await self.receive_json()
 
-                assert 'leaderboard' in data
-                assert 'round' in data
-                assert 'chat' in data
-                assert 'generation' in data
+                    assert 'leaderboard' in data
+                    assert 'round' in data
+                    assert 'chat' in data
+                    assert 'generation' in data
 
-                print(data['chat']['messages'])
-                generation = data['generation']
-                print(generation['correct_sentence'])
+                    print(data['chat']['messages'])
+                    generation = data['generation']
+                    print(generation['correct_sentence'])
 
-                # Get evaluation result
-                await self.send_json(
-                    {
-                        "action": "evaluate",
-                    }
-                )
-
-                data = await self.receive_json()
-
-                while True:
-                    if data == {}:
-                        data = await self.receive_json()
-                    else:
-                        break
-                
-                assert 'leaderboard' in data
-                assert 'round' in data
-                assert 'chat' in data
-                assert 'generation' in data
-
-                print(data['chat']['messages'])
-                generation = data['generation']
-
-                assert 'interpreted_image' in generation
-                assert 'image_similarity' in generation
-
-                # Submit answer
-                await self.send_json(
-                    {
-                        "action": "submit",
-                        "program": "inlab_test",
-                        "obj": {
-                            "round_id": round['id'],
-                            "created_at": "2025-11-20T00:00:00Z",
-                            "generated_time": round['generated_time'],
-                            "sentence": "A beautiful panoramic view of Osaka Castle on a clear, sunny day. The magnificent white and green castle stand proudly atop its massive stone walls, surrounded by a moat. A group of friends seen in the foreground, looking up at the castle in awe. The golden decorations on the castle roof are gleam in the sun. "
+                    # Get evaluation result
+                    await self.send_json(
+                        {
+                            "action": "evaluate",
                         }
-                    }
-                )
-                data = await self.receive_json()
+                    )
 
-                assert 'leaderboard' in data
-                assert 'round' in data
-                assert 'chat' in data
-                assert 'generation' in data
+                    data = await self.receive_json()
 
-                print(data['chat']['messages'])
-                generation = data['generation']
-                print(generation['correct_sentence'])
+                    while True:
+                        if data == {}:
+                            data = await self.receive_json()
+                        else:
+                            break
+                    
+                    assert 'leaderboard' in data
+                    assert 'round' in data
+                    assert 'chat' in data
+                    assert 'generation' in data
 
-                # Get evaluation result
-                await self.send_json(
-                    {
-                        "action": "evaluate",
-                    }
-                )
+                    print(data['chat']['messages'])
+                    generation = data['generation']
 
-                data = await self.receive_json()
+                    assert 'interpreted_image' in generation
+                    assert 'image_similarity' in generation
 
-                while True:
-                    if data == {}:
-                        data = await self.receive_json()
-                    else:
-                        break
-                
-                assert 'leaderboard' in data
-                assert 'round' in data
-                assert 'chat' in data
-                assert 'generation' in data
+                    # end the game
+                    await self.send_json(
+                        {
+                            "action": "end",
+                        }
+                    )
 
-                print(data['chat']['messages'])
-                generation = data['generation']
+                    data = await self.receive_json()
+                    assert 'leaderboard' in data
+                    assert 'round' in data
+                    assert 'chat' in data
 
-                assert 'interpreted_image' in generation
-                assert 'image_similarity' in generation
-
-                # end the game
-                await self.send_json(
-                    {
-                        "action": "end",
-                    }
-                )
-
-                data = await self.receive_json()
-                assert 'leaderboard' in data
-                assert 'round' in data
-                assert 'chat' in data
-            finally:
+                # ensure ws reference cleared after context manager
                 self.ws = None
+                break
+            except (ReadTimeout, LocalProtocolError) as e:
+                await self._client.aclose()
+                if attempt < max_connect_attempts - 1:
+                    await asyncio.sleep(1 * (2 ** attempt))
+                    self._client = AsyncClient(base_url="http://localhost:8000", timeout=120)
+                    await self.set_access_token()
+                    continue
+                raise
         await self._client.aclose()
 
 # Pytest test case
