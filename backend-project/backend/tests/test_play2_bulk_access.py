@@ -7,7 +7,7 @@ sys.path.append(os.getcwd())
 from main import app 
 from wsproto.utilities import LocalProtocolError
 
-TEST_NUMBER = 41 # Total number of test accounts + 1
+TEST_NUMBER = 101 # Total number of test accounts + 1
 
 def test_create_test_accounts():
     client = TestClient(app)
