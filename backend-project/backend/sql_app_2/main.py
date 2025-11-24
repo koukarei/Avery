@@ -509,7 +509,7 @@ async def create_user_w_random_username(user: Annotated[schemas.UserRandomCreate
         user.user_type="instructor"
     new_user = crud.create_random_user(db=db, user=user)
     random_programs = ["student_1_sem_awe", "student_1_sem_img"]
-    assigned_program = random.choice(random_programs)
+    assigned_program = random.choices(random_programs, weights=[1, 1])[0]
     db_program = crud.get_program_by_name(db, program_name=assigned_program)
 
     if db_program:
