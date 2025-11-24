@@ -11,6 +11,8 @@ import time, os, datetime, shutil, tempfile, zipfile, zoneinfo, random, json, as
 import pandas as pd
 import numpy as np
 from pathlib import Path
+from cachetools import TTLCache
+from threading import RLock
 
 from .analysis_router import router as analysis_router
 from .admin_router import router as admin_router
@@ -41,6 +43,206 @@ models.Base.metadata.create_all(bind=engine2)
 # Define the directory where the images will be stored
 media_dir = Path(os.getenv("MEDIA_DIR", "/static"))
 media_dir.mkdir(parents=True, exist_ok=True)
+
+JST = zoneinfo.ZoneInfo("Asia/Tokyo")
+
+LEADERBOARD_CACHE_TTL = int(os.getenv("LEADERBOARD_CACHE_TTL", "15"))
+LEADERBOARD_CACHE_MAXSIZE = int(os.getenv("LEADERBOARD_CACHE_MAXSIZE", "128"))
+LEADERBOARD_STATS_CACHE_TTL = int(os.getenv("LEADERBOARD_STATS_CACHE_TTL", str(LEADERBOARD_CACHE_TTL)))
+LEADERBOARD_STATS_CACHE_MAXSIZE = int(os.getenv("LEADERBOARD_STATS_CACHE_MAXSIZE", "128"))
+USER_CACHE_TTL = int(os.getenv("USER_CACHE_TTL", "10"))
+USER_CACHE_MAXSIZE = int(os.getenv("USER_CACHE_MAXSIZE", "2048"))
+
+leaderboard_cache = TTLCache(maxsize=LEADERBOARD_CACHE_MAXSIZE, ttl=LEADERBOARD_CACHE_TTL)
+leaderboard_stats_cache = TTLCache(maxsize=LEADERBOARD_STATS_CACHE_MAXSIZE, ttl=LEADERBOARD_STATS_CACHE_TTL)
+user_cache = TTLCache(maxsize=USER_CACHE_MAXSIZE, ttl=USER_CACHE_TTL)
+
+cache_lock = RLock()
+user_cache_lock = RLock()
+
+
+def _datetime_key(value: Optional[datetime.datetime]) -> Optional[str]:
+    return value.isoformat() if value else None
+
+
+def _leaderboard_cache_key(
+    school_name: Optional[str],
+    skip: int,
+    limit: int,
+    published_at_start: Optional[datetime.datetime],
+    published_at_end: Optional[datetime.datetime],
+    is_public: bool,
+    created_by_id: Optional[int],
+) -> Tuple:
+    school_key = school_name if school_name is not None else "__all__"
+    return (
+        school_key,
+        skip,
+        limit,
+        _datetime_key(published_at_start),
+        _datetime_key(published_at_end),
+        is_public,
+        created_by_id,
+    )
+
+
+def _leaderboard_stats_cache_key(
+    school_name: Optional[str],
+    published_at_start: Optional[datetime.datetime],
+    published_at_end: Optional[datetime.datetime],
+    is_public: bool,
+    created_by_id: Optional[int],
+) -> Tuple:
+    school_key = school_name if school_name is not None else "__all__"
+    return (
+        school_key,
+        _datetime_key(published_at_start),
+        _datetime_key(published_at_end),
+        is_public,
+        created_by_id,
+    )
+
+
+def invalidate_leaderboard_cache() -> None:
+    with cache_lock:
+        leaderboard_cache.clear()
+        leaderboard_stats_cache.clear()
+
+
+def _get_cached_user(username: str) -> Optional[schemas.User]:
+    with user_cache_lock:
+        return user_cache.get(username)
+
+
+def _cache_user(username: str, user: schemas.User) -> None:
+    with user_cache_lock:
+        user_cache[username] = user
+
+
+def invalidate_user_cache(username: str) -> None:
+    with user_cache_lock:
+        user_cache.pop(username, None)
+
+
+async def _load_user_by_username(db: Session, username: str) -> Optional[schemas.User]:
+    cached_user = _get_cached_user(username)
+    if cached_user:
+        return cached_user
+
+    db_user = await asyncio.to_thread(crud.get_user_by_username, db, username=username)
+    if db_user is None:
+        return None
+
+    user_schema = schemas.User.model_validate(db_user, from_attributes=True)
+    if user_schema.is_active:
+        _cache_user(username, user_schema)
+    return user_schema
+
+
+def _parse_jst_date(date_str: Optional[str]) -> Optional[datetime.datetime]:
+    if not date_str:
+        return None
+    return datetime.datetime.strptime(date_str, "%d%m%Y").replace(tzinfo=JST)
+
+
+def _clamp_student_dates(
+    start: Optional[datetime.datetime],
+    end: Optional[datetime.datetime],
+    is_student: bool,
+) -> Tuple[Optional[datetime.datetime], Optional[datetime.datetime]]:
+    if not is_student:
+        return start, end
+    now = datetime.datetime.now(tz=JST)
+    if start and start > now:
+        start = now
+    if end and end > now:
+        end = now
+    return start, end
+
+
+async def get_leaderboards_cached(
+    db: Session,
+    *,
+    school_name: Optional[str],
+    skip: int,
+    limit: int,
+    published_at_start: Optional[datetime.datetime],
+    published_at_end: Optional[datetime.datetime],
+    is_public: bool,
+    created_by_id: Optional[int],
+) -> List[Tuple[schemas.LeaderboardOut, schemas.SchoolOut]]:
+    key = _leaderboard_cache_key(
+        school_name,
+        skip,
+        limit,
+        published_at_start,
+        published_at_end,
+        is_public,
+        created_by_id,
+    )
+    with cache_lock:
+        cached = leaderboard_cache.get(key)
+    if cached is not None:
+        return cached
+
+    rows = await asyncio.to_thread(
+        crud.get_leaderboards,
+        db,
+        school_name,
+        skip,
+        limit,
+        published_at_start,
+        published_at_end,
+        is_public,
+        created_by_id,
+    )
+    serialized = [
+        (
+            schemas.LeaderboardOut.model_validate(leaderboard, from_attributes=True),
+            schemas.SchoolOut.model_validate(school, from_attributes=True),
+        )
+        for leaderboard, school in rows
+    ]
+    with cache_lock:
+        leaderboard_cache[key] = serialized
+    return serialized
+
+
+async def get_leaderboards_stats_cached(
+    db: Session,
+    *,
+    school_name: Optional[str],
+    published_at_start: Optional[datetime.datetime],
+    published_at_end: Optional[datetime.datetime],
+    is_public: bool,
+    created_by_id: Optional[int],
+) -> schemas.LeaderboardsStats:
+    key = _leaderboard_stats_cache_key(
+        school_name,
+        published_at_start,
+        published_at_end,
+        is_public,
+        created_by_id,
+    )
+    with cache_lock:
+        cached = leaderboard_stats_cache.get(key)
+    if cached is not None:
+        return cached
+
+    raw_stats = await asyncio.to_thread(
+        crud.get_leaderboards_stats,
+        db,
+        school_name,
+        published_at_start,
+        published_at_end,
+        None,
+        is_public,
+        created_by_id,
+    )
+    stats_model = schemas.LeaderboardsStats.model_validate(raw_stats)
+    with cache_lock:
+        leaderboard_stats_cache[key] = stats_model
+    return stats_model
 
 # Dependency
 def get_db():
@@ -132,7 +334,7 @@ async def get_current_user(db: Annotated[Session, Depends(get_db)],token: Annota
             detail="Token has expired",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        user = crud.get_user_by_username(db, username=token_data.username)
+        user = await _load_user_by_username(db, token_data.username)
         if user is None:
             raise credentials_exception
         elif user.is_active:
@@ -168,7 +370,7 @@ async def get_current_admin(db: Annotated[Session, Depends(get_db)],token: Annot
             detail="Token has expired",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        user = crud.get_user_by_username(db, username=token_data.username)
+        user = await _load_user_by_username(db, token_data.username)
         if user is None:
             raise credentials_exception
         elif user.is_admin:
@@ -212,7 +414,7 @@ async def get_current_user_ws(db: Annotated[Session, Depends(get_db)],token: str
             detail="Token has expired",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        user = crud.get_user_by_username(db, username=token_data.username)
+        user = await _load_user_by_username(db, token_data.username)
         if user is None:
             raise credentials_exception
         elif user.is_active:
@@ -244,6 +446,8 @@ async def login_for_access_token(
             detail="Please use Moodle login",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    _cache_user(user.username, schemas.User.model_validate(user, from_attributes=True))
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
@@ -367,6 +571,8 @@ async def login_for_access_token_lti(
             detail="No LTI account found",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    _cache_user(user.username, schemas.User.model_validate(user, from_attributes=True))
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
@@ -556,7 +762,9 @@ async def delete_user(current_user: Annotated[schemas.User, Depends(get_current_
     db_user = crud.get_user(db, user_id=user_id)
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    return crud.delete_user(db=db, user_id=user_id)
+    deleted_user = crud.delete_user(db=db, user_id=user_id)
+    invalidate_user_cache(db_user.username)
+    return deleted_user
 
 @app.put("/users/{user_id}/password", tags=["User"], response_model=schemas.User)
 async def update_user_password(
@@ -567,7 +775,9 @@ async def update_user_password(
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to update password")
     user_id = current_user.id
-    return crud.update_user_password(db=db, user_id=user_id, new_password=user.new_password)
+    updated_user = crud.update_user_password(db=db, user_id=user_id, new_password=user.new_password)
+    invalidate_user_cache(current_user.username)
+    return updated_user
 
 @app.put("/users/", tags=["User"], response_model=schemas.User)
 async def update_user(
@@ -598,7 +808,9 @@ async def update_user(
             exclude_none=True
         )
     )
-    return crud.update_user(db=db, user=user)
+    updated_user = crud.update_user(db=db, user=user)
+    invalidate_user_cache(db_user.username)
+    return updated_user
 
 @app.get("/users/me", tags=["User"], response_model=schemas.User)
 async def read_user_me(current_user: Annotated[schemas.User, Depends(get_current_user)], db: Session = Depends(get_db)):
@@ -904,65 +1116,49 @@ async def remove_story_from_school(
     return crud.delete_story_school(db=db, story_school_update=story_school)
 
 @app.get("/leaderboards/", tags=["Leaderboard"], response_model=list[Tuple[schemas.LeaderboardOut, schemas.SchoolOut]])
-async def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_current_user)],skip: int = 0, limit: int = 100, published_at_start: str=None, published_at_end: str=None, is_public: bool = True, db: Session = Depends(get_db)):
+async def read_leaderboards(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    skip: int = 0,
+    limit: int = 100,
+    published_at_start: str = None,
+    published_at_end: str = None,
+    is_public: bool = True,
+    db: Session = Depends(get_db),
+):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view leaderboards")
+
     school_name = current_user.school
     if school_name is None and not current_user.is_admin:
         school_name = "public"
 
-    if not published_at_start and not published_at_end:
-        if not is_public:
-            leaderboards = crud.get_leaderboards(
-                db=db,
-                school_name=school_name,
-                skip=skip,
-                limit=limit,
-                published_at_end=datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo')),
-                is_public=False,
-            )
-            return [lb for lb in leaderboards if lb[0].created_by_id == current_user.id]
-        leaderboards = crud.get_leaderboards(db, school_name=school_name, skip=skip, limit=limit, published_at_end=datetime.datetime.now(tz=zoneinfo.ZoneInfo('Japan')))
-        return leaderboards
+    start_dt = _parse_jst_date(published_at_start)
+    end_dt = _parse_jst_date(published_at_end)
+    start_dt, end_dt = _clamp_student_dates(start_dt, end_dt, current_user.user_type == "student")
 
-    # print("before convent",published_at_start, published_at_end)
+    if start_dt is None and end_dt is None:
+        end_dt = datetime.datetime.now(tz=JST)
 
+    owner_filter = current_user.id if not is_public else None
 
-    if published_at_start:
-        published_at_start = datetime.datetime.strptime(published_at_start, "%d%m%Y").replace(tzinfo=zoneinfo.ZoneInfo('Asia/Tokyo'))
-    if published_at_end:
-        published_at_end = datetime.datetime.strptime(published_at_end, "%d%m%Y").replace(tzinfo=zoneinfo.ZoneInfo('Asia/Tokyo'))
-
-    # print("after convert",published_at_start, published_at_end)
-
-    if current_user.user_type == "student":
-        if published_at_start and published_at_start > datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo')):
-            published_at_start = datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo'))
-        if published_at_end and published_at_end > datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo')):
-            published_at_end = datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo'))
-
-    # print("after check",published_at_start, published_at_end)
-    if is_public:
-        leaderboards = crud.get_leaderboards(db, school_name=school_name, skip=skip, limit=limit, published_at_start=published_at_start, published_at_end=published_at_end)
-    else:
-        leaderboards = crud.get_leaderboards(
-            db=db,
-            school_name=school_name,
-            skip=skip,
-            limit=limit,
-            published_at_start=published_at_start,
-            published_at_end=published_at_end,
-            is_public=False,
-        )
-        leaderboards = [lb for lb in leaderboards if lb[0].created_by_id == current_user.id]
+    leaderboards = await get_leaderboards_cached(
+        db=db,
+        school_name=school_name,
+        skip=skip,
+        limit=limit,
+        published_at_start=start_dt,
+        published_at_end=end_dt,
+        is_public=is_public,
+        created_by_id=owner_filter,
+    )
 
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_leaderboards",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
 
@@ -983,42 +1179,23 @@ async def read_leaderboards_stats(
     if school_name is None and not current_user.is_admin:
         school_name = "public"
 
-    if not published_at_start and not published_at_end:
-        if not is_public:
-            stats = crud.get_leaderboards_stats(
-                db=db,
-                school_name=school_name,
-                published_at_end=datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo')),
-                user_id=current_user.id,
-                is_public=False,
-            )
-            return stats
-        stats = crud.get_leaderboards_stats(db, school_name=school_name, published_at_end=datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo')))
-        return stats
+    start_dt = _parse_jst_date(published_at_start)
+    end_dt = _parse_jst_date(published_at_end)
+    start_dt, end_dt = _clamp_student_dates(start_dt, end_dt, current_user.user_type == "student")
 
-    if published_at_start:
-        published_at_start = datetime.datetime.strptime(published_at_start, "%d%m%Y").replace(tzinfo=zoneinfo.ZoneInfo('Asia/Tokyo'))
-    if published_at_end:
-        published_at_end = datetime.datetime.strptime(published_at_end, "%d%m%Y").replace(tzinfo=zoneinfo.ZoneInfo('Asia/Tokyo'))
+    if start_dt is None and end_dt is None:
+        end_dt = datetime.datetime.now(tz=JST)
 
-    if current_user.user_type == "student":
-        if published_at_start and published_at_start > datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo')):
-            published_at_start = datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo'))
-        if published_at_end and published_at_end > datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo')):
-            published_at_end = datetime.datetime.now(tz=zoneinfo.ZoneInfo('Asia/Tokyo'))
+    owner_filter = current_user.id if not is_public else None
 
-    # print("after check",published_at_start, published_at_end)
-    if is_public:
-        stats = crud.get_leaderboards_stats(db, school_name=school_name, published_at_start=published_at_start, published_at_end=published_at_end)
-    else:
-        stats = crud.get_leaderboards_stats(
-            db=db,
-            school_name=school_name,
-            published_at_start=published_at_start,
-            published_at_end=published_at_end,
-            is_public=False,
-            user_id=current_user.id
-        )
+    stats = await get_leaderboards_stats_cached(
+        db=db,
+        school_name=school_name,
+        published_at_start=start_dt,
+        published_at_end=end_dt,
+        is_public=is_public,
+        created_by_id=owner_filter,
+    )
 
     crud.create_user_action(
         db=db,
@@ -1171,6 +1348,8 @@ async def create_leaderboard(
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
     )
+
+    invalidate_leaderboard_cache()
 
     return result
 
@@ -1441,6 +1620,8 @@ async def create_leaderboards(
         )
     )
 
+    invalidate_leaderboard_cache()
+
     return leaderboard_list
 
 @app.post("/leaderboards/image", tags=["Leaderboard"], response_model=schemas.IdOnly, status_code=201)
@@ -1536,7 +1717,9 @@ async def update_leaderboard(
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
     )
-    return crud.update_leaderboard(db=db, leaderboard=leaderboard)
+    updated_leaderboard = crud.update_leaderboard(db=db, leaderboard=leaderboard)
+    invalidate_leaderboard_cache()
+    return updated_leaderboard
 
 @app.put("/leaderboards/{leaderboard_id}/school", tags=["Leaderboard"], response_model=list[schemas.SchoolOut])
 async def update_leaderboard_school(
@@ -1563,7 +1746,9 @@ async def update_leaderboard_school(
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
     )
-    return crud.add_leaderboard_school(db=db, leaderboard=schemas.LeaderboardUpdate(id=leaderboard_id, school=leaderboard.school))
+    schools = crud.add_leaderboard_school(db=db, leaderboard=schemas.LeaderboardUpdate(id=leaderboard_id, school=leaderboard.school))
+    invalidate_leaderboard_cache()
+    return schools
 
 @app.delete("/leaderboards/{leaderboard_id}/school", tags=["Leaderboard"], response_model=list[schemas.SchoolOut])
 async def delete_leaderboard_school(
@@ -1590,7 +1775,9 @@ async def delete_leaderboard_school(
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
     )
-    return crud.remove_leaderboard_school(db=db, leaderboard=schemas.LeaderboardUpdate(id=leaderboard_id, school=[school]))
+    schools = crud.remove_leaderboard_school(db=db, leaderboard=schemas.LeaderboardUpdate(id=leaderboard_id, school=[school]))
+    invalidate_leaderboard_cache()
+    return schools
 
 @app.put("/leaderboards/{leaderboard_id}/vocabulary", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
 async def add_leaderboard_vocabulary(
@@ -1617,7 +1804,9 @@ async def add_leaderboard_vocabulary(
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
     )
-    return crud.add_leaderboard_vocab(db=db, leaderboard_id=leaderboard_id, vocabulary=vocabulary)
+    updated_leaderboard = crud.add_leaderboard_vocab(db=db, leaderboard_id=leaderboard_id, vocabulary=vocabulary)
+    invalidate_leaderboard_cache()
+    return updated_leaderboard
 
 @app.delete("/leaderboards/{leaderboard_id}/vocabulary", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
 async def delete_leaderboard_vocabulary(
@@ -1644,7 +1833,9 @@ async def delete_leaderboard_vocabulary(
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
     )
-    return crud.remove_leaderboard_vocab(db=db, leaderboard_id=leaderboard_id, vocab_id=vocabulary_id)
+    updated_leaderboard = crud.remove_leaderboard_vocab(db=db, leaderboard_id=leaderboard_id, vocab_id=vocabulary_id)
+    invalidate_leaderboard_cache()
+    return updated_leaderboard
 
 @app.delete("/leaderboards/{leaderboard_id}", tags=["Leaderboard"], response_model=schemas.IdOnly)
 async def delete_leaderboard(
@@ -1670,7 +1861,9 @@ async def delete_leaderboard(
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
     )
-    return crud.delete_leaderboard(db=db, leaderboard_id=leaderboard_id)
+    result = crud.delete_leaderboard(db=db, leaderboard_id=leaderboard_id)
+    invalidate_leaderboard_cache()
+    return result
 
 @app.post("/program", tags=["Program"], response_model=schemas.Program, status_code=201)
 async def create_program(
@@ -2144,6 +2337,10 @@ async def round_websocket(
 
     start_time = datetime.datetime.now(tz=timezone(timedelta(hours=9)))
     duration = 0
+    db_round = None
+    db_generation = None
+    chatbot_obj = None
+    chain_result = None
     # accept the websocket connection and record in database
     crud.create_user_action(
         db=db,

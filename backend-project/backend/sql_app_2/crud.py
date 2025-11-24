@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import or_, and_
 
 from . import models, schemas
@@ -60,7 +60,7 @@ def create_random_user(db: Session, user: schemas.UserCreate):
 
     db_user = models.User(
         email=user.email,
-        username=user.username, 
+        username=user.username,
         hashed_password=hashed_password,
         is_active=True,
         profile_id=db_userprofile.id,
@@ -92,7 +92,7 @@ def create_public_user(db: Session, user: schemas.UserCreate):
 
     db_user = models.User(
         email=user.email,
-        username=user.username, 
+        username=user.username,
         hashed_password=hashed_password,
         is_active=True,
         profile_id=db_userprofile.id,
@@ -130,7 +130,7 @@ def create_user_lti(db: Session, user: schemas.UserLti):
         lti_username=user.username,
         school=user.school,
         email=user.email,
-        username=internal_username, 
+        username=internal_username,
         hashed_password=hashed_password,
         is_active=True,
         profile_id=db_userprofile.id,
@@ -169,109 +169,93 @@ def delete_user(db: Session, user_id: int):
     return db_user
 
 def get_leaderboards(
-        db: Session, 
+        db: Session,
         school_name: str = None,
-        skip: int = 0, 
-        limit: int = 100, 
+        skip: int = 0,
+        limit: int = 100,
         published_at_start: datetime.datetime = None,
         published_at_end: datetime.datetime = None,
-        is_public: bool = True
+        is_public: bool = True,
+        created_by_id: Optional[int] = None,
 ):
-    if school_name:
-        school_leaderboards = db.query(
-            models.Leaderboard,
-            models.School_Leaderboard
-        ).\
-        filter(models.School_Leaderboard.school == school_name).\
-        join(
-            models.Leaderboard,
-            models.Leaderboard.id == models.School_Leaderboard.leaderboard_id
-        )
-    else:
-        school_leaderboards = db.query(
-            models.Leaderboard,
-            models.School_Leaderboard
-        ).join(
-            models.Leaderboard,
-            models.Leaderboard.id == models.School_Leaderboard.leaderboard_id
-        )
+    query = db.query(
+        models.Leaderboard,
+        models.School_Leaderboard
+    ).join(
+        models.Leaderboard,
+        models.Leaderboard.id == models.School_Leaderboard.leaderboard_id
+    ).options(
+        selectinload(models.Leaderboard.scene),
+        selectinload(models.Leaderboard.story),
+        selectinload(models.Leaderboard.created_by),
+        selectinload(models.Leaderboard.vocabularies),
+        selectinload(models.Leaderboard.original_image),
+    )
 
-    if published_at_start is None and published_at_end is None:
-        return school_leaderboards.\
-            filter(models.Leaderboard.is_public == is_public).\
-            filter(models.Leaderboard.published_at <= datetime.datetime.now()).\
-                offset(skip).limit(limit).all()
-    elif published_at_start is None:
-        return school_leaderboards.\
-            filter(models.Leaderboard.is_public == is_public).\
-            filter(models.Leaderboard.published_at <= published_at_end).\
-                offset(skip).limit(limit).all()
-    elif published_at_end is None:
-        published_at_end = datetime.datetime.now()
-    return school_leaderboards.\
-        filter(models.Leaderboard.is_public == is_public).\
-        filter(models.Leaderboard.published_at >= published_at_start).\
-        filter(models.Leaderboard.published_at <= published_at_end).\
-                offset(skip).limit(limit).all()
+    if school_name:
+        query = query.filter(models.School_Leaderboard.school == school_name)
+    if is_public is not None:
+        query = query.filter(models.Leaderboard.is_public == is_public)
+    if created_by_id is not None:
+        query = query.filter(models.Leaderboard.created_by_id == created_by_id)
+    if published_at_start is not None:
+        query = query.filter(models.Leaderboard.published_at >= published_at_start)
+    if published_at_end is None:
+        if published_at_start and published_at_start.tzinfo:
+            published_at_end = datetime.datetime.now(tz=published_at_start.tzinfo)
+        else:
+            published_at_end = datetime.datetime.now()
+
+    query = query.filter(models.Leaderboard.published_at <= published_at_end)
+
+    return query.\
+        order_by(models.Leaderboard.published_at.desc()).\
+        offset(skip).\
+        limit(limit).\
+        all()
 
 
 def get_leaderboards_stats(
-        db: Session, 
+        db: Session,
         school_name: str = None,
         published_at_start: datetime.datetime = None,
         published_at_end: datetime.datetime = None,
         user_id: int = None,
-        is_public: bool = True
+        is_public: bool = True,
+        created_by_id: Optional[int] = None,
     ):
-    if school_name:
-        school_leaderboards = db.query(
-            models.Leaderboard,
-            models.School_Leaderboard
-        ).\
-        filter(models.School_Leaderboard.school == school_name).\
-        join(
-            models.Leaderboard,
-            models.Leaderboard.id == models.School_Leaderboard.leaderboard_id
-        )
-    else:
-        school_leaderboards = db.query(
-            models.Leaderboard,
-            models.School_Leaderboard
-        ).join(
-            models.Leaderboard,
-            models.Leaderboard.id == models.School_Leaderboard.leaderboard_id
-        )
-    if user_id is not None:
-        school_leaderboards = school_leaderboards.\
-            filter(models.Leaderboard.created_by_id == user_id)
+    owner_id = created_by_id if created_by_id is not None else user_id
+    query = db.query(models.Leaderboard).join(
+        models.School_Leaderboard,
+        models.Leaderboard.id == models.School_Leaderboard.leaderboard_id
+    )
 
-    if published_at_start is None and published_at_end is None:
-        n_leaderboards = school_leaderboards.\
-            filter(models.Leaderboard.is_public == is_public).\
-            filter(models.Leaderboard.published_at <= datetime.datetime.now()).\
-                count()
-    elif published_at_start is None:
-        n_leaderboards =  school_leaderboards.\
-            filter(models.Leaderboard.is_public == is_public).\
-            filter(models.Leaderboard.published_at <= published_at_end).\
-                count()
-    else:
-        if published_at_end is None:
+    if school_name:
+        query = query.filter(models.School_Leaderboard.school == school_name)
+    if is_public is not None:
+        query = query.filter(models.Leaderboard.is_public == is_public)
+    if owner_id is not None:
+        query = query.filter(models.Leaderboard.created_by_id == owner_id)
+    if published_at_start is not None:
+        query = query.filter(models.Leaderboard.published_at >= published_at_start)
+    if published_at_end is None:
+        if published_at_start and published_at_start.tzinfo:
+            published_at_end = datetime.datetime.now(tz=published_at_start.tzinfo)
+        else:
             published_at_end = datetime.datetime.now()
-        n_leaderboards =  school_leaderboards.\
-            filter(models.Leaderboard.is_public == is_public).\
-            filter(models.Leaderboard.published_at >= published_at_start).\
-            filter(models.Leaderboard.published_at <= published_at_end).\
-                    count()
-    
+
+    query = query.filter(models.Leaderboard.published_at <= published_at_end)
+
+    n_leaderboards = query.count()
+
     return {
         "n_leaderboards": n_leaderboards
     }
 
 def get_leaderboards_admin(
-        db: Session, 
-        skip: int = 0, 
-        limit: int = 100, 
+        db: Session,
+        skip: int = 0,
+        limit: int = 100,
         published_at_start: datetime.datetime = None,
         published_at_end: datetime.datetime = None,
         is_public: bool = True
@@ -295,7 +279,7 @@ def get_leaderboards_admin(
                 offset(skip).limit(limit).all()
 
 def get_leaderboards_admin_stats(
-        db: Session, 
+        db: Session,
         published_at_start: datetime.datetime = None,
         published_at_end: datetime.datetime = None,
         is_public: bool = True
@@ -325,7 +309,7 @@ def get_school_leaderboard(db: Session, leaderboard_id: int):
     return db.query(models.School_Leaderboard).filter(models.School_Leaderboard.leaderboard_id == leaderboard_id).all()
 
 def create_leaderboard(
-        db: Session, 
+        db: Session,
         leaderboard: schemas.LeaderboardCreate,
 ):
     db_leaderboard = models.Leaderboard(
@@ -356,7 +340,7 @@ def update_leaderboard(
         db_leaderboard.scene_id = leaderboard.scene_id
     if leaderboard.story_id is not None:
         db_leaderboard.story_id = leaderboard.story_id
-        
+
     db.commit()
     db.refresh(db_leaderboard)
 
@@ -364,7 +348,7 @@ def update_leaderboard(
         db_leaderboard.response_id = leaderboard.response_id
         db.commit()
         db.refresh(db_leaderboard)
-    
+
     return db_leaderboard
 
 def add_leaderboard_school(
@@ -374,7 +358,7 @@ def add_leaderboard_school(
     db_leaderboard = db.query(models.Leaderboard).filter(models.Leaderboard.id == leaderboard.id).first()
     if db_leaderboard is None:
         raise ValueError("Leaderboard not found")
-    
+
     school = leaderboard.school
     for school_name in school:
         db_school = db.query(models.School_Leaderboard).filter(models.School_Leaderboard.leaderboard_id == db_leaderboard.id).filter(models.School_Leaderboard.school == school_name).first()
@@ -395,7 +379,7 @@ def remove_leaderboard_school(
     db_leaderboard = db.query(models.Leaderboard).filter(models.Leaderboard.id == leaderboard.id).first()
     if db_leaderboard is None:
         raise ValueError("Leaderboard not found")
-    
+
     school = leaderboard.school
 
     db_schools = db.query(models.School_Leaderboard).filter(models.School_Leaderboard.leaderboard_id == db_leaderboard.id).all()
@@ -404,7 +388,7 @@ def remove_leaderboard_school(
         if db_school.school in school:
             db.delete(db_school)
             db.commit()
-    
+
     db_schools = db.query(models.School_Leaderboard).filter(models.School_Leaderboard.leaderboard_id == db_leaderboard.id).all()
 
     return db_schools
@@ -417,7 +401,7 @@ def add_leaderboard_vocab(
     db_leaderboard = db.query(models.Leaderboard).filter(models.Leaderboard.id == leaderboard_id).first()
     if db_leaderboard is None:
         raise ValueError("Leaderboard not found")
-    
+
     db_vocab = db.query(
         models.Vocabulary
     ).filter(
@@ -450,7 +434,7 @@ def add_leaderboard_vocab(
         )
         db.add(db_vocab)
         db.commit()
-    
+
     return db_leaderboard
 
 def remove_leaderboard_vocab(
@@ -461,7 +445,7 @@ def remove_leaderboard_vocab(
     db_leaderboard = db.query(models.Leaderboard).filter(models.Leaderboard.id == leaderboard_id).first()
     if db_leaderboard is None:
         raise ValueError("Leaderboard not found")
-    
+
     db_vocab = db.query(
         models.Vocabulary
     ).filter(
@@ -480,12 +464,12 @@ def remove_leaderboard_vocab(
 
     if db_vocab is None:
         raise ValueError("Vocabulary not found in leaderboard")
-    
+
     db.delete(db_vocab)
     db.commit()
 
     return db_leaderboard
-    
+
 
 def update_leaderboard_difficulty(
         db: Session,
@@ -718,9 +702,9 @@ def update_round_display_name(db: Session, round_update: schemas.RoundUpdateName
     db_round = db.query(models.Round).filter(models.Round.id == round_update.id).first()
     if db_round is None:
         raise ValueError("Round not found")
-    
+
     db_round.display_name = round_update.display_name
-        
+
     db.commit()
     db.refresh(db_round)
     return db_round
@@ -747,16 +731,16 @@ def get_rounds(db: Session, skip: int = 0, limit: int = 100, player_id: int = No
 
 
 def get_rounds_full(
-        db: Session, 
-        skip: int = 0, 
-        limit: int = 100, 
-        player_id: int = None, 
-        leaderboard_id: int = None, 
-        program_id: int = None, 
+        db: Session,
+        skip: int = 0,
+        limit: int = 100,
+        player_id: int = None,
+        leaderboard_id: int = None,
+        program_id: int = None,
         school_name: str = None,
         user_type: str = "student"
 ):
-    
+
     if school_name:
         school_rounds = db.query(
             models.Round,
@@ -795,14 +779,14 @@ def get_rounds_full(
         return rounds.order_by(models.Round.id.desc()).offset(skip).limit(limit).all()
 
 def get_rounds_full_count(
-        db: Session, 
-        player_id: int = None, 
-        leaderboard_id: int = None, 
-        program_id: int = None, 
+        db: Session,
+        player_id: int = None,
+        leaderboard_id: int = None,
+        program_id: int = None,
         school_name: str = None,
         user_type: str = "student"
 ):
-    
+
     if school_name:
         school_rounds = db.query(
             models.Round,
@@ -862,7 +846,7 @@ def create_round(db: Session, leaderboard_id:int, user_id: int, created_at: date
             model=model_name,
             created_at=created_at,
         )
-    
+
     db.add(db_round)
     db.commit()
     db.refresh(db_round)
@@ -912,7 +896,7 @@ def get_generations(db: Session, program_id: int=None, skip: int = 0, limit: int
                 filter(models.Round.program_id == program_id).\
                 filter(models.Generation.is_completed == True).\
                 order_by(models.Generation.id.desc()).offset(skip).limit(limit).all()
-                
+
         elif order_by == "total_score":
             if leaderboard_id and player_id:
                 generations = db.query(
@@ -992,7 +976,7 @@ def get_generations(db: Session, program_id: int=None, skip: int = 0, limit: int
             join(models.Round, models.Generation.round_id == models.Round.id).\
             filter(models.Generation.is_completed == True).\
             order_by(models.Generation.id.desc()).offset(skip).limit(limit).all()
-            
+
     elif order_by == "total_score":
         if leaderboard_id and player_id:
             generations = db.query(
@@ -1041,7 +1025,7 @@ def get_generations_by_ids(db: Session, generation_ids: List[int]):
 
 def create_generation(db: Session, round_id: int, generation: schemas.GenerationCreate):
     db_round = db.query(models.Round).filter(models.Round.id == round_id).first()
-    
+
     db_generation = models.Generation(
         **generation.model_dump()
     )
@@ -1050,7 +1034,7 @@ def create_generation(db: Session, round_id: int, generation: schemas.Generation
     db.refresh(db_generation)
 
     db_round.last_generation_id = db_generation.id
-    
+
     db.commit()
     db.refresh(db_round)
     return db_generation
@@ -1080,7 +1064,7 @@ def update_generation2(db: Session, generation: schemas.GenerationInterpretation
     return db_generation
 
 def update_generation3(db: Session, generation: schemas.GenerationComplete):
-    
+
     db.bulk_update_mappings(models.Generation, [generation.model_dump(exclude_none=True)])
     db.commit()
     db_generation = db.query(models.Generation).filter(models.Generation.id == generation.id).first()
@@ -1189,7 +1173,7 @@ def get_personal_dictionary(db: Session, player_id: int, vocabulary_id: int):
     return db.query(models.PersonalDictionary).filter(models.PersonalDictionary.player == player_id).filter(models.PersonalDictionary.vocabulary == vocabulary_id).first()
 
 def create_personal_dictionary(
-        db: Session, 
+        db: Session,
         user_id: int,
         vocabulary_id: int,
         round_id: int,
@@ -1244,7 +1228,7 @@ def get_leaderboard_vocabulary(db: Session, leaderboard_id: int, vocabulary_id: 
     return db.query(models.LeaderboardVocabulary).filter(models.LeaderboardVocabulary.leaderboard_id == leaderboard_id).filter(models.LeaderboardVocabulary.vocabulary_id == vocabulary_id).first()
 
 def create_leaderboard_vocabulary(
-        db: Session, 
+        db: Session,
         leaderboard_id: int,
         vocabulary_id: int
 ):
@@ -1317,7 +1301,7 @@ def get_tasks(db: Session, generation_id: Optional[int] = None, leaderboard_id: 
         return db.query(models.Task).filter(models.Task.leaderboard_id == leaderboard_id).all()
     else:
         return db.query(models.Task).all()
-    
+
 def delete_task(db: Session, task_id: int):
     db_task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if db_task:
@@ -1337,7 +1321,7 @@ def get_all_tasks(db: Session):
     return db.query(models.Task).all()
 
 def get_error_task(db: Session, group_type: str):
-    
+
     guest_ids = db.query(models.User).filter(models.User.username.like('%guest%')).all()
 
     answer_input_generation = db.query(models.Generation).\
@@ -1347,7 +1331,7 @@ def get_error_task(db: Session, group_type: str):
                 models.Round.player_id.notin_([guest.id for guest in guest_ids])
             )
         )
-    
+
     if group_type == 'no_interpretation':
         image_group = db.query(models.InterpretedImage).\
             filter(or_(models.InterpretedImage.image == None,
@@ -1403,7 +1387,7 @@ def get_error_task(db: Session, group_type: str):
             ).\
                 all()
         return generation_group
-    
+
     if group_type == 'no_similarity':
         # image_similarity is not set
         score_group = db.query(models.Score).\
@@ -1418,14 +1402,14 @@ def get_error_task(db: Session, group_type: str):
             )).\
                 all()
         return score_group
-    
+
     if group_type == 'no_complete':
         # the generation is not completed
         generation_group = answer_input_generation.\
             filter(models.Generation.is_completed != True).\
                 all()
         return generation_group
-    
+
 def create_user_action(db: Session, user_action: schemas.UserActionBase):
     db_user_action = models.User_Action(
         **user_action.model_dump()
@@ -1456,7 +1440,7 @@ def read_user_action(
         return db.query(models.User_Action).filter(models.User_Action.action_type == action_type).offset(skip).limit(limit).all()
     else:
         return db.query(models.User_Action).offset(skip).limit(limit).all()
-    
+
 # CRUD operations for analytics
 def create_word_cloud(
         db: Session,
@@ -1526,7 +1510,7 @@ def create_word_cloud_item_generation(
         ).first()
         if db_word_cloud_item_generation:
             return db_word_cloud_item_generation
-        
+
         db_word_cloud_item_generation = models.MistakeWordCloudItemGeneration(
             word_cloud_item_id=word_cloud_item_id,
             generation_id=generation_or_message_id
@@ -1625,7 +1609,7 @@ def update_word_cloud(
     db.bulk_update_mappings(models.WordCloud, [word_cloud.model_dump(exclude_none=True)])
     db.commit()
     db_word_cloud = db.query(models.WordCloud).filter(models.WordCloud.id == word_cloud.id).first()
-    
+
     if cloud_type == 'mistake':
         for item in word_cloud.items:
             db_word_cloud_item = db.query(models.MistakeWordCloudItem).filter(models.MistakeWordCloudItem.word_cloud_id == word_cloud.id).\
@@ -1715,12 +1699,12 @@ def delete_word_cloud_item_generation(
         db_word_cloud_item_generation = db.query(models.AssistantChatWordCloudItemChat).\
             filter(models.AssistantChatWordCloudItemChat.word_cloud_item_id == word_cloud_item_id).\
             filter(models.AssistantChatWordCloudItemChat.message_id == generation_or_message_id).first()
-        
+
     if db_word_cloud_item_generation:
         db.delete(db_word_cloud_item_generation)
         db.commit()
         return db_word_cloud_item_generation
-    
+
 def read_word_cloud(
         db: Session,
         id: int
@@ -1729,7 +1713,7 @@ def read_word_cloud(
     return db_word_cloud
 
 def create_leaderboard_analysis(
-        db: Session, 
+        db: Session,
         leaderboard_analysis: schemas.LeaderboardAnalysisCreate
 ):
     db_leaderboard_analysis = models.Leaderboard_Analysis(
@@ -1741,7 +1725,7 @@ def create_leaderboard_analysis(
     return db_leaderboard_analysis
 
 def create_leaderboard_analysis_word_cloud(
-        db: Session, 
+        db: Session,
         leaderboard_analysis_word_cloud: schemas.LeaderboardAnalysis_WordCloudCreate
 ):
     db_leaderboard_analysis_word_cloud = models.LeaderboardAnalysis_WordCloud(
@@ -1759,10 +1743,10 @@ def read_leaderboard_analysis(
 ):
     db_leaderboard_analysis = db.query(models.Leaderboard_Analysis).\
         filter(models.Leaderboard_Analysis.leaderboard_id == leaderboard_id)
-    
+
     if program_id:
         db_leaderboard_analysis = db_leaderboard_analysis.filter(models.Leaderboard_Analysis.program_id == program_id)
-    
+
     return db_leaderboard_analysis.first()
 
 def read_leaderboard_analysis_word_cloud(
@@ -1783,7 +1767,7 @@ def read_leaderboard_analysis_word_cloud(
         return db_leaderboardanalysis_wordcloud.first()
     elif require_num > 1:
         return db_leaderboardanalysis_wordcloud.limit(require_num).all()
-    
+
 
 def delete_word_cloud(
         db: Session,
@@ -1792,9 +1776,9 @@ def delete_word_cloud(
     db_word_cloud = db.query(models.WordCloud).filter(models.WordCloud.id == id).first()
     if db_word_cloud is None:
         return None
-    
+
     db_leaderboard_analysis_word_clouds = db.query(models.LeaderboardAnalysis_WordCloud).filter(models.LeaderboardAnalysis_WordCloud.word_cloud_id == id).first()
-    
+
     cloud_type = db_leaderboard_analysis_word_clouds.type if db_leaderboard_analysis_word_clouds else None
 
     # Delete all connections to leaderboard analysis word clouds
@@ -1823,7 +1807,7 @@ def delete_word_cloud(
                 db_word_cloud_item_generations = db.query(models.UserChatWordCloudItemChat).filter(models.UserChatWordCloudItemChat.word_cloud_item_id == db_word_cloud_item.id).delete(synchronize_session=False)
             elif cloud_type == 'assistant_chat':
                 db_word_cloud_item_generations = db.query(models.AssistantChatWordCloudItemChat).filter(models.AssistantChatWordCloudItemChat.word_cloud_item_id == db_word_cloud_item.id).delete(synchronize_session=False)
-    
+
         db_word_cloud_items.delete(synchronize_session=False)
         db.commit()
 
@@ -1851,7 +1835,7 @@ def update_word_cloud_item_color(
     elif cloud_type == 'assistant_chat':
         db_word_cloud_item = db.query(models.AssistantChatWordCloudItem).\
             filter(models.AssistantChatWordCloudItem.id == word_cloud_item_id).first()
-        
+
     if db_word_cloud_item:
         db_word_cloud_item.color = color
         db.commit()
