@@ -35,7 +35,7 @@ services:
         - db-store2:/var/lib/mysql
         - ./db-project/conf.d:/etc/mysql/conf.d
         # ★ ローカルのscriptディレクトリにマウントします
-        - ./db-project/init:/docker-entrypoint-initdb.d 
+        - ./db-project/init:/docker-entrypoint-initdb.d
     tty: true
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
@@ -60,7 +60,7 @@ services:
     #   - main:app
     #   - --workers 4
     #   - --bind 0.0.0.0:8000
-    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload --proxy-headers --forwarded-allow-ips='*'
     restart: unless-stopped
     ports:
       - "7871:8000"
@@ -86,7 +86,7 @@ services:
           cpus: '0.5'
 
   worker:
-    build: 
+    build:
       context: backend-project
       dockerfile: worker.dockerfile
     container_name: worker
@@ -135,7 +135,7 @@ services:
     image: redis:latest
     container_name: redis
     command:
-    - redis-server 
+    - redis-server
     - --port 7876
     - --maxmemory 32gb
     - --maxmemory-policy allkeys-lfu
@@ -151,13 +151,13 @@ services:
   nginx:
     env_file:
       - react-project/avery_analytics_vite/.env
-    depends_on: 
+    depends_on:
         - backend-project
     container_name: proxy-app
-    build: 
+    build:
         context: react-project
         dockerfile: Dockerfile
-    ports: 
+    ports:
         - "7873:80"
     restart: always
     networks:

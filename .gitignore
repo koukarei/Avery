@@ -14,3 +14,4 @@ typings/*
 virtual
 /react-project/avery_analytics_vite/node_modules
 /react-project/avery_analytics_vite/yarn.lock
+/react-project/avery_analytics_vite

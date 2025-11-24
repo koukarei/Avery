@@ -75,7 +75,7 @@ async def read_tasks(
 
 @app.get("/tasks/{task_id}", tags=["Task"], response_model=schemas.TaskStatus)
 async def check_status(
-    task_id: str, 
+    task_id: str,
     db: Session = Depends(get_db)
 ):
     result = celery_app.AsyncResult(task_id)
@@ -90,7 +90,7 @@ async def check_status(
 
 @app.get("/tasks/leaderboard/{leaderboard_id}", tags=["Task"], response_model=list[schemas.TaskStatus])
 async def check_leaderboard_task_status(
-    leaderboard_id: int, 
+    leaderboard_id: int,
     db: Session = Depends(get_db)
 ):
     celery_tasks = crud.get_tasks(db, leaderboard_id=leaderboard_id)
@@ -231,7 +231,7 @@ async def login_for_access_token(
     db: Session = Depends(get_db),
 ):
     user = authenticate_user(db, form_data.username, form_data.password)
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -244,7 +244,7 @@ async def login_for_access_token(
             detail="Please use Moodle login",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires
@@ -259,7 +259,7 @@ async def login_for_access_token(
         )
     )
     refresh_token = create_refresh_token(user.username)
-    
+
     return schemas.Token(access_token=access_token,refresh_token=refresh_token, token_type="bearer")
 
 
@@ -267,8 +267,8 @@ async def login_for_access_token(
 async def lti_login(request: Request):
     valid = await lti.validate_lti_request(request)
     if not valid:
-        return {'error': 'Invalid LTI request'} 
-    
+        return {'error': 'Invalid LTI request'}
+
     # Extracting additional fields from the form data
     form_data = await request.form()
 
@@ -311,13 +311,13 @@ async def lti_login(request: Request):
             email=form_data.get('lis_person_contact_email_primary', ''),
             school=school,
         )
-        
+
         user = authenticate_user_2(
-            db=next(get_db()), 
-            lti_user_id=user_login.user_id, 
+            db=next(get_db()),
+            lti_user_id=user_login.user_id,
             school=school
         )
-        
+
         if user:
             try:
                 token = await login_for_access_token_lti(user=user_login, db=next(get_db()))
@@ -358,9 +358,9 @@ async def login_for_access_token_lti(
     user: schemas.UserLti,
     db: Session = Depends(get_db),
 ):
-    
+
     user = authenticate_user_2(db, lti_user_id=user.user_id, school=user.school)
-    
+
     if user == None or not user.lti:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -381,9 +381,9 @@ async def login_for_access_token_lti(
             received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         )
     )
-    
+
     refresh_token = create_refresh_token(user.username)
-    
+
     return schemas.Token(access_token=access_token,refresh_token=refresh_token, token_type="bearer")
 
 @app.post("/refresh_token")
@@ -468,7 +468,7 @@ async def create_user(user: Annotated[schemas.UserCreateIn, Form()], db: Session
             program_id=db_program.id,
             user_id=new_user.id,
         )
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -500,7 +500,7 @@ async def create_user_w_random_username(user: Annotated[schemas.UserRandomCreate
         password=user.password,
         is_admin=False,
         user_type="student",
-        display_name=user.username,  
+        display_name=user.username,
     )
     user.is_admin=False
     user.user_type="student"
@@ -518,7 +518,7 @@ async def create_user_w_random_username(user: Annotated[schemas.UserRandomCreate
             program_id=db_program.id,
             user_id=new_user.id,
         )
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -579,7 +579,7 @@ async def update_user(
         raise HTTPException(status_code=401, detail="Login to update user")
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
-    
+
     if user.id:
         db_user = crud.get_user(db, user_id=user.id)
     elif user.username:
@@ -588,7 +588,7 @@ async def update_user(
         db_user = crud.get_user_by_email(db, email=user.email)
     else:
         raise HTTPException(status_code=400, detail="Please provide an id, username, or email")
-    
+
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
     user.id=db_user.id
@@ -610,10 +610,10 @@ async def read_user_me(current_user: Annotated[schemas.User, Depends(get_current
 async def read_users_stats(current_user: Annotated[schemas.User, Depends(get_current_user)], db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to delete user")
-        
+
     if current_user.user_type == "student":
         raise HTTPException(status_code=401, detail="You are not authorized to view users")
-    
+
     if current_user.is_admin:
         stats = crud.get_users_stats(db)
     else:
@@ -621,18 +621,18 @@ async def read_users_stats(current_user: Annotated[schemas.User, Depends(get_cur
             school_name = current_user.school
         else:
             school_name = "public"
-        stats = crud.get_users_stats_by_school(db, school=school_name)    
-    
+        stats = crud.get_users_stats_by_school(db, school=school_name)
+
     return stats
 
 @app.get("/users/", tags=["User"], response_model=list[schemas.User])
 async def read_users(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to delete user")
-        
+
     if current_user.user_type == "student":
         raise HTTPException(status_code=401, detail="You are not authorized to view users")
-    
+
     if current_user.is_admin:
         users = crud.get_users(db, skip=skip, limit=limit)
     else:
@@ -640,8 +640,8 @@ async def read_users(current_user: Annotated[schemas.User, Depends(get_current_u
             school_name = current_user.school
         else:
             school_name = "public"
-        users = crud.get_users_by_school(db, school=school_name, skip=skip, limit=limit)    
-    
+        users = crud.get_users_by_school(db, school=school_name, skip=skip, limit=limit)
+
     return users
 
 @app.get("/users/by_username/{username}", tags=["User"], response_model=schemas.User)
@@ -675,7 +675,7 @@ async def create_scene(current_user: Annotated[schemas.User, Depends(get_current
         raise HTTPException(status_code=401, detail="Login to create scene")
     if current_user.user_type == "student":
         raise HTTPException(status_code=401, detail="You are not authorized to create scenes")
-    
+
     scene = crud.create_scene(db=db, scene=scene)
     if current_user.school:
         crud.add_scene_school(
@@ -705,7 +705,7 @@ async def read_scene_schools(
         raise HTTPException(status_code=401, detail="Login to read programs")
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -731,7 +731,7 @@ async def add_scene_to_school(
         raise HTTPException(status_code=401, detail="Login to update program")
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -754,7 +754,7 @@ async def remove_scene_from_school(
         raise HTTPException(status_code=401, detail="Login to update program")
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -772,11 +772,11 @@ async def read_stories(current_user: Annotated[schemas.User, Depends(get_current
         raise HTTPException(status_code=401, detail="Login to read stories")
     stories = crud.get_stories(db, skip=skip, limit=limit)
     return stories
-        
+
 
 @app.post("/story/", tags=["Story"], response_model=schemas.StoryOut, status_code=201)
 async def create_story(
-    current_user: Annotated[schemas.User, Depends(get_current_user)], 
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
     story_content_file: Annotated[UploadFile, File()],
     title: Annotated[str, Form()],
     scene_id: Annotated[int, Form()],
@@ -784,11 +784,11 @@ async def create_story(
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to create story")
-    
+
     if not story_content_file.filename.endswith(".txt"):
         raise HTTPException(status_code=400, detail="Please upload a text file")
-    
-    
+
+
     try:
         story_content_file.file.seek(0)
         raw = story_content_file.file.read()
@@ -806,7 +806,7 @@ async def create_story(
             scene_id=scene_id,
             content=story_content
         )
-                
+
     except Exception as e:
         logger1.error(f"Error uploading file: {str(e)}")
         raise HTTPException(status_code=400, detail="Error uploading file")
@@ -842,7 +842,7 @@ async def read_story_schools(
         raise HTTPException(status_code=401, detail="Login to read programs")
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -868,7 +868,7 @@ async def add_story_to_school(
         raise HTTPException(status_code=401, detail="Login to update program")
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -891,7 +891,7 @@ async def remove_story_from_school(
         raise HTTPException(status_code=401, detail="Login to update program")
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -910,7 +910,7 @@ async def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_cu
     school_name = current_user.school
     if school_name is None and not current_user.is_admin:
         school_name = "public"
-    
+
     if not published_at_start and not published_at_end:
         if not is_public:
             leaderboards = crud.get_leaderboards(
@@ -924,7 +924,7 @@ async def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_cu
             return [lb for lb in leaderboards if lb[0].created_by_id == current_user.id]
         leaderboards = crud.get_leaderboards(db, school_name=school_name, skip=skip, limit=limit, published_at_end=datetime.datetime.now(tz=zoneinfo.ZoneInfo('Japan')))
         return leaderboards
-    
+
     # print("before convent",published_at_start, published_at_end)
 
 
@@ -972,9 +972,9 @@ async def read_leaderboards(current_user: Annotated[schemas.User, Depends(get_cu
 @app.get("/leaderboards/stats", tags=["Leaderboard", "Stats"], response_model=schemas.LeaderboardsStats)
 async def read_leaderboards_stats(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
-    published_at_start: str=None, 
-    published_at_end: str=None, 
-    is_public: bool = True, 
+    published_at_start: str=None,
+    published_at_end: str=None,
+    is_public: bool = True,
     db: Session = Depends(get_db)
 ):
     if not current_user:
@@ -982,7 +982,7 @@ async def read_leaderboards_stats(
     school_name = current_user.school
     if school_name is None and not current_user.is_admin:
         school_name = "public"
-    
+
     if not published_at_start and not published_at_end:
         if not is_public:
             stats = crud.get_leaderboards_stats(
@@ -1060,7 +1060,7 @@ async def read_leaderboards_admin(
         published_at_end=published_at_end,
         is_public=is_public,
     )
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1097,7 +1097,7 @@ async def read_leaderboards_admin_stats(
         published_at_end=published_at_end,
         is_public=is_public,
     )
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1128,7 +1128,7 @@ async def create_leaderboard(
     )
 
     result = crud.create_leaderboard(
-        db=db, 
+        db=db,
         leaderboard=leaderboard,
     )
 
@@ -1141,9 +1141,9 @@ async def create_leaderboard(
     db_original_image = crud.get_original_image(db, image_id=leaderboard.original_image_id)
 
     t =  await generateDescription2.delayx(
-        leaderboard_id=result.id, 
-        image=db_original_image.image, 
-        story=story, 
+        leaderboard_id=result.id,
+        image=db_original_image.image,
+        story=story,
         model_name="gpt-4o-mini"
     )
     if current_user.school:
@@ -1160,7 +1160,7 @@ async def create_leaderboard(
     )
 
 
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1242,15 +1242,15 @@ async def create_leaderboards(
     # Check arguments
     if not zipped_image_files.filename.endswith(".zip"):
         raise HTTPException(status_code=400, detail="Please upload a ZIP file")
-    
+
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to create leaderboards")
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
-    
+
     if not csv_file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Please upload a CSV file")
-    
+
     # Get the scene
     scene = crud.get_scene(db=db, scene_name="anime")
 
@@ -1261,7 +1261,7 @@ async def create_leaderboards(
     col_names = ['title', 'story_extract']
     if not all(col in leaderboards.columns for col in col_names):
         raise HTTPException(status_code=400, detail="CSV file must have 'title' and 'story_extract' columns")
-    
+
     if 'published_at' in leaderboards.columns:
         leaderboards['published_at'] = pd.to_datetime(leaderboards['published_at'], format='%d/%m/%Y')
 
@@ -1272,10 +1272,10 @@ async def create_leaderboards(
             with tempfile.NamedTemporaryFile(delete=False) as tmp:
                 # Copy the uploaded file's content to the temporary file
                 shutil.copyfileobj(zipped_image_files.file, tmp)
-                
+
             with zipfile.ZipFile(tmp.name, 'r') as zip_ref:
                 zip_ref.extractall(temp_dir)
-            
+
         except Exception as e:
             raise HTTPException(
                 status_code=500,
@@ -1286,7 +1286,7 @@ async def create_leaderboards(
             import os
             if 'tmp' in locals():
                 os.unlink(tmp.name)
-    
+
 
         images_files = [f for f in os.listdir(temp_dir) if os.path.isfile(os.path.join(temp_dir, f))]
         if int(len(leaderboards)) != int(len(images_files)):
@@ -1318,13 +1318,13 @@ async def create_leaderboards(
 
     # Read the CSV file
     try:
-        
+
         leaderboards.set_index('title', inplace=True)
 
         # Create leaderboards
         leaderboard_list = []
         for index, row in leaderboards.iterrows():
-            
+
             published_at = row.get('published_at', datetime.datetime.now(tz=timezone(timedelta(hours=9))))
 
             if 'story_extract' in leaderboards.columns:
@@ -1394,7 +1394,7 @@ async def create_leaderboards(
                 diff = set(added_vocabularies) - set(preset_vocabularies)
                 if diff:
                     logger1.info(f"Leaderboard {index} Added vocabularies: {diff}")
-            
+
             # Add school
             if school:
                 crud.update_leaderboard(
@@ -1405,14 +1405,14 @@ async def create_leaderboards(
                         vocabularies=[]
                     )
                 )
-            
+
             leaderboard_list.append(db_leaderboard)
 
             # Generate description
             t = await generateDescription2.delayx(
-                leaderboard_id=db_leaderboard.id, 
-                image=img.image, 
-                story=story_extract, 
+                leaderboard_id=db_leaderboard.id,
+                image=img.image,
+                story=story_extract,
                 model_name="gpt-4o-mini",
             )
             crud.create_task(
@@ -1430,7 +1430,7 @@ async def create_leaderboards(
     if os.path.exists(temp_dir):
         shutil.rmtree(temp_dir)
 
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1459,7 +1459,7 @@ async def create_leaderboard_image(
         raise HTTPException(status_code=400, detail="Please upload a valid image file")
     finally:
         original_image.file.close()
-        
+
     db_original_image = crud.create_original_image(
         db=db,
         image=schemas.ImageBase(
@@ -1477,7 +1477,7 @@ async def read_leaderboard(current_user: Annotated[schemas.User, Depends(get_cur
     if db_leaderboard is None:
         logger1.error(f"Leaderboard not found: {leaderboard_id}")
         raise HTTPException(status_code=404, detail="Leaderboard not found")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1498,7 +1498,7 @@ async def read_schools(current_user: Annotated[schemas.User, Depends(get_current
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
     schools = crud.get_school_leaderboard(db, leaderboard_id=leaderboard_id)
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1525,7 +1525,7 @@ async def update_leaderboard(
     db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
     if db_leaderboard is None:
         raise HTTPException(status_code=404, detail="Leaderboard not found")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1552,7 +1552,7 @@ async def update_leaderboard_school(
     db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
     if db_leaderboard is None:
         raise HTTPException(status_code=404, detail="Leaderboard not found")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1579,7 +1579,7 @@ async def delete_leaderboard_school(
     db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
     if db_leaderboard is None:
         raise HTTPException(status_code=404, detail="Leaderboard not found")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1606,7 +1606,7 @@ async def add_leaderboard_vocabulary(
     db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
     if db_leaderboard is None:
         raise HTTPException(status_code=404, detail="Leaderboard not found")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1633,7 +1633,7 @@ async def delete_leaderboard_vocabulary(
     db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
     if db_leaderboard is None:
         raise HTTPException(status_code=404, detail="Leaderboard not found")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1659,7 +1659,7 @@ async def delete_leaderboard(
     db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
     if db_leaderboard is None:
         raise HTTPException(status_code=404, detail="Leaderboard not found")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1682,7 +1682,7 @@ async def create_program(
         raise HTTPException(status_code=401, detail="Login to create program")
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1720,7 +1720,7 @@ async def read_programs(current_user: Annotated[schemas.User, Depends(get_curren
 
     if not programs:
         return [crud.get_program_by_name(db, "inlab_test")]
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1742,7 +1742,7 @@ async def read_school_programs(
         raise HTTPException(status_code=401, detail="Login to read programs")
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1768,7 +1768,7 @@ async def add_program_to_school(
         raise HTTPException(status_code=401, detail="Login to update program")
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1791,7 +1791,7 @@ async def remove_program_from_school(
         raise HTTPException(status_code=401, detail="Login to update program")
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1813,7 +1813,7 @@ async def get_user_program(
         raise HTTPException(status_code=401, detail="Login to view program")
     if current_user.id != user_id and not current_user.user_type == "instructor":
         raise HTTPException(status_code=401, detail="You are not allowed to view this user's program")
-    
+
     checking_user = crud.get_user(db=db, user_id=user_id)
     if checking_user and checking_user.school != current_user.school and not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not allowed to view this user's program")
@@ -1822,7 +1822,7 @@ async def get_user_program(
         db=db,
         user_id=user_id,
     )
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1846,11 +1846,11 @@ async def add_program_to_user(
         raise HTTPException(status_code=401, detail="Login to update program")
     if not current_user.user_type == "instructor":
         raise HTTPException(status_code=401, detail="You are not an instructor")
-    
+
     updating_user = crud.get_user(db=db, user_id=programUserUpdate.user_id)
     if updating_user and updating_user.school != current_user.school and not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not allowed to update this user's program")
-    
+
     if updating_user.school:
         school = updating_user.school
     else:
@@ -1860,10 +1860,10 @@ async def add_program_to_user(
         db=db,
         school_name=school,
     )
-    
+
     if programUserUpdate.program_id not in [sp.program_id for sp in school_programs]:
         raise HTTPException(status_code=401, detail="This program not available for your school")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1886,11 +1886,11 @@ async def remove_program_from_user(
         raise HTTPException(status_code=401, detail="Login to update program")
     if not current_user.user_type == "instructor":
         raise HTTPException(status_code=401, detail="You are not an instructor")
-    
+
     updating_user = crud.get_user(db=db, user_id=programUserUpdate.user_id)
     if updating_user and updating_user.school != current_user.school and not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not allowed to update this user's program")
-    
+
     if updating_user.school:
         school = updating_user.school
     else:
@@ -1900,10 +1900,10 @@ async def remove_program_from_user(
         db=db,
         school_name=school,
     )
-    
+
     if programUserUpdate.program_id not in [sp.program_id for sp in school_programs]:
         raise HTTPException(status_code=401, detail="This program not available for your school")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1923,14 +1923,14 @@ async def get_round(
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view")
-    
-    
+
+
     db_round = crud.get_round(db=db, round_id=round_id)
     if db_round is None:
         raise HTTPException(status_code=404, detail="Round not found")
     if db_round.player_id != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not allowed to view this round")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1952,14 +1952,14 @@ async def update_round_display_name(
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to update")
-    
+
 
     db_round = crud.get_round(db=db, round_id=round.id)
     if db_round is None:
         raise HTTPException(status_code=404, detail="Round not found")
     if db_round.player_id != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not allowed to update this round")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -1982,13 +1982,13 @@ async def get_rounds_by_leaderboard(
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view")
-    
+
     if program == "none":
         return []
     elif program == "overview":
         # check admin
         if current_user.is_admin and current_user.user_type == "instructor":
-            
+
             db_rounds_users = crud.get_rounds_full(
                 db=db,
                 leaderboard_id=leaderboard_id,
@@ -1997,7 +1997,7 @@ async def get_rounds_by_leaderboard(
             return [r for r,u in db_rounds_users]
         raise HTTPException(status_code=401, detail="You are not allowed to view all rounds")
     db_program = crud.get_program_by_name(db, program)
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -2032,7 +2032,7 @@ async def get_rounds_by_leaderboard(
         for r in db_rounds:
             if r.player_id != current_user.id:
                 r.player_id = None
-    
+
     return db_rounds
 
 @app.get("/leaderboards/{leaderboard_id}/rounds/stats", tags=["Leaderboard", "Round", "Stats"], response_model=schemas.LeaderboardStats)
@@ -2044,13 +2044,13 @@ async def get_rounds_stats_by_leaderboard(
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view")
-    
+
     if program == "none":
         return {"n_rounds": 0}
     elif program == "overview":
         # check admin
         if current_user.is_admin and current_user.user_type == "instructor":
-            
+
             n_rounds = crud.get_rounds_full_count(
                 db=db,
                 leaderboard_id=leaderboard_id,
@@ -2059,7 +2059,7 @@ async def get_rounds_stats_by_leaderboard(
             return {"n_rounds": n_rounds}
         raise HTTPException(status_code=401, detail="You are not allowed to view all rounds")
     db_program = crud.get_program_by_name(db, program)
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -2085,7 +2085,7 @@ async def get_rounds_stats_by_leaderboard(
             school_name=current_user.school,
             user_type=current_user.user_type,
         )
-    
+
     return {"n_rounds": n_rounds}
 
 @app.get("/my_rounds/", tags=["Round"], response_model=list[schemas.RoundOut])
@@ -2110,7 +2110,7 @@ async def get_my_rounds(
                 leaderboard_id=leaderboard_id,
                 program_id=db_program.id
             )
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -2139,7 +2139,7 @@ async def round_websocket(
     current_user = await get_current_user_ws(db=db, token=token)
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to connect")
-    
+
     player_id = current_user.id
 
     start_time = datetime.datetime.now(tz=timezone(timedelta(hours=9)))
@@ -2193,7 +2193,7 @@ async def round_websocket(
         db=db,
         user_id=player_id,
     )
-    
+
     db_program = crud.get_program_by_name(db, obj.program)
 
     if not (db_program and db_program_user and db_program.id in [pu.program_id for pu in db_program_user]):
@@ -2202,7 +2202,7 @@ async def round_websocket(
     # if user resumes the round
     if user_action["action"] == "resume":
         leaderboard_id = user_action["obj"]["leaderboard_id"]
-        
+
         unfinished_rounds = crud.get_rounds(
             db=db,
             player_id=player_id,
@@ -2224,7 +2224,7 @@ async def round_websocket(
                 round_id=unfinished_rounds[0].id,
             )
             db_leaderboard = crud.get_leaderboard(db=db, leaderboard_id=leaderboard_id)
-            
+
             db_generation = crud.get_generation(db=db, generation_id=db_round.last_generation_id)
             db_chat = crud.get_chat(db=db, chat_id=db_round.chat_history)
             prev_res_ids = [
@@ -2284,7 +2284,7 @@ async def round_websocket(
                 "chat": {
                     "id": db_round.chat_history,
                     "messages" : [
-                        {   
+                        {
                             'id': db_message.id,
                             'sender': db_message.sender,
                             'content': db_message.content,
@@ -2301,7 +2301,7 @@ async def round_websocket(
                 round_id=finished_rounds[0].id,
             )
             db_leaderboard = crud.get_leaderboard(db=db, leaderboard_id=leaderboard_id)
-            
+
             db_generation = crud.get_generation(db=db, generation_id=db_round.last_generation_id)
             db_chat = crud.get_chat(db=db, chat_id=db_round.chat_history)
             prev_res_ids = [
@@ -2345,7 +2345,7 @@ async def round_websocket(
                 "chat": {
                     "id": db_round.chat_history,
                     "messages" : [
-                        {   
+                        {
                             'id': db_message.id,
                             'sender': db_message.sender,
                             'content': db_message.content,
@@ -2441,7 +2441,7 @@ async def round_websocket(
             "chat": {
                 "id": db_round.chat_history,
                 "messages" : [
-                    {   
+                    {
                         'id': db_message.id,
                         'sender': db_message.sender,
                         'content': db_message.content,
@@ -2451,7 +2451,7 @@ async def round_websocket(
                 ]
             },
         }
-    
+
     await websocket.send_json(send_data)
 
     crud.update_user_action(
@@ -2523,7 +2523,7 @@ async def round_websocket(
                     "chat": {
                         "id": db_round.chat_history,
                         "messages" : [
-                            {   
+                            {
                                 'id': db_message.id,
                                 'sender': db_message.sender,
                                 'content': db_message.content,
@@ -2557,7 +2557,7 @@ async def round_websocket(
                 sentences = [
                     g.sentence.strip() for g in db_round.generations if g.sentence != '' and g.correct_sentence is not None and g.id != db_generation.id
                 ]
-                
+
                 if db_generation.correct_sentence is None:
                     db_generation = crud.update_generation0(
                         db=db,
@@ -2567,7 +2567,7 @@ async def round_websocket(
                 elif obj.sentence.strip() in sentences:
                     db_generation = crud.get_generation(db=db, generation_id=db_generation.id)
                     status = 3
-                else: 
+                else:
                     generated_time += 1
                     obj.generated_time = generated_time
                     db_generation = crud.create_generation(
@@ -2585,7 +2585,7 @@ async def round_websocket(
                     except Exception as e:
                         logger1.error(f"Error in get_user_answer: {str(e)}")
                         raise HTTPException(status_code=400, detail=str(e))
-                
+
 
                 if status == 0:
                     crud.update_generation3(
@@ -2609,7 +2609,7 @@ async def round_websocket(
                         duration=duration
                     )
                     duration = 0
-                    
+
                     db_generation = crud.update_generation1(
                         db=db,
                         generation=schemas.GenerationCorrectSentence(
@@ -2633,7 +2633,7 @@ async def round_websocket(
                         "id": db_generation.id,
                         "at": db_generation.created_at,
                     }
-    
+
                     if "IMG" in db_program.feedback and "AWS" in db_program.feedback:
                         chain_interpretation = celery_app.chain(
                             celery_app.group(
@@ -2660,7 +2660,7 @@ async def round_websocket(
                         chain_result = await chain_interpretation.apply_asyncx()
                     else:
                         chain_result = None
-                    
+
 
                 elif status == 1:
                     messages = [
@@ -2719,7 +2719,7 @@ async def round_websocket(
                     "chat": {
                         "id": db_round.chat_history,
                         "messages" : [
-                            {   
+                            {
                                 'id': db_message.id,
                                 'sender': db_message.sender,
                                 'content': db_message.content,
@@ -2739,7 +2739,7 @@ async def round_websocket(
             elif user_action["action"] == "evaluate" and (db_generation.correct_sentence is None or db_generation.correct_sentence == ""):
                 send_data = {}
             elif user_action["action"] == "evaluate":
-                
+
                 if "IMG" in db_program.feedback and db_generation.interpreted_image is None:
                     # If the interpreted image is not generated, log an error
                     logger1.error(f"Interpreted image not found for generation {db_generation.id}")
@@ -2777,12 +2777,12 @@ async def round_websocket(
                 else:
                     scores_dict = None
                     image_similarity = None
-                
+
                 if not db_generation.is_completed:
                     # initialize start_time for duration calculation
                     start_time = datetime.datetime.now(tz=timezone(timedelta(hours=9)))
                     duration = 0
-                    
+
                     generation_com = schemas.GenerationComplete(
                         id=db_generation.id,
                         is_completed=True
@@ -2794,7 +2794,7 @@ async def round_websocket(
 
                     descriptions = crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
                     descriptions = [des.content for des in descriptions]
-    
+
                     # Set messages for score and evaluation
                     db_messages = []
 
@@ -2847,7 +2847,7 @@ async def round_websocket(
                             db_generation.grammar_errors,
                             db_generation.spelling_errors,
                             descriptions
-                        ) 
+                        )
                     else:
                         evaluation = None
                         db_evaluate_msg = None
@@ -2888,7 +2888,7 @@ async def round_websocket(
                                 sender="assistant",
                                 created_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
                                 is_hint=False,
-                               
+
                                 is_evaluation=True,
                                 responses_id=chatbot_obj.prev_res_id
                             ),
@@ -2922,7 +2922,7 @@ async def round_websocket(
                     "chat": {
                         "id": db_round.chat_history,
                         "messages" : [
-                            {   
+                            {
                                 'id': db_message.id,
                                 'sender': db_message.sender,
                                 'content': db_message.content,
@@ -2954,7 +2954,7 @@ async def round_websocket(
                         duration=duration,
                     )
                 )
-                
+
                 # prepare data to send
                 send_data = {
                     "leaderboard": {
@@ -3016,7 +3016,7 @@ async def round_websocket(
                 generation_id=db_generation.id,
                 duration=duration
             )
-        
+
 @app.post("/user_actions/", tags=["User Action"], status_code=201)
 async def create_user_action(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
@@ -3032,7 +3032,7 @@ async def create_user_action(
         received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
         sent_at=user_action.sent_at,
     ))
-    
+
     return {"detail": "User action created"}
 
 @app.get("/vocabulary/{vocabulary}", tags=["Vocabulary"], response_model=list[schemas.Vocabulary])
@@ -3045,7 +3045,7 @@ async def read_vocabulary(current_user: Annotated[schemas.User, Depends(get_curr
         vocabularies = crud.get_vocabulary(db, vocabulary=vocabulary)
     if not vocabularies:
         raise HTTPException(status_code=404, detail="Vocabulary not found")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -3063,7 +3063,7 @@ async def read_vocabularies(current_user: Annotated[schemas.User, Depends(get_cu
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view vocabularies")
     vocabularies = crud.get_vocabularies(db, skip=skip, limit=limit)
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -3085,17 +3085,17 @@ async def create_vocabularies(
         raise HTTPException(status_code=401, detail="Login to create vocabulary")
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
-    
+
     if not vocabularies_csv.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Please upload a CSV file")
-    
+
     output = []
     try:
         vocabularies = pd.read_csv(vocabularies_csv.file)
         col_names = ['word','pos']
         if not all(col in vocabularies.columns for col in col_names):
             raise HTTPException(status_code=400, detail="CSV file must have 'word' and 'pos' columns")
-        
+
         for index, row in vocabularies.iterrows():
             pos = row['pos'].split(",")
             for p in pos:
@@ -3112,7 +3112,7 @@ async def create_vocabularies(
                     continue
                 elif meaning == "Word not found in the dictionary":
                     continue
-                
+
                 v = crud.create_vocabulary(
                     db=db,
                     vocabulary=schemas.VocabularyBase(
@@ -3122,7 +3122,7 @@ async def create_vocabularies(
                     )
                 )
                 output.append(v)
-    
+
         crud.create_user_action(
             db=db,
             user_action=schemas.UserActionBase(
@@ -3143,7 +3143,7 @@ async def read_personal_dictionaries(current_user: Annotated[schemas.User, Depen
         return []
     player_id = current_user.id
     personal_dictionaries = crud.get_personal_dictionaries(db, player_id=player_id)
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -3165,7 +3165,7 @@ async def create_personal_dictionary(
         raise HTTPException(status_code=401, detail="Login to create personal dictionary")
 
     personal_dictionary.user_id = current_user.id
-    
+
     vocab = crud.get_vocabulary(
         db=db,
         vocabulary=personal_dictionary.vocabulary,
@@ -3191,7 +3191,7 @@ async def create_personal_dictionary(
                 meaning=meaning
             )
         )
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -3221,7 +3221,7 @@ async def update_personal_dictionary(
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to update personal dictionary")
     personal_dictionary.user_id = current_user.id
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -3243,7 +3243,7 @@ async def delete_personal_dictionary(
     personal_dictionary_id: int,
     db: Session = Depends(get_db),
 ):
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -3262,12 +3262,12 @@ async def delete_personal_dictionary(
 @app.get("/evaluation_msg/{generation_id}", tags=["Generation"], response_model=schemas.Message)
 async def get_evaluation(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
-    generation_id: int, 
+    generation_id: int,
     db: Session = Depends(get_db)
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view images")
-    
+
     db_generation = crud.get_generation(
         db=db,
         generation_id=generation_id
@@ -3298,7 +3298,7 @@ async def get_evaluation(
             prev_res_ids = [
                 msg.response_id for msg in db_chat.messages if msg.response_id is not None
             ]
-            
+
             chatbot_obj = openai_chatbot.Hint_Chatbot(
                 model_name=db_round.model,
                 vocabularies=db_round.leaderboard.vocabularies,
@@ -3357,7 +3357,7 @@ async def get_evaluation(
                     ),
                     chat_id=db_round.chat_history
                 )['message']
-                
+
                 db_generation = crud.update_generation3(
                     db=db,
                     generation=schemas.GenerationComplete(
@@ -3367,13 +3367,13 @@ async def get_evaluation(
                     )
                 )
         return db_generation.evaluation
-    
+
     raise HTTPException(status_code=500, detail="No evaluation message.")
 
 @app.get("/chat/{round_id}", tags=["Chat"], response_model=schemas.Chat)
 async def read_chat(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
-    round_id: int, 
+    round_id: int,
     db: Session = Depends(get_db),
 ):
     if not current_user:
@@ -3387,7 +3387,7 @@ async def read_chat(
     chat = crud.get_chat(db, chat_id=chat_id)
     if chat is None:
         raise HTTPException(status_code=404, detail="Chat not found")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -3404,7 +3404,7 @@ async def read_chat(
 @app.get("/chat/{round_id}/stats", tags=["Chat", "Stats"], response_model=schemas.ChatStats)
 async def read_chat_stats(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
-    round_id: int, 
+    round_id: int,
     db: Session = Depends(get_db),
 ):
     if not current_user:
@@ -3412,12 +3412,12 @@ async def read_chat_stats(
     db_round = crud.get_round(db, round_id)
     if db_round is None:
         raise HTTPException(status_code=404, detail="Round not found")
-    
+
     chat_id = db_round.chat_history
     chat_stats = crud.get_chat_stats(db, chat_id=chat_id)
     if chat_stats is None:
         raise HTTPException(status_code=404, detail="Chat stats not found")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -3433,7 +3433,7 @@ async def read_chat_stats(
 @app.get("/original_image/{leaderboard_id}", tags=["Image"])
 async def get_original_image(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
-    leaderboard_id: int, 
+    leaderboard_id: int,
     db: Session = Depends(get_db)
 ):
     if not current_user:
@@ -3446,9 +3446,9 @@ async def get_original_image(
     #decode base64 image
     if db_leaderboard.original_image is None:
         raise HTTPException(status_code=404, detail="Original image not found")
-    
+
     imgdata = decode_image(db_leaderboard.original_image.image)
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -3463,16 +3463,16 @@ async def get_original_image(
         content=imgdata,
         media_type="image/png"  # Adjust this based on your image type (jpeg, png, etc.)
     )
-    
+
 @app.get("/interpreted_image/{generation_id}", tags=["Image"])
 async def get_interpreted_image(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
-    generation_id: int, 
+    generation_id: int,
     db: Session = Depends(get_db)
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view images")
-    
+
     db_generation = crud.get_generation(
         db=db,
         generation_id=generation_id
@@ -3490,9 +3490,9 @@ async def get_interpreted_image(
     #     raise HTTPException(status_code=401, detail="You are not authorized to view images")
     if db_generation.interpreted_image is None:
         raise HTTPException(status_code=404, detail="Interpreted image not found")
-    
+
     imgdata = decode_image(db_generation.interpreted_image.image)
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -3511,7 +3511,7 @@ async def get_interpreted_image(
 @app.get("/generation/{generation_id}", tags=["Generation"], response_model=schemas.GenerationOut)
 async def read_generation(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
-    generation_id: int, 
+    generation_id: int,
     db: Session = Depends(get_db)
 ):
     if not current_user:
@@ -3522,7 +3522,7 @@ async def read_generation(
     )
     if db_generation is None:
         raise HTTPException(status_code=404, detail="Generation not found")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -3549,7 +3549,7 @@ async def read_generations(
         raise HTTPException(status_code=401, detail="Login to view generations")
     if player_id is not None and player_id != current_user.id and current_user.user_type == "student":
         raise HTTPException(status_code=401, detail="You are not authorized to view generations")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -3571,7 +3571,7 @@ async def read_generations(
             leaderboard_id=leaderboard_id,
             order_by=order_by
         )
-        
+
         return generations
     db_program = crud.get_program_by_name(db, program)
     if db_program is None:
@@ -3595,7 +3595,7 @@ async def read_my_generations(
 ):
     if not current_user:
         return []
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -3626,7 +3626,7 @@ async def read_my_generations(
 @app.get("/generation/{generation_id}/score", tags=["Generation"], response_model=Optional[schemas.Score])
 async def get_generation_score(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
-    generation_id: int, 
+    generation_id: int,
     db: Session = Depends(get_db)
 ):
     if not current_user:
@@ -3637,7 +3637,7 @@ async def get_generation_score(
     )
     if db_generation is None:
         raise HTTPException(status_code=404, detail="Generation not found")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -3658,13 +3658,13 @@ async def get_generation_score(
 @app.get("/leaderboards/{leaderboard_id}/check_ok_to_start_new", tags=["Leaderboard"], response_model=schemas.LeaderboardStartNew)
 async def check_leaderboard_playrecord(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
-    leaderboard_id: int, 
+    leaderboard_id: int,
     program: Optional[str] = "none",
     db: Session = Depends(get_db)
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to check leaderboard")
-    
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -3731,7 +3731,7 @@ async def fix_error_task(
         raise HTTPException(status_code=401, detail="Login to fix error")
     if not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an admin")
-    
+
     try:
 
         db_images = crud.get_error_task(

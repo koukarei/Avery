@@ -6,7 +6,7 @@ sys.path.append(os.getcwd())
 
 from fastapi.testclient import TestClient
 
-from main import app 
+from main import app
 from fastapi import UploadFile
 
 client = TestClient(app)
@@ -27,15 +27,15 @@ def test_start_data():
     }
 
     response = client.post(
-        "/sqlapp2/users/", 
-        json=user_acc.copy(), 
-        headers={"Content-Type": "application/json"}
+        "/sqlapp2/users/",
+        data=user_acc.copy(),
+        headers={"Content-Type": "application/x-www-form-urlencoded"}
     )
 
     response = client.post(
         "/sqlapp2/users/",
-        json=user_acc2.copy(),
-        headers={"Content-Type": "application/json"}
+        data=user_acc2.copy(),
+        headers={"Content-Type": "application/x-www-form-urlencoded"}
     )
 
 @pytest.mark.usefixtures("login")
@@ -45,7 +45,7 @@ class TestAdmin:
     _client = client
 
     def test_read_scenes(self):
-        
+
         # Test read all scenes
         response = client.get(
             "/sqlapp2/scenes/",
@@ -126,7 +126,7 @@ class TestAdmin:
                 files={"story_content_file": ("mice_story_for_test.txt", f, "text/plain")},
                 data={
                     "title": "The Tale of Two Bad Mice",
-                    "scene_id": "1"  
+                    "scene_id": "1"
                 },
                 headers={"Authorization": f"Bearer {self.access_token}"}
             )
@@ -138,4 +138,3 @@ class TestAdmin:
         assert response.status_code == 200, response.json()
         assert len(response.json()) == num_stories + 1
 
-    
