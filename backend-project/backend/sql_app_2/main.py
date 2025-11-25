@@ -34,9 +34,8 @@ import logging
 from fastapi.middleware.cors import CORSMiddleware
 
 origins = [
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "ws://localhost:5173",
+    os.getenv("CLIENT_ORIGIN", "http://localhost:3000"),
+    os.getenv("CLIENT_WS_ORIGIN", "ws://localhost:3000"),
 ]
 
 models.Base.metadata.create_all(bind=engine2)
