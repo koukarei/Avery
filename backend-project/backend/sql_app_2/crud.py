@@ -660,6 +660,12 @@ def get_programs_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 
 def get_program_by_name(db: Session, program_name: str):
     return db.query(models.Program).filter(models.Program.name == program_name).first()
 
+def count_users_in_program(db: Session, program_id: int, school: str = None):
+    return db.query(models.User, models.ProgramUser).\
+        filter(models.User.school == school).\
+            filter(models.ProgramUser.program_id == program_id).\
+                join(models.ProgramUser, models.User.id == models.ProgramUser.user_id).count()
+
 def get_round(db: Session, round_id: int):
     return db.query(models.Round).filter(models.Round.id == round_id).first()
 
