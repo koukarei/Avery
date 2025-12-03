@@ -1,5 +1,5 @@
 import logging.config
-from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, responses, Security, status, WebSocket, WebSocketDisconnect, Request
+from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, responses, status, WebSocket, WebSocketDisconnect, Request
 from fastapi.templating import Jinja2Templates
 
 templates = Jinja2Templates(directory="templates")
@@ -7,7 +7,7 @@ templates = Jinja2Templates(directory="templates")
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import parse_obj_as
 from sqlalchemy.orm import Session
-import time, os, datetime, shutil, tempfile, zipfile, zoneinfo, random, json, asyncio #, yappi
+import os, datetime, shutil, tempfile, zipfile, zoneinfo, random, json, asyncio #, yappi
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -22,7 +22,7 @@ from tasks import generateDescription2, generate_interpretation2, calculate_scor
 from .database import SessionLocal2, engine2
 
 from .dependencies import sentence, score, dictionary, openai_chatbot, lti
-from .authentication import authenticate_user, authenticate_user_2, create_access_token, oauth2_scheme, SECRET_KEY, SECRET_KEY_WS, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, REFRESH_TOKEN_EXPIRE_MINUTES, JWTError, jwt, create_ws_token
+from .authentication import authenticate_user, authenticate_user_2, create_access_token, oauth2_scheme, SECRET_KEY, SECRET_KEY_WS, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, JWTError, jwt, create_ws_token
 from util import *
 
 from typing import Tuple, List, Annotated, Optional, Union, Literal
@@ -688,7 +688,7 @@ async def create_user(user: Annotated[schemas.UserCreateIn, Form()], db: Session
 @app.get("/users/random_username", tags=["User"], response_model=schemas.UserRandomCreate)
 async def get_random_username(db: Session = Depends(get_db)):
     while True:
-        today_in_string = datetime.datetime.now(tz=JST).strftime("%Y%m%d")
+        today_in_string = datetime.datetime.now(tz=JST).strftime("%y%m%d")
         random_username = today_in_string + ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=8))
         db_user = crud.get_user_by_username(db, username=random_username)
         if not db_user:
