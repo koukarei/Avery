@@ -43,7 +43,7 @@ models.Base.metadata.create_all(bind=engine2)
 media_dir = Path(os.getenv("MEDIA_DIR", "/static"))
 media_dir.mkdir(parents=True, exist_ok=True)
 
-JST = zoneinfo.ZoneInfo("Asia/Tokyo")
+JST = JST
 
 LEADERBOARD_CACHE_TTL = int(os.getenv("LEADERBOARD_CACHE_TTL", "15"))
 LEADERBOARD_CACHE_MAXSIZE = int(os.getenv("LEADERBOARD_CACHE_MAXSIZE", "128"))
@@ -457,8 +457,8 @@ async def login_for_access_token(
         user_action=schemas.UserActionBase(
             user_id=user.id,
             action="login",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     refresh_token = create_refresh_token(user.username)
@@ -582,8 +582,8 @@ async def login_for_access_token_lti(
         user_action=schemas.UserActionBase(
             user_id=user.id,
             action="lti_login",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
 
@@ -679,8 +679,8 @@ async def create_user(user: Annotated[schemas.UserCreateIn, Form()], db: Session
         user_action=schemas.UserActionBase(
             user_id=new_user.id,
             action="create_user",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     return new_user
@@ -688,7 +688,8 @@ async def create_user(user: Annotated[schemas.UserCreateIn, Form()], db: Session
 @app.get("/users/random_username", tags=["User"], response_model=schemas.UserRandomCreate)
 async def get_random_username(db: Session = Depends(get_db)):
     while True:
-        random_username = "a" + ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=8))
+        today_in_string = datetime.datetime.now(tz=JST).strftime("%Y%m%d")
+        random_username = today_in_string + ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=8))
         db_user = crud.get_user_by_username(db, username=random_username)
         if not db_user:
             break
@@ -730,8 +731,8 @@ async def create_user_w_random_username(user: Annotated[schemas.UserRandomCreate
         user_action=schemas.UserActionBase(
             user_id=new_user.id,
             action="create_random_user",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     return new_user
@@ -747,8 +748,8 @@ async def create_user_lti(user: schemas.UserLti, db: Session = Depends(get_db)):
         user_action=schemas.UserActionBase(
             user_id=new_user.id,
             action="create_user_lti",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     return new_user
@@ -923,8 +924,8 @@ async def read_scene_schools(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_scene_schools",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     sceneSchool = crud.get_scenes_by_school(
@@ -949,8 +950,8 @@ async def add_scene_to_school(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="update_school_scene",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     add_scene = crud.add_scene_school(db=db, scene_school_update=scene_school)
@@ -972,8 +973,8 @@ async def remove_scene_from_school(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="remove_school_scene",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     return crud.delete_scene_school(db=db, scene_school_update=scene_school)
@@ -1060,8 +1061,8 @@ async def read_story_schools(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_story_schools",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     storySchool = crud.get_story_by_school(
@@ -1086,8 +1087,8 @@ async def add_story_to_school(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="update_school_story",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     add_story = crud.add_story_school(db=db, story_school_update=story_school)
@@ -1109,8 +1110,8 @@ async def remove_story_from_school(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="remove_school_story",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     return crud.delete_story_school(db=db, story_school_update=story_school)
@@ -1202,8 +1203,8 @@ async def read_leaderboards_stats(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_leaderboards_stats",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
 
@@ -1344,8 +1345,8 @@ async def create_leaderboard(
             user_id=current_user.id,
             action="create_leaderboard",
             related_id=result.id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
 
@@ -1615,8 +1616,8 @@ async def create_leaderboards(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="create_leaderboards",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
 
@@ -1665,8 +1666,8 @@ async def read_leaderboard(current_user: Annotated[schemas.User, Depends(get_cur
             user_id=current_user.id,
             action="view_leaderboard_info",
             related_id=leaderboard_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
 
@@ -1686,8 +1687,8 @@ async def read_schools(current_user: Annotated[schemas.User, Depends(get_current
             user_id=current_user.id,
             action="view_schools",
             related_id=leaderboard_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     return schools
@@ -1713,8 +1714,8 @@ async def update_leaderboard(
             user_id=current_user.id,
             action="update_leaderboard_info",
             related_id=leaderboard_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     updated_leaderboard = crud.update_leaderboard(db=db, leaderboard=leaderboard)
@@ -1742,8 +1743,8 @@ async def update_leaderboard_school(
             user_id=current_user.id,
             action="update_leaderboard_school",
             related_id=leaderboard_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     schools = crud.add_leaderboard_school(db=db, leaderboard=schemas.LeaderboardUpdate(id=leaderboard_id, school=leaderboard.school))
@@ -1771,8 +1772,8 @@ async def delete_leaderboard_school(
             user_id=current_user.id,
             action="delete_leaderboard_school",
             related_id=leaderboard_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     schools = crud.remove_leaderboard_school(db=db, leaderboard=schemas.LeaderboardUpdate(id=leaderboard_id, school=[school]))
@@ -1800,8 +1801,8 @@ async def add_leaderboard_vocabulary(
             user_id=current_user.id,
             action="add_leaderboard_vocabulary",
             related_id=leaderboard_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     updated_leaderboard = crud.add_leaderboard_vocab(db=db, leaderboard_id=leaderboard_id, vocabulary=vocabulary)
@@ -1829,8 +1830,8 @@ async def delete_leaderboard_vocabulary(
             user_id=current_user.id,
             action="delete_leaderboard_vocabulary",
             related_id=leaderboard_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     updated_leaderboard = crud.remove_leaderboard_vocab(db=db, leaderboard_id=leaderboard_id, vocab_id=vocabulary_id)
@@ -1857,8 +1858,8 @@ async def delete_leaderboard(
             user_id=current_user.id,
             action="delete_leaderboard",
             related_id=leaderboard_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     result = crud.delete_leaderboard(db=db, leaderboard_id=leaderboard_id)
@@ -1881,8 +1882,8 @@ async def create_program(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="create_program",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     return crud.create_program(db=db, program=program)
@@ -1919,8 +1920,8 @@ async def read_programs(current_user: Annotated[schemas.User, Depends(get_curren
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_programs",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     return programs
@@ -1941,8 +1942,8 @@ async def read_school_programs(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_school_programs",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     programSchool = crud.get_programs_by_school(
@@ -1967,8 +1968,8 @@ async def add_program_to_school(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="update_school_program",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     add_program = crud.add_program_school(db=db, program_school_update=program_school)
@@ -1990,8 +1991,8 @@ async def remove_program_from_school(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="remove_school_program",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     return crud.delete_program_school(db=db, program_school_update=program_school)
@@ -2022,8 +2023,8 @@ async def get_user_program(
             user_id=current_user.id,
             action="view_user_program",
             related_id=user_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
 
@@ -2062,8 +2063,8 @@ async def add_program_to_user(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="update_user_program",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     add_program = crud.add_program_user(db=db, program_id=programUserUpdate.program_id, user_id=programUserUpdate.user_id)
@@ -2102,8 +2103,8 @@ async def remove_program_from_user(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="remove_user_program",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     return crud.delete_program_user(db=db, program_id=programUserUpdate.program_id, user_id=programUserUpdate.user_id)
@@ -2130,8 +2131,8 @@ async def get_round(
             user_id=current_user.id,
             action="view_round",
             related_id=round_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
 
@@ -2159,8 +2160,8 @@ async def update_round_display_name(
             user_id=current_user.id,
             action="update_round_display_name",
             related_id=round.id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
 
@@ -2197,8 +2198,8 @@ async def get_rounds_by_leaderboard(
             user_id=current_user.id,
             action="view_rounds_by_leaderboard",
             related_id=leaderboard_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
 
@@ -2259,8 +2260,8 @@ async def get_rounds_stats_by_leaderboard(
             user_id=current_user.id,
             action="view_rounds_stats_by_leaderboard",
             related_id=leaderboard_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
 
@@ -2310,8 +2311,8 @@ async def get_my_rounds(
             user_id=current_user.id,
             action="view_my_rounds",
             related_id=leaderboard_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
 
@@ -3029,7 +3030,7 @@ async def round_websocket(
                             message=schemas.MessageBase(
                                 content=score_message,
                                 sender="assistant",
-                                created_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+                                created_at=datetime.datetime.now(tz=JST),
                                 is_hint=False,
                                 is_evaluation=True,
                             ),
@@ -3084,7 +3085,7 @@ async def round_websocket(
                             message=schemas.MessageBase(
                                 content=evaluation_message,
                                 sender="assistant",
-                                created_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+                                created_at=datetime.datetime.now(tz=JST),
                                 is_hint=False,
 
                                 is_evaluation=True,
@@ -3227,7 +3228,7 @@ async def create_user_action(
         user_id=current_user.id,
         action=user_action.action,
         related_id=user_action.related_id,
-        received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+        received_at=datetime.datetime.now(tz=JST),
         sent_at=user_action.sent_at,
     ))
 
@@ -3250,8 +3251,8 @@ async def read_vocabulary(current_user: Annotated[schemas.User, Depends(get_curr
             user_id=current_user.id,
             action="check_vocabulary_info",
             related_id=vocabularies[0].id if vocabularies else None,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     return vocabularies
@@ -3267,8 +3268,8 @@ async def read_vocabularies(current_user: Annotated[schemas.User, Depends(get_cu
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="check_vocabularies",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     return vocabularies
@@ -3326,8 +3327,8 @@ async def create_vocabularies(
             user_action=schemas.UserActionBase(
                 user_id=current_user.id,
                 action="create_vocabularies",
-                sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-                received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+                sent_at=datetime.datetime.now(tz=JST),
+                received_at=datetime.datetime.now(tz=JST),
             )
         )
         return output
@@ -3347,8 +3348,8 @@ async def read_personal_dictionaries(current_user: Annotated[schemas.User, Depen
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_personal_dictionary",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     return personal_dictionaries
@@ -3396,8 +3397,8 @@ async def create_personal_dictionary(
             user_id=current_user.id,
             action="create_personal_dictionary",
             related_id=vocab.id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
 
@@ -3426,8 +3427,8 @@ async def update_personal_dictionary(
             user_id=current_user.id,
             action="update_personal_dictionary",
             related_id=personal_dictionary.id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     return crud.update_personal_dictionary(
@@ -3448,8 +3449,8 @@ async def delete_personal_dictionary(
             user_id=current_user.id,
             action="delete_personal_dictionary",
             related_id=personal_dictionary_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     return crud.delete_personal_dictionary(
@@ -3482,8 +3483,8 @@ async def get_evaluation(
             user_id=current_user.id,
             action="view_evaluation",
             related_id=generation_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     if "AWE" in db_round.program.feedback and db_generation.is_completed:
@@ -3548,7 +3549,7 @@ async def get_evaluation(
                     message=schemas.MessageBase(
                         content=evaluation_message,
                         sender="assistant",
-                        created_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+                        created_at=datetime.datetime.now(tz=JST),
                         is_hint=False,
                         is_evaluation=True,
                         responses_id=chatbot_obj.prev_res_id
@@ -3592,8 +3593,8 @@ async def read_chat(
             user_id=current_user.id,
             action="view_chat",
             related_id=round_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     return chat
@@ -3622,8 +3623,8 @@ async def read_chat_stats(
             user_id=current_user.id,
             action="view_chat_stats",
             related_id=round_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     return chat_stats
@@ -3653,8 +3654,8 @@ async def get_original_image(
             user_id=current_user.id,
             action="view_original_image",
             related_id=leaderboard_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     return responses.Response(
@@ -3697,8 +3698,8 @@ async def get_interpreted_image(
             user_id=current_user.id,
             action="view_interpreted_image",
             related_id=generation_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     return responses.Response(
@@ -3753,8 +3754,8 @@ async def read_generations(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_generations",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
 
@@ -3799,8 +3800,8 @@ async def read_my_generations(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view_my_generations",
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     player_id = current_user.id
@@ -3842,8 +3843,8 @@ async def get_generation_score(
             user_id=current_user.id,
             action="view_generation_score",
             related_id=generation_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
 
@@ -3869,8 +3870,8 @@ async def check_leaderboard_playrecord(
             user_id=current_user.id,
             action="check_leaderboard_no_play_record",
             related_id=leaderboard_id,
-            sent_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
-            received_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
 
