@@ -43,7 +43,7 @@ models.Base.metadata.create_all(bind=engine2)
 media_dir = Path(os.getenv("MEDIA_DIR", "/static"))
 media_dir.mkdir(parents=True, exist_ok=True)
 
-JST = JST
+JST = zoneinfo.ZoneInfo("Asia/Tokyo")
 
 LEADERBOARD_CACHE_TTL = int(os.getenv("LEADERBOARD_CACHE_TTL", "15"))
 LEADERBOARD_CACHE_MAXSIZE = int(os.getenv("LEADERBOARD_CACHE_MAXSIZE", "128"))
