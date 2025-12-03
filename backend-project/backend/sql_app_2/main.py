@@ -2394,7 +2394,7 @@ async def round_websocket(
     db_program = crud.get_program_by_name(db, obj.program)
     if not db_program_user:
         db_program = crud.get_program_by_name(db, "inlab_test")
-    elif not (db_program and db_program_user and db_program.id in [pu.program_id for pu in db_program_user]):
+    elif not (db_program and db_program.id in [pu.program_id for pu in db_program_user]):
         db_program = db_program_user[0].program
 
     # if user resumes the round
