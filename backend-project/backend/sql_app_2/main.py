@@ -1505,7 +1505,7 @@ async def create_leaderboards(
         leaderboard_list = []
         for index, row in leaderboards.iterrows():
 
-            published_at = row.get('published_at', datetime.datetime.now(tz=timezone(timedelta(hours=9))))
+            published_at = row.get('published_at', datetime.datetime.now(tz=JST))
 
             if 'story_extract' in leaderboards.columns:
                 story_extract = row['story_extract']
@@ -2336,7 +2336,7 @@ async def round_websocket(
 
     player_id = current_user.id
 
-    start_time = datetime.datetime.now(tz=timezone(timedelta(hours=9)))
+    start_time = datetime.datetime.now(tz=JST)
     duration = 0
     db_round = None
     db_generation = None
@@ -2371,8 +2371,8 @@ async def round_websocket(
             user_action=schemas.UserActionBase(
                 user_id=player_id,
                 action="disconnect websocket",
-                sent_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
-                received_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                sent_at=datetime.datetime.now(tz=JST),
+                received_at=datetime.datetime.now(tz=JST),
             )
         )
         logger1.info(f"WebSocket disconnected for user {player_id} before initial message")
@@ -2601,7 +2601,7 @@ async def round_websocket(
             message=schemas.MessageBase(
                 content="画像を説明する際にヒントが使えます。下の『Averyへのメッセージ🤖』に質問したい内容を入力してくださいね！",
                 sender="assistant",
-                created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                created_at=datetime.datetime.now(tz=JST),
                 is_hint=False
             ),
             chat_id=db_round.chat_history
@@ -2658,7 +2658,7 @@ async def round_websocket(
         user_action=schemas.UserActionUpdate(
             id=db_user_action.id,
             related_id=db_generation.id if db_generation else None,
-            sent_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+            sent_at=datetime.datetime.now(tz=JST),
         )
     )
 
@@ -2675,8 +2675,8 @@ async def round_websocket(
                     user_id=player_id,
                     action=user_action["action"],
                     related_id=db_generation.id if db_generation else None,
-                    received_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
-                    sent_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                    received_at=datetime.datetime.now(tz=JST),
+                    sent_at=datetime.datetime.now(tz=JST),
                 )
             )
 
@@ -2689,7 +2689,7 @@ async def round_websocket(
                     message=schemas.MessageBase(
                         content=obj.content,
                         sender="user",
-                        created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                        created_at=datetime.datetime.now(tz=JST),
                         is_hint=True
                     ),
                     chat_id=db_round.chat_history
@@ -2710,7 +2710,7 @@ async def round_websocket(
                         message=schemas.MessageBase(
                             content=hint,
                             sender="assistant",
-                            created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                            created_at=datetime.datetime.now(tz=JST),
                             is_hint=True,
                             response_id=chatbot_obj.prev_res_id
                         ),
@@ -2800,7 +2800,7 @@ async def round_websocket(
                         )
                     )
 
-                    duration += (datetime.datetime.now(tz=timezone(timedelta(hours=9))) - start_time).total_seconds()
+                    duration += (datetime.datetime.now(tz=JST) - start_time).total_seconds()
 
                     crud.update_generation_duration(
                         db=db,
@@ -2822,7 +2822,7 @@ async def round_websocket(
                             content="""回答を記録しました。📝
 あなたの回答（画像生成に参考された）: {}\n\n修正された回答：{}""".format(db_generation.sentence, db_generation.correct_sentence),
                             sender="assistant",
-                            created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                            created_at=datetime.datetime.now(tz=JST),
                             is_hint=False
                         )
                     ]
@@ -2866,7 +2866,7 @@ async def round_websocket(
                         schemas.MessageBase(
                             content="ブー！英語で答えてください。",
                             sender="assistant",
-                            created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                            created_at=datetime.datetime.now(tz=JST),
                             is_hint=False
                         )
                     ]
@@ -2876,7 +2876,7 @@ async def round_websocket(
                         schemas.MessageBase(
                             content="ブー！不適切な言葉が含まれています。",
                             sender="assistant",
-                            created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                            created_at=datetime.datetime.now(tz=JST),
                             is_hint=False
                         )
                     ]
@@ -2886,7 +2886,7 @@ async def round_websocket(
                         schemas.MessageBase(
                             content="ブー！同じ回答がすでに提出されています。新しいアイデアを試してみましょう！",
                             sender="assistant",
-                            created_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                            created_at=datetime.datetime.now(tz=JST),
                             is_hint=False
                         )
                     ]
@@ -2979,7 +2979,7 @@ async def round_websocket(
 
                 if not db_generation.is_completed:
                     # initialize start_time for duration calculation
-                    start_time = datetime.datetime.now(tz=timezone(timedelta(hours=9)))
+                    start_time = datetime.datetime.now(tz=JST)
                     duration = 0
 
                     generation_com = schemas.GenerationComplete(
@@ -3182,12 +3182,12 @@ async def round_websocket(
                 user_action=schemas.UserActionUpdate(
                     id=db_user_action.id,
                     related_id=db_generation.id if db_generation else None,
-                    sent_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+                    sent_at=datetime.datetime.now(tz=JST),
                 )
             )
 
     except WebSocketDisconnect:
-        disconnect_time = datetime.datetime.now(tz=timezone(timedelta(hours=9)))
+        disconnect_time = datetime.datetime.now(tz=JST)
 
         # record disconnect time
         crud.create_user_action(
@@ -3207,7 +3207,7 @@ async def round_websocket(
         except:
             pass
     finally:
-        disconnect_time = datetime.datetime.now(tz=timezone(timedelta(hours=9)))
+        disconnect_time = datetime.datetime.now(tz=JST)
         if start_time and db_generation and not db_generation.is_completed:
             duration += (disconnect_time - start_time).total_seconds()
             crud.update_generation_duration(
@@ -3728,8 +3728,8 @@ async def read_generation(
             user_id=current_user.id,
             action="view_generation_info",
             related_id=generation_id,
-            sent_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
-            received_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
 
@@ -3816,8 +3816,8 @@ async def read_my_generations(
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
             action="view my generations",
-            sent_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
-            received_at=datetime.datetime.now(tz=timezone(timedelta(hours=9))),
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
         )
     )
     return generations
