@@ -554,7 +554,8 @@ async def lti_login(request: Request):
                 "access_token": token.access_token,
                 "refresh_token": token.refresh_token,
                 "token_type": token.token_type,
-                "program": program
+                "program": program,
+                "launch_presentation_locale": form_data.get("launch_presentation_locale", "ja")
             }})
     raise HTTPException(status_code=500, detail="Failed to login")
 
