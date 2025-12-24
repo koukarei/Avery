@@ -43,6 +43,10 @@ async def validate_lti_request(request: Request):
     if request_url == "https://dev.let.media.kyoto-u.ac.jp/sqlapp2/lti/login":
         request_url_wo_secured = f"http://backend/sqlapp2/lti/login"
         candidate_urls.append(request_url_wo_secured)
+    
+    if "https" in LTI_URL:
+        lti_url_wo_secured = LTI_URL.replace("https:","http:")
+        candidate_urls.append(lti_url_wo_secured)
 
     if request_url_no_port != request_url:
         candidate_urls.append(request_url_no_port)
