@@ -40,10 +40,10 @@ async def validate_lti_request(request: Request):
         request_url_no_port = f"{scheme}//{host_without_port}{path}"
     candidate_urls = [request_url]
 
-    if scheme == "http:":
-        request_url_secured = f"https://{rest}"
-        candidate_urls.append(request_url_secured)
-
+    if scheme == "https":
+        request_url_wo_secured = f"http://{rest}"
+        candidate_urls.append(request_url_wo_secured)
+        
     if request_url_no_port != request_url:
         candidate_urls.append(request_url_no_port)
     if LTI_URL:
