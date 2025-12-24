@@ -30,7 +30,7 @@ async def validate_lti_request(request: Request):
         return False
 
     request_url = str(request.url)
-    print(request_url)
+    
     request_url_no_port = request_url
     scheme, rest = request_url.split("//", 1)
     if ":" in request_url.split("//", 1)[-1]:
@@ -40,8 +40,8 @@ async def validate_lti_request(request: Request):
         request_url_no_port = f"{scheme}//{host_without_port}{path}"
     candidate_urls = [request_url]
 
-    if request_url == "https://dev.let.media.kyoto-u.ac.jp/sqlapp2/lti/login":
-        request_url_wo_secured = f"http://backend/sqlapp2/lti/login"
+    if "sqlapp2" in request_url:
+        request_url_wo_secured = "http://backend/sqlapp2/lti/login"
         candidate_urls.append(request_url_wo_secured)
     
     if "https" in LTI_URL:
