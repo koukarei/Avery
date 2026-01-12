@@ -635,4 +635,16 @@ class LeaderboardAnalysis_WordCloudCreate(BaseModel):
     type: str = "writing"  # or "mistake" or 'user_chat' or 'assistant_chat'
     lang: str = "en"
 
+class RevisionOperation(BaseModel):
+    name: str
+    checked: bool
 
+class RevisionOut(BaseModel):
+    id: int
+    operations: List[RevisionOperation] = []
+
+class RevisionUpdate(BaseModel):
+    id: int
+    name: str
+    checked: bool
+    

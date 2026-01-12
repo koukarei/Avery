@@ -37,6 +37,7 @@ origins = [
     os.getenv("CLIENT_ORIGIN", "http://localhost:3000"),
     os.getenv("CLIENT_WS_ORIGIN", "ws://localhost:3000"),
 ]
+REVISIONS_FILE_PATH = Path(os.getenv("REVISIONS_FILE_PATH", "revisions.json"))
 
 models.Base.metadata.create_all(bind=engine2)
 # Define the directory where the images will be stored
@@ -3912,6 +3913,77 @@ async def check_leaderboard_playrecord(
         id=leaderboard_id,
         start_new=True
     )
+
+@app.get("/revision/{generation_id}", tags=["Revision"], response_model=schemas.RevisionOut)
+async def read_revision(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    generation_id: int,
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view revision")
+    if current_user.user_type == "student":
+        raise HTTPException(status_code=401, detail="You are not authorized to view revision")
+    if not REVISIONS_FILE_PATH.exists():
+        # create empty json file
+        with open(REVISIONS_FILE_PATH, 'w') as f:
+            json.dump({}, f)
+
+    # read json file
+    with open(REVISIONS_FILE_PATH, 'r') as f:
+        revisions_data = json.load(f)
+    user_check_data = revisions_data.get(str(current_user.id), {})
+        
+    output_revision_data = user_check_data.get(str(generation_id), {})
+
+    return schemas.RevisionOut(
+        id=generation_id,
+        operations = [
+            schemas.RevisionOperation(
+                name=op_name,
+                checked=op_checked
+            ) for op_name, op_checked in output_revision_data.items()
+        ]
+    )
+
+@app.put("/revision/{generation_id}", tags=["Revision"], response_model=schemas.RevisionOut)
+async def update_revision(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    generation_id: int,
+    revision_update: schemas.RevisionUpdate,
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to update revision")
+    if current_user.user_type == "student":
+        raise HTTPException(status_code=401, detail="You are not authorized to update revision")
+    
+    if not REVISIONS_FILE_PATH.exists():
+        # create empty json file
+        with open(REVISIONS_FILE_PATH, 'w') as f:
+            json.dump({}, f)
+
+    # read json file
+    with open(REVISIONS_FILE_PATH, 'r') as f:
+        revisions_data = json.load(f)
+        user_check_data = revisions_data.get(str(current_user.id), {})
+        generation_revision = user_check_data.get(str(generation_id), {})
+        # update or add revision
+        generation_revision[revision_update.name] = revision_update.checked
+        user_check_data[str(generation_id)] = generation_revision
+        revisions_data[str(current_user.id)] = user_check_data
+
+    # write json file
+    with open(REVISIONS_FILE_PATH, 'w') as f:
+        json.dump(revisions_data, f, indent=4)
+    return schemas.RevisionOut(
+        id=generation_id,
+        operations = [
+            schemas.RevisionOperation(
+                name=op,
+                checked=generation_revision[op]
+            ) for op in generation_revision.keys()
+        ]
+    )
+
 
 @app.get("/generations/fix_error", tags=["Task"], response_model=list[Union[schemas.GenerationOut, schemas.Score, schemas.InterpretedImage]])
 async def read_error(
