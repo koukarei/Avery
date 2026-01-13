@@ -3921,8 +3921,7 @@ async def read_revision(
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view revision")
-    if current_user.user_type == "student":
-        raise HTTPException(status_code=401, detail="You are not authorized to view revision")
+    
     if not REVISIONS_FILE_PATH.exists():
         # create empty json file
         with open(REVISIONS_FILE_PATH, 'w') as f:
@@ -3953,8 +3952,6 @@ async def update_revision(
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to update revision")
-    if current_user.user_type == "student":
-        raise HTTPException(status_code=401, detail="You are not authorized to update revision")
     
     if not REVISIONS_FILE_PATH.exists():
         # create empty json file
