@@ -503,6 +503,9 @@ async def lti_login(request: Request):
         elif oauth_consumer_key == "uranga_consumer_key":
             school = "uranga"
             program = "student_2_sem"
+        elif oauth_consumer_key == "ishibe_consumer_key":
+            school = "ishibe"
+            program = "student_2_sem"
 
         if "instructor" in form_data.get('roles', '').lower():
             role = "instructor"
