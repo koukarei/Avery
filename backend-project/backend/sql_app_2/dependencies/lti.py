@@ -84,7 +84,7 @@ async def validate_lti_request(request: Request):
             )
 
     logger.error(f"LTI_URL: {LTI_URL}")
-    logger.error(f"request_url: {request_url}")
+    logger.error(f"candidates: {candidate_urls}")
     #logger.error(f"LTI_CONSUMERS: {LTI_CONSUMERS}")
     logger.error(f"request.method: {request.method}")
     logger.error(f"request.headers: {request.headers}")
