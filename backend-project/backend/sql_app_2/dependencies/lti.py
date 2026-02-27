@@ -83,12 +83,12 @@ async def validate_lti_request(request: Request):
                 e,
             )
 
-    logger.error(f"LTI_URL: {LTI_URL}")
-    logger.error(f"candidates: {candidate_urls}")
-    #logger.error(f"LTI_CONSUMERS: {LTI_CONSUMERS}")
-    logger.error(f"request.method: {request.method}")
-    logger.error(f"request.headers: {request.headers}")
-    logger.error(f"form_data: {form_data}")
+            logger.error(f"LTI_URL: {LTI_URL}")
+            logger.error(f"request URL: {request.url}")
+            #logger.error(f"LTI_CONSUMERS: {LTI_CONSUMERS}")
+            logger.error(f"request.method: {request.method}")
+            logger.error(f"request.headers: {request.headers}")
+            logger.error(f"form_data: {form_data}")
     logger.error("LTI validation failed for all candidate URLs.")
 
     return False
