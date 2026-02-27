@@ -6,14 +6,12 @@ logger = logging.getLogger(__name__)
 
 def load_lti_credentials():
     consumers = {}
-    i = 1
-    while True:
-        key = os.getenv(f'LTI_CONSUMER_KEY_{i}')
-        secret = os.getenv(f'LTI_SHARED_SECRET_{i}')
-        if not key or not secret:
-            break
-        consumers[key] = {"secret": secret}
-        i += 1
+    for env_key, value in os.environ.items():
+        if env_key.startswith("LTI_CONSUMER_KEY_"):
+            suffix = env_key.rsplit("_", 1)[-1]
+            secret = os.getenv(f"LTI_SHARED_SECRET_{suffix}")
+            if value and secret:
+                consumers[value] = {"secret": secret}
     return consumers
 
 # LTI Request validation
