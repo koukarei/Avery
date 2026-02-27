@@ -83,7 +83,7 @@ async def validate_lti_request(request: Request):
 
             logger.error(f"LTI_URL: {LTI_URL}")
             logger.error(f"request URL: {request.url}")
-            #logger.error(f"LTI_CONSUMERS: {LTI_CONSUMERS}")
+            logger.error(f"LTI_CONSUMERS: {LTI_CONSUMERS} oauth_consumer_key: {form_data.get("oauth_consumer_key")}")
             logger.error(f"request.method: {request.method}")
             logger.error(f"request.headers: {request.headers}")
             logger.error(f"form_data: {form_data}")
