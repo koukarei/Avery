@@ -501,7 +501,7 @@ async def lti_login(request: Request):
             school = "newleaf"
             program = "inlab_test"
         elif oauth_consumer_key == "uranga_consumer_key":
-            school = "uranga"
+            school = form_data.get("school")
             program = "student_2_sem"
         elif oauth_consumer_key == "ishibe_consumer_key":
             school = "ishibe"
@@ -509,6 +509,8 @@ async def lti_login(request: Request):
 
         if "instructor" in form_data.get('roles', '').lower():
             role = "instructor"
+        elif "learner" in form_data.get('roles', '').lower():
+            role = "student"
         else:
             role = "student"
 
@@ -3046,15 +3048,26 @@ async def round_websocket(
                         )['message'])
 
                     if "AWE" in db_program.feedback:
-                        evaluation = await asyncio.to_thread(
-                            chatbot_obj.get_result,
-                            db_generation.sentence,
-                            db_generation.correct_sentence,
-                            db_round.leaderboard.original_image.image,
-                            db_generation.grammar_errors,
-                            db_generation.spelling_errors,
-                            descriptions
-                        )
+                        if current_user.school == "ishibe":
+                            evaluation = await asyncio.to_thread(
+                                chatbot_obj.get_short_result,
+                                db_generation.sentence,
+                                db_generation.correct_sentence,
+                                db_round.leaderboard.original_image.image,
+                                db_generation.grammar_errors,
+                                db_generation.spelling_errors,
+                                descriptions
+                            )
+                        else:
+                            evaluation = await asyncio.to_thread(
+                                chatbot_obj.get_result,
+                                db_generation.sentence,
+                                db_generation.correct_sentence,
+                                db_round.leaderboard.original_image.image,
+                                db_generation.grammar_errors,
+                                db_generation.spelling_errors,
+                                descriptions
+                            )
                     else:
                         evaluation = None
                         db_evaluate_msg = None
@@ -3067,8 +3080,10 @@ async def round_websocket(
                             recommended_vocabs = [vocab.word for vocab in recommended_vocabs]
                             if recommended_vocabs:
                                 recommended_vocab = "\n\n**おすすめの単語**\n" + ", ".join(recommended_vocabs)
-
-                        evaluation_message = """**文法**
+                        if current_user.school == "ishibe":
+                            evaluation_message = evaluation.feedback
+                        else:
+                            evaluation_message = """**文法**
 {grammar_feedback}
 **スペル**
 {spelling_feedback}
@@ -3079,14 +3094,14 @@ async def round_websocket(
 
 **総合評価**
 {overall_feedback}{recommended_vocab}""". \
-                        format(
-                            grammar_feedback=evaluation['grammar_evaluation'],
-                            spelling_feedback=evaluation['spelling_evaluation'],
-                            style_feedback=evaluation['style_evaluation'],
-                            content_feedback=evaluation['content_evaluation'],
-                            overall_feedback=evaluation['overall_evaluation'],
-                            recommended_vocab=recommended_vocab
-                        )
+                            format(
+                                grammar_feedback=evaluation['grammar_evaluation'],
+                                spelling_feedback=evaluation['spelling_evaluation'],
+                                style_feedback=evaluation['style_evaluation'],
+                                content_feedback=evaluation['content_evaluation'],
+                                overall_feedback=evaluation['overall_evaluation'],
+                                recommended_vocab=recommended_vocab
+                            )
 
                         db_evaluate_msg = crud.create_message(
                             db=db,

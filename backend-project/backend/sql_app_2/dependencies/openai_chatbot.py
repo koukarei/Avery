@@ -380,6 +380,127 @@ Every soldiers are exhausted and they are sleeping on the floor.
             print(f"Error: {e}")
             print(f"Messages: {self.messages}")
             return {}
+            
+    def get_short_result(self, sentence, correct_sentence,base64_image,grammar_errors,spelling_errors, descriptions):
+        prompt = """
+# 役割
+あなたの名前は Avery、ロボットです。
+**役割：** あなたはAveryです。日本人EFL学習者の英語ライティング力向上を支援する、優しく知的な英語作文チューターです。
+
+**基本理念：** **ソクラテス式かつメタ言語的アプローチ**を採用すること。単に文章を修正するのではなく、「主語と動詞の一致」「時制の一貫性」「語彙選択」など、誤りの種類を明示し、「なぜ」そうなるのかを説明すること。
+
+**ガイドライン：**
+
+1. **メタ言語的フィードバック：** 必要に応じて、文法規則や誤りの種類を明示する（例：「これは過去形の誤りです」「前置詞に注意しましょう」）。
+2. **明示的修正：** 誤りの種類を示した後、正しい形を**太字**で示す。必要がない限り、全文修正文は提示しない。
+3. **理解確認：** 可能な限り、学習者が規則を振り返る具体的な質問で終える（例：「なぜここでは 'have' ではなく 'has' を使うのでしょうか？」）。
+4. **語調と言語：** 親切で忍耐強く、支援的な態度を保つ。常に日本語で返信すること。
+5. **簡潔さ：** 厳密に50語以内。正確かつ簡潔に述べる。
+6. **範囲：** トピックから逸れないように指導する。逸れた場合はライティング課題に戻す。
+7. **多様性：** フィードバックのパターンが単調にならないよう工夫する。
+8. **文化的配慮：** 英語と日本語のコミュニケーション様式の文化差に配慮する。
+9. **語彙強化：** 明確さ・語調・多様性を高めるための代替語や表現を提案する。
+10. **応答形式：** 複数の修正がある場合は箇条書きで示す。Markdown形式を使用する（例：修正は**太字**）。
+11. **質問対応：** 学習者が作文内容や英語一般について質問した場合も、50語以内で明確かつ簡潔に答えること。
+
+        """
+
+        self.messages=[]
+
+        user_prompt = """# 現状
+1. ユーザーの英作文（評価対象）：{user_sentence}
+2. システムが修正された英作文: {correct_sentence}
+3. 検出された文法の誤り: {grammar_errors}
+4. 検出されたスペルミス: {spelling_errors}
+5. 参考記述: {descriptions}""".format(
+    user_sentence=sentence,
+    correct_sentence=correct_sentence,
+    grammar_errors=grammar_errors,
+    spelling_errors=spelling_errors, 
+    descriptions=descriptions
+)
+
+        self.messages.append(
+            {
+                "role": "user", 
+                "content": [
+                    {
+                    "type": "input_image",
+                    "image_url": f"data:image/jpeg;base64,{base64_image}"
+                    },
+                    {"type": "input_text", "text": user_prompt}
+                ]
+            }
+        )
+        
+        try: 
+            response = self.client.responses.create(
+                model=self.model_name,
+                instructions=prompt,
+                input=self.messages,
+                temperature=0.8,
+                previous_response_id=self.prev_res_id,
+                text={
+                    "format": {
+                        "type": "json_schema",
+                        "name": "Feedback",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "feedback": {
+                                    "type": "string"
+                                },
+                            },
+                            "required": ["feedback"],
+                            "additionalProperties": False
+                        },
+                        "strict": True
+                    }
+                }
+            )
+
+            self.prev_res_id = response.id
+            if self.first_res_id is None:
+                self.first_res_id = response.id
+
+            evaluation = json.loads(response.output_text)
+
+            return evaluation
+        except Exception as e:
+            if 'Previous response with id' in str(e):
+                response = self.client.responses.create(
+                    model=self.model_name,
+                    instructions=prompt,
+                    input=self.messages,
+                    temperature=0.8,
+                    text={
+                        "format": {
+                            "type": "json_schema",
+                            "name": "Feedback",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "feedback": {
+                                        "type": "string"
+                                    },
+                                },
+                                "required": ["feedback"],
+                                "additionalProperties": False
+                            },
+                            "strict": True
+                        }
+                    }
+                )
+
+                self.prev_res_id = response.id
+                if self.first_res_id is None:
+                    self.first_res_id = response.id
+                evaluation = json.loads(response.output_text)
+
+                return evaluation
+            print(f"Error: {e}")
+            print(f"Messages: {self.messages}")
+            return {}
         
     def scoring(self, sentence, base64_image=None):
         instructions = """### ✅ Role
