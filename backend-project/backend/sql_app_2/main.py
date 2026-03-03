@@ -3081,7 +3081,7 @@ async def round_websocket(
                             if recommended_vocabs:
                                 recommended_vocab = "\n\n**おすすめの単語**\n" + ", ".join(recommended_vocabs)
                         if current_user.school == "ishibe":
-                            evaluation_message = evaluation.feedback
+                            evaluation_message = evaluation["feedback"]
                         else:
                             evaluation_message = """**文法**
 {grammar_feedback}
