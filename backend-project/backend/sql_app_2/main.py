@@ -1,5 +1,5 @@
 import logging.config
-from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, responses, status, WebSocket, WebSocketDisconnect, Request
+from fastapi import Depends, FastAPI, HTTPException, File, UploadFile, Form, responses, status, Request
 from fastapi.templating import Jinja2Templates
 
 templates = Jinja2Templates(directory="templates")
@@ -7,26 +7,26 @@ templates = Jinja2Templates(directory="templates")
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import parse_obj_as
 from sqlalchemy.orm import Session
-import os, datetime, shutil, tempfile, zipfile, zoneinfo, random, json, asyncio #, yappi
+import os, datetime, shutil, tempfile, zipfile, zoneinfo, random, json, asyncio, time #, yappi
 import pandas as pd
-import numpy as np
 from pathlib import Path
 from cachetools import TTLCache
 from threading import RLock
 
 from .analysis_router import router as analysis_router
 from .admin_router import router as admin_router
+from .ws_router import router as ws_router
 from . import crud, models, schemas
 from tasks import app as celery_app
 from tasks import generateDescription2, generate_interpretation2, calculate_score_gpt
 from .database import SessionLocal2, engine2
 
 from .dependencies import sentence, score, dictionary, openai_chatbot, lti
-from .authentication import authenticate_user, authenticate_user_2, create_access_token, oauth2_scheme, SECRET_KEY, SECRET_KEY_WS, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, JWTError, jwt, create_ws_token
+from .authentication import authenticate_user, authenticate_user_2, create_access_token, oauth2_scheme, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, create_refresh_token, JWTError, jwt, create_ws_token
 from util import *
 
 from typing import Tuple, List, Annotated, Optional, Union, Literal
-from datetime import timezone, timedelta
+from datetime import timedelta
 from contextlib import asynccontextmanager
 
 import logging
@@ -39,7 +39,27 @@ origins = [
 ]
 REVISIONS_FILE_PATH = Path(os.getenv("REVISIONS_FILE_PATH", "revisions.json"))
 
-models.Base.metadata.create_all(bind=engine2)
+DB_SCHEMA_INIT_MAX_RETRIES = int(os.getenv("DB_SCHEMA_INIT_MAX_RETRIES", "30"))
+DB_SCHEMA_INIT_RETRY_SECONDS = float(os.getenv("DB_SCHEMA_INIT_RETRY_SECONDS", "2"))
+
+
+def _initialize_database_schema_with_retry() -> None:
+    for attempt in range(1, DB_SCHEMA_INIT_MAX_RETRIES + 1):
+        try:
+            models.Base.metadata.create_all(bind=engine2)
+            return
+        except Exception:
+            if attempt == DB_SCHEMA_INIT_MAX_RETRIES:
+                logging.exception("Database schema initialization failed after %s attempts.", DB_SCHEMA_INIT_MAX_RETRIES)
+                raise
+            logging.warning(
+                "Database unavailable during schema initialization (attempt %s/%s). Retrying in %.1f seconds.",
+                attempt,
+                DB_SCHEMA_INIT_MAX_RETRIES,
+                DB_SCHEMA_INIT_RETRY_SECONDS,
+            )
+            time.sleep(DB_SCHEMA_INIT_RETRY_SECONDS)
+
 # Define the directory where the images will be stored
 media_dir = Path(os.getenv("MEDIA_DIR", "/static"))
 media_dir.mkdir(parents=True, exist_ok=True)
@@ -67,6 +87,7 @@ def _datetime_key(value: Optional[datetime.datetime]) -> Optional[str]:
 
 def _leaderboard_cache_key(
     school_name: Optional[str],
+    course_id: Optional[int],
     skip: int,
     limit: int,
     published_at_start: Optional[datetime.datetime],
@@ -75,8 +96,10 @@ def _leaderboard_cache_key(
     created_by_id: Optional[int],
 ) -> Tuple:
     school_key = school_name if school_name is not None else "__all__"
+    course_key = course_id if course_id is not None else "__all__"
     return (
         school_key,
+        course_key,
         skip,
         limit,
         _datetime_key(published_at_start),
@@ -88,14 +111,17 @@ def _leaderboard_cache_key(
 
 def _leaderboard_stats_cache_key(
     school_name: Optional[str],
+    course_id: Optional[int],
     published_at_start: Optional[datetime.datetime],
     published_at_end: Optional[datetime.datetime],
     is_public: bool,
     created_by_id: Optional[int],
 ) -> Tuple:
     school_key = school_name if school_name is not None else "__all__"
+    course_key = course_id if course_id is not None else "__all__"
     return (
         school_key,
+        course_key,
         _datetime_key(published_at_start),
         _datetime_key(published_at_end),
         is_public,
@@ -164,6 +190,7 @@ async def get_leaderboards_cached(
     db: Session,
     *,
     school_name: Optional[str],
+    course_id: Optional[int],
     skip: int,
     limit: int,
     published_at_start: Optional[datetime.datetime],
@@ -173,6 +200,7 @@ async def get_leaderboards_cached(
 ) -> List[Tuple[schemas.LeaderboardOut, schemas.SchoolOut]]:
     key = _leaderboard_cache_key(
         school_name,
+        course_id,
         skip,
         limit,
         published_at_start,
@@ -189,6 +217,7 @@ async def get_leaderboards_cached(
         crud.get_leaderboards,
         db,
         school_name,
+        course_id,
         skip,
         limit,
         published_at_start,
@@ -212,6 +241,7 @@ async def get_leaderboards_stats_cached(
     db: Session,
     *,
     school_name: Optional[str],
+    course_id: Optional[int],
     published_at_start: Optional[datetime.datetime],
     published_at_end: Optional[datetime.datetime],
     is_public: bool,
@@ -219,6 +249,7 @@ async def get_leaderboards_stats_cached(
 ) -> schemas.LeaderboardsStats:
     key = _leaderboard_stats_cache_key(
         school_name,
+        course_id,
         published_at_start,
         published_at_end,
         is_public,
@@ -233,6 +264,7 @@ async def get_leaderboards_stats_cached(
         crud.get_leaderboards_stats,
         db,
         school_name,
+        course_id,
         published_at_start,
         published_at_end,
         None,
@@ -256,6 +288,11 @@ app = FastAPI(
     debug=True,
     title="AVERY",
 )
+
+
+@app.on_event("startup")
+async def initialize_database_schema() -> None:
+    await asyncio.to_thread(_initialize_database_schema_with_retry)
 
 app.add_middleware(
     CORSMiddleware,
@@ -323,9 +360,10 @@ async def get_current_user(db: Annotated[Session, Depends(get_db)],token: Annota
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             username: str = payload.get("sub")
+            course_id: Optional[int] = payload.get("course_id")
             if username is None:
                 raise credentials_exception
-            token_data = schemas.TokenData(username=username)
+            token_data = schemas.TokenData(username=username, course_id=course_id)
         except JWTError:
             raise credentials_exception
         except jwt.ExpiredSignatureError:
@@ -338,6 +376,8 @@ async def get_current_user(db: Annotated[Session, Depends(get_db)],token: Annota
         if user is None:
             raise credentials_exception
         elif user.is_active:
+            if course_id is not None:
+                user.course_id = course_id
             return user
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -393,39 +433,9 @@ app.include_router(
     dependencies=[Depends(get_current_admin)]
 )
 
-async def get_current_user_ws(db: Annotated[Session, Depends(get_db)],token: str):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    if token:
-        try:
-            payload = jwt.decode(token, SECRET_KEY_WS, algorithms=[ALGORITHM])
-            username: str = payload.get("sub")
-            if username is None:
-                raise credentials_exception
-            token_data = schemas.TokenData(username=username)
-        except JWTError:
-            raise credentials_exception
-        except jwt.ExpiredSignatureError:
-            raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-        user = await _load_user_by_username(db, token_data.username)
-        if user is None:
-            raise credentials_exception
-        elif user.is_active:
-            return user
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Inactive user",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    else:
-        raise credentials_exception
+app.include_router(
+    ws_router,
+)
 
 @app.post("/token",response_model=schemas.Token)
 async def login_for_access_token(
@@ -480,6 +490,21 @@ async def lti_login(request: Request):
     oauth_consumer_key = form_data.get('oauth_consumer_key')
 
     if user_id:
+        login_method = "lti"
+        context_id = form_data.get('context_id')
+        context_label = form_data.get('context_label')
+        context_title = form_data.get('context_title')
+
+        db_course = crud.get_course(db=next(get_db()), course_id=context_id)
+        if not db_course:
+            # Create the course if it doesn't exist
+            course_data = schemas.CourseBase(
+                course_id=context_id,
+                course_label=context_label,
+                course_title=context_title
+            )
+            db_course = crud.create_course(db=next(get_db()), course=course_data)
+
         school = "School not provided"
         program = form_data.get('custom_program', 'none')
         if oauth_consumer_key == "saikyo_consumer_key":
@@ -501,7 +526,8 @@ async def lti_login(request: Request):
             school = "newleaf"
             program = "inlab_test"
         elif oauth_consumer_key == "uranga_consumer_key":
-            school = "uranga"
+            login_method = "korero_lti"
+            school = form_data.get('custom_school', 'uranga')
             program = "student_2_sem"
         elif oauth_consumer_key == "ishibe_consumer_key":
             school = "ishibe"
@@ -509,6 +535,8 @@ async def lti_login(request: Request):
 
         if "instructor" in form_data.get('roles', '').lower():
             role = "instructor"
+        elif "learner" in form_data.get('roles', '').lower():
+            role = "student"
         else:
             role = "student"
 
@@ -530,13 +558,13 @@ async def lti_login(request: Request):
 
         if user:
             try:
-                token = await login_for_access_token_lti(user=user_login, db=next(get_db()))
+                token = await login_for_access_token_lti(user=user_login, course_id=db_course.id if db_course else None, db=next(get_db()))
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Failed to login: {str(e)}")
         else:
             # Create user
             response = await create_user_lti(user=user_login, db=next(get_db()))
-            token = await login_for_access_token_lti(user=user_login, db=next(get_db()))
+            token = await login_for_access_token_lti(user=user_login, course_id=db_course.id if db_course else None, db=next(get_db()))
             db_program = crud.get_program_by_name(next(get_db()), program_name=program)
             if db_program:
                 db_user = crud.get_user_by_lti(
@@ -554,6 +582,7 @@ async def lti_login(request: Request):
         return templates.TemplateResponse(
             "avery.html",
             {"request": request, "session_data": {
+                "login_method": login_method,
                 "school": school,
                 "access_token": token.access_token,
                 "refresh_token": token.refresh_token,
@@ -567,6 +596,7 @@ async def lti_login(request: Request):
 @app.post("/lti/token",response_model=schemas.Token)
 async def login_for_access_token_lti(
     user: schemas.UserLti,
+    course_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
 
@@ -583,8 +613,9 @@ async def login_for_access_token_lti(
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+        data={"sub": user.username, "course_id": course_id}, expires_delta=access_token_expires
     )
+
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(
@@ -595,7 +626,7 @@ async def login_for_access_token_lti(
         )
     )
 
-    refresh_token = create_refresh_token(user.username)
+    refresh_token = create_refresh_token(user.username, course_id=course_id)
 
     return schemas.Token(access_token=access_token,refresh_token=refresh_token, token_type="bearer")
 
@@ -613,6 +644,7 @@ async def refresh_token(
     try:
         payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
+        course_id: Optional[int] = payload.get("course_id")
         if username is None:
             raise credentials_exception
     except JWTError:
@@ -629,7 +661,7 @@ async def refresh_token(
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+        data={"sub": user.username, "course_id": course_id}, expires_delta=access_token_expires
     )
 
     return {"access_token": access_token}
@@ -637,6 +669,7 @@ async def refresh_token(
 @app.post("/ws_token", response_model=schemas.WSToken)
 async def obtain_ws_token(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
+    course_id: Optional[int] = None,
 ):
     if not current_user:
         raise HTTPException(
@@ -651,7 +684,7 @@ async def obtain_ws_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
     ws_token = create_ws_token(
-        data={"sub": current_user.username},
+        data={"sub": current_user.username, "course_id": course_id},
         expires_delta=timedelta(seconds=7200)  # 2 hours
     )
     return schemas.WSToken(ws_token=ws_token)
@@ -1153,6 +1186,7 @@ async def read_leaderboards(
     leaderboards = await get_leaderboards_cached(
         db=db,
         school_name=school_name,
+        course_id=current_user.course_id,
         skip=skip,
         limit=limit,
         published_at_start=start_dt,
@@ -1200,6 +1234,7 @@ async def read_leaderboards_stats(
     stats = await get_leaderboards_stats_cached(
         db=db,
         school_name=school_name,
+        course_id=current_user.course_id,
         published_at_start=start_dt,
         published_at_end=end_dt,
         is_public=is_public,
@@ -1333,9 +1368,24 @@ async def create_leaderboard(
         model_name="gpt-4o-mini"
     )
     if current_user.school:
-        crud.add_leaderboard_school(db=db, leaderboard=schemas.LeaderboardUpdate(id=result.id, school=[current_user.school]))
+        db_course = crud.get_course(
+            db=db,
+            course_id=current_user.course_id
+        )
+
+        crud.add_leaderboard_school(
+            db=db, 
+            leaderboard=schemas.LeaderboardSchoolUpdate(
+                id=result.id, 
+                school=current_user.school,
+                course_id=db_course.id if db_course else None
+                )
+        )
     else:
-        crud.add_leaderboard_school(db=db, leaderboard=schemas.LeaderboardUpdate(id=result.id, school=["public"]))
+        crud.add_leaderboard_school(
+            db=db, 
+            leaderboard=schemas.LeaderboardSchoolUpdate(id=result.id, school=["public"])
+        )
 
     crud.create_task(
         db=db,
@@ -1344,8 +1394,6 @@ async def create_leaderboard(
             leaderboard_id=result.id,
         )
     )
-
-
 
     crud.create_user_action(
         db=db,
@@ -1734,7 +1782,7 @@ async def update_leaderboard(
 async def update_leaderboard_school(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: int,
-    leaderboard: schemas.LeaderboardUpdate,
+    leaderboard: schemas.LeaderboardSchoolUpdate,
     db: Session = Depends(get_db),
 ):
     if not current_user:
@@ -1755,7 +1803,7 @@ async def update_leaderboard_school(
             received_at=datetime.datetime.now(tz=JST),
         )
     )
-    schools = crud.add_leaderboard_school(db=db, leaderboard=schemas.LeaderboardUpdate(id=leaderboard_id, school=leaderboard.school))
+    schools = crud.add_leaderboard_school(db=db, leaderboard=leaderboard)
     invalidate_leaderboard_cache()
     return schools
 
@@ -1763,7 +1811,7 @@ async def update_leaderboard_school(
 async def delete_leaderboard_school(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: int,
-    school: str,
+    leaderboard: schemas.LeaderboardSchoolUpdate,
     db: Session = Depends(get_db),
 ):
     if not current_user:
@@ -1784,7 +1832,7 @@ async def delete_leaderboard_school(
             received_at=datetime.datetime.now(tz=JST),
         )
     )
-    schools = crud.remove_leaderboard_school(db=db, leaderboard=schemas.LeaderboardUpdate(id=leaderboard_id, school=[school]))
+    schools = crud.remove_leaderboard_school(db=db, leaderboard=leaderboard)
     invalidate_leaderboard_cache()
     return schools
 
@@ -2330,899 +2378,6 @@ async def get_my_rounds(
         player_id=player_id,
         leaderboard_id=leaderboard_id,
     )
-
-@app.websocket("/ws/{leaderboard_id}")
-async def round_websocket(
-    websocket: WebSocket,
-    leaderboard_id: int,
-    token: str,
-    db: Session = Depends(get_db),
-):
-    current_user = await get_current_user_ws(db=db, token=token)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Login to connect")
-
-    player_id = current_user.id
-
-    start_time = datetime.datetime.now(tz=JST)
-    duration = 0
-    db_round = None
-    db_generation = None
-    chatbot_obj = None
-    chain_result = None
-    # accept the websocket connection and record in database
-    crud.create_user_action(
-        db=db,
-        user_action=schemas.UserActionBase(
-            user_id=player_id,
-            action="connect websocket",
-            sent_at=start_time,
-            received_at=start_time,
-        )
-    )
-    await websocket.accept()
-    try:
-        user_action = await websocket.receive_json()
-        db_user_action = crud.create_user_action(
-            db=db,
-            user_action=schemas.UserActionBase(
-                user_id=player_id,
-                action=user_action["action"],
-                received_at=start_time,
-                sent_at=start_time,
-            )
-        )
-    except WebSocketDisconnect:
-        # client disconnected immediately after connecting; record and exit gracefully
-        crud.create_user_action(
-            db=db,
-            user_action=schemas.UserActionBase(
-                user_id=player_id,
-                action="disconnect websocket",
-                sent_at=datetime.datetime.now(tz=JST),
-                received_at=datetime.datetime.now(tz=JST),
-            )
-        )
-        logger1.info(f"WebSocket disconnected for user {player_id} before initial message")
-        return
-    except Exception as e:
-        logger1.error(f"Error during websocket initial receive: {str(e)}")
-        try:
-            await websocket.close(code=1011, reason=str(e))
-        except Exception:
-            pass
-        return
-
-    # set program
-    obj = parse_obj_as(schemas.RoundCreate, user_action['obj'])
-    db_program_user = crud.get_programs_by_user(
-        db=db,
-        user_id=player_id,
-    )
-
-    db_program = crud.get_program_by_name(db, obj.program)
-    if not db_program_user:
-        db_program = crud.get_program_by_name(db, "inlab_test")
-    elif not (db_program and db_program.id in [pu.program_id for pu in db_program_user]):
-        db_program = db_program_user[0].program
-
-    # if user resumes the round
-    if user_action["action"] == "resume":
-        leaderboard_id = user_action["obj"]["leaderboard_id"]
-
-        unfinished_rounds = crud.get_rounds(
-            db=db,
-            player_id=player_id,
-            leaderboard_id=leaderboard_id,
-            is_completed=False,
-            program_id=db_program.id
-        )
-        finished_rounds = crud.get_rounds(
-            db=db,
-            player_id=player_id,
-            leaderboard_id=leaderboard_id,
-            is_completed=True,
-            program_id=db_program.id
-        )
-
-        if unfinished_rounds:
-            db_round = crud.get_round(
-                db=db,
-                round_id=unfinished_rounds[0].id,
-            )
-            db_leaderboard = crud.get_leaderboard(db=db, leaderboard_id=leaderboard_id)
-
-            db_generation = crud.get_generation(db=db, generation_id=db_round.last_generation_id)
-            db_chat = crud.get_chat(db=db, chat_id=db_round.chat_history)
-            prev_res_ids = [
-                msg.response_id for msg in db_chat.messages if msg.response_id is not None
-            ]
-            chatbot_obj = openai_chatbot.Hint_Chatbot(
-                model_name=db_round.model,
-                vocabularies=db_leaderboard.vocabularies,
-                first_res_id=db_leaderboard.response_id,
-                prev_res_id=prev_res_ids[-1] if prev_res_ids else db_leaderboard.response_id,
-                prev_res_ids=prev_res_ids
-            )
-
-            db_score = crud.get_score(db=db, generation_id=db_generation.id)
-
-            if not db_generation.is_completed:
-                generated_time = db_generation.generated_time
-                duration += db_generation.duration
-            else:
-                generated_time = db_generation.generated_time + 1
-                db_generation = crud.create_generation(
-                    db=db,
-                    round_id=db_round.id,
-                    generation=schemas.GenerationCreate(
-                        round_id=db_round.id,
-                        sentence='',
-                        generated_time=generated_time,
-                        created_at=start_time,
-                    )
-                )
-
-            # prepare data to send
-            send_data = {
-                "feedback": db_program.feedback,
-                "leaderboard": {
-                    "id": leaderboard_id,
-                    "image": db_round.leaderboard.original_image.image,
-                },
-                "round": {
-                    "id": db_round.id,
-                    "display_name": db_round.display_name,
-                    "generated_time":generated_time,
-                    "generations": [
-                        g.id for g in db_round.generations if g.is_completed
-                    ]
-                },
-                "generation": {
-                    "id": db_generation.id,
-                    "interpreted_image": db_generation.interpreted_image.image if db_generation.interpreted_image else None,
-                    "generated_time": db_generation.generated_time,
-                    "sentence": db_generation.sentence,
-                    "correct_sentence": db_generation.correct_sentence,
-                    "is_completed": db_generation.is_completed,
-                    "image_similarity": db_score.image_similarity if db_score else None,
-                    "duration": duration,
-                },
-                "chat": {
-                    "id": db_round.chat_history,
-                    "messages" : [
-                        {
-                            'id': db_message.id,
-                            'sender': db_message.sender,
-                            'content': db_message.content,
-                            'created_at': db_message.created_at.isoformat(),
-                            'is_hint': db_message.is_hint
-                        }
-                        for db_message in db_chat.messages
-                    ]
-                },
-            }
-        elif finished_rounds:
-            db_round = crud.get_round(
-                db=db,
-                round_id=finished_rounds[0].id,
-            )
-            db_leaderboard = crud.get_leaderboard(db=db, leaderboard_id=leaderboard_id)
-
-            db_generation = crud.get_generation(db=db, generation_id=db_round.last_generation_id)
-            db_chat = crud.get_chat(db=db, chat_id=db_round.chat_history)
-            prev_res_ids = [
-                msg.response_id for msg in db_chat.messages if msg.response_id is not None
-            ]
-            chatbot_obj = openai_chatbot.Hint_Chatbot(
-                model_name=db_round.model,
-                vocabularies=db_leaderboard.vocabularies,
-                first_res_id=db_leaderboard.response_id,
-                prev_res_id=prev_res_ids[-1] if prev_res_ids else db_leaderboard.response_id,
-                prev_res_ids=prev_res_ids
-            )
-            generated_time = db_generation.generated_time
-
-            db_score = crud.get_score(db=db, generation_id=db_generation.id)
-
-            # prepare data to send
-            send_data = {
-                "feedback": db_program.feedback,
-                "leaderboard": {
-                    "id": leaderboard_id,
-                    "image": db_round.leaderboard.original_image.image,
-                },
-                "round": {
-                    "id": db_round.id,
-                    "display_name": db_round.display_name,
-                    "generated_time":generated_time,
-                    "generations": [
-                        g.id for g in db_round.generations if g.is_completed
-                    ]
-                },
-                "generation": {
-                    "id": db_generation.id,
-                    "interpreted_image": db_generation.interpreted_image.image if db_generation.interpreted_image else None,
-                    "generated_time": db_generation.generated_time,
-                    "sentence": db_generation.sentence,
-                    "correct_sentence": db_generation.correct_sentence,
-                    "is_completed": db_generation.is_completed,
-                    "image_similarity": db_score.image_similarity if db_score else None,
-                },
-                "chat": {
-                    "id": db_round.chat_history,
-                    "messages" : [
-                        {
-                            'id': db_message.id,
-                            'sender': db_message.sender,
-                            'content': db_message.content,
-                            'created_at': db_message.created_at.isoformat(),
-                            'is_hint': db_message.is_hint
-                        }
-                        for db_message in db_chat.messages
-                    ]
-                },
-            }
-        else:
-            user_action["action"] = "start"
-    elif user_action["action"] not in ["start", "resume"]:
-        logger1.error(f"Unknown initial action '{user_action['action']}' from user {player_id}")
-        send_data = {}
-
-    if user_action["action"] == "start":
-
-        db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
-        db_score = None
-
-        if db_program is None:
-            db_round = crud.create_round(
-                db=db,
-                leaderboard_id=leaderboard_id,
-                user_id=player_id,
-                model_name=obj.model,
-                created_at=obj.created_at,
-            )
-
-        else:
-            db_round = crud.create_round(
-                db=db,
-                leaderboard_id=leaderboard_id,
-                user_id=player_id,
-                program_id=db_program.id,
-                model_name=obj.model,
-                created_at=obj.created_at,
-            )
-
-        db_generation = crud.create_generation(
-            db=db,
-            round_id=db_round.id,
-            generation=schemas.GenerationCreate(
-                round_id=db_round.id,
-                sentence='',
-                generated_time=0,
-                created_at=start_time,
-            )
-        )
-
-        db_message = crud.create_message(
-            db=db,
-            message=schemas.MessageBase(
-                content="画像を説明する際にヒントが使えます。下の『Averyへのメッセージ🤖』に質問したい内容を入力してくださいね！",
-                sender="assistant",
-                created_at=datetime.datetime.now(tz=JST),
-                is_hint=False
-            ),
-            chat_id=db_round.chat_history
-        )['message']
-
-        chatbot_obj = openai_chatbot.Hint_Chatbot(
-            model_name=obj.model,
-            vocabularies=db_leaderboard.vocabularies,
-            first_res_id=db_leaderboard.response_id,
-            prev_res_id=db_leaderboard.response_id
-        )
-
-        generated_time = 0
-
-        # prepare data to send
-        send_data = {
-            "feedback": db_program.feedback,
-            "leaderboard": {
-                "id": leaderboard_id,
-                "image": db_round.leaderboard.original_image.image,
-            },
-            "round": {
-                "id": db_round.id,
-                "display_name": db_round.display_name,
-                "generated_time":generated_time,
-                "generations": []
-            },
-            "generation": {
-                "id": db_generation.id,
-                "interpreted_image": db_generation.interpreted_image.image if db_generation.interpreted_image else None,
-                "generated_time": db_generation.generated_time,
-                "correct_sentence": db_generation.correct_sentence,
-                "is_completed": db_generation.is_completed,
-                "image_similarity": db_score.image_similarity if db_score else None,
-            },
-            "chat": {
-                "id": db_round.chat_history,
-                "messages" : [
-                    {
-                        'id': db_message.id,
-                        'sender': db_message.sender,
-                        'content': db_message.content,
-                        'created_at': db_message.created_at.isoformat(),
-                        'is_hint': db_message.is_hint
-                    }
-                ]
-            },
-        }
-
-    await websocket.send_json(send_data)
-
-    crud.update_user_action(
-        db=db,
-        user_action=schemas.UserActionUpdate(
-            id=db_user_action.id,
-            related_id=db_generation.id if db_generation else None,
-            sent_at=datetime.datetime.now(tz=JST),
-        )
-    )
-
-    try:
-        # yappi.clear_stats()
-        # yappi.set_clock_type("wall")
-        # yappi.start()
-        while True:
-            user_action = await websocket.receive_json()
-
-            db_user_action = crud.create_user_action(
-                db=db,
-                user_action=schemas.UserActionBase(
-                    user_id=player_id,
-                    action=user_action["action"],
-                    related_id=db_generation.id if db_generation else None,
-                    received_at=datetime.datetime.now(tz=JST),
-                    sent_at=datetime.datetime.now(tz=JST),
-                )
-            )
-
-            # if user asks for a hint
-            if user_action["action"] == "hint":
-                db_messages = []
-                obj = parse_obj_as(schemas.MessageReceive, user_action['obj'])
-                crud.create_message(
-                    db=db,
-                    message=schemas.MessageBase(
-                        content=obj.content,
-                        sender="user",
-                        created_at=datetime.datetime.now(tz=JST),
-                        is_hint=True
-                    ),
-                    chat_id=db_round.chat_history
-                )
-
-                # run in threadpool to avoid blocking event loop
-                # chatbot_obj.nextResponse: ask_for_hint, new_messages, base64_image
-                hint = await asyncio.to_thread(
-                    chatbot_obj.nextResponse,
-                    obj.content,
-                    [],
-                    db_round.leaderboard.original_image.image,
-                )
-
-                db_messages.append(
-                    crud.create_message(
-                        db=db,
-                        message=schemas.MessageBase(
-                            content=hint,
-                            sender="assistant",
-                            created_at=datetime.datetime.now(tz=JST),
-                            is_hint=True,
-                            response_id=chatbot_obj.prev_res_id
-                        ),
-                        chat_id=db_round.chat_history
-                    )['message']
-                )
-
-                send_data = {
-                    "chat": {
-                        "id": db_round.chat_history,
-                        "messages" : [
-                            {
-                                'id': db_message.id,
-                                'sender': db_message.sender,
-                                'content': db_message.content,
-                                'created_at': db_message.created_at.isoformat(),
-                                'is_hint': db_message.is_hint
-                            }
-                            for db_message in db_messages
-                        ]
-                    },
-                }
-
-            elif user_action["action"] == "change_display_name":
-                obj = parse_obj_as(schemas.RoundUpdateName, user_action['obj'])
-                db_round = crud.update_round_display_name(
-                    db=db,
-                    round_update=obj
-                )
-
-                send_data = {
-                    "round": {
-                        "id": db_round.id,
-                        "display_name": db_round.display_name,
-                        "generated_time":generated_time,
-                    },
-                }
-
-            # if user submits the answer
-            elif user_action["action"] == "submit":
-                obj = parse_obj_as(schemas.GenerationCreate, user_action['obj'])
-                status = 0
-                sentences = [
-                    g.sentence.strip() for g in db_round.generations if g.sentence != '' and g.correct_sentence is not None and g.id != db_generation.id
-                ]
-
-                if db_generation.correct_sentence is None:
-                    db_generation = crud.update_generation0(
-                        db=db,
-                        generation=obj,
-                        generation_id=db_generation.id
-                    )
-                elif obj.sentence.strip() in sentences:
-                    db_generation = crud.get_generation(db=db, generation_id=db_generation.id)
-                    status = 3
-                else:
-                    generated_time += 1
-                    obj.generated_time = generated_time
-                    db_generation = crud.create_generation(
-                        db=db,
-                        round_id=db_round.id,
-                        generation=obj,
-                    )
-
-                if status != 3:
-                    try:
-                        status, correct_sentence, spelling_mistakes, grammar_mistakes=await asyncio.to_thread(
-                            sentence.checkSentence,
-                            db_generation.sentence
-                        )
-                    except Exception as e:
-                        logger1.error(f"Error in get_user_answer: {str(e)}")
-                        raise HTTPException(status_code=400, detail=str(e))
-
-
-                if status == 0:
-                    crud.update_generation3(
-                        db=db,
-                        generation=schemas.GenerationComplete(
-                            id=db_generation.id,
-                            grammar_errors=str(grammar_mistakes),
-                            spelling_errors=str(spelling_mistakes),
-                            n_grammar_errors=len(grammar_mistakes),
-                            n_spelling_errors=len(spelling_mistakes),
-                            updated_grammar_errors=True,
-                            is_completed=False
-                        )
-                    )
-
-                    duration += (datetime.datetime.now(tz=JST) - start_time).total_seconds()
-
-                    crud.update_generation_duration(
-                        db=db,
-                        generation_id=db_generation.id,
-                        duration=duration
-                    )
-                    duration = 0
-
-                    db_generation = crud.update_generation1(
-                        db=db,
-                        generation=schemas.GenerationCorrectSentence(
-                            id=db_generation.id,
-                            correct_sentence=correct_sentence
-                        )
-                    )
-
-                    messages = [
-                        schemas.MessageBase(
-                            content="""回答を記録しました。📝
-あなたの回答（画像生成に参考された）: {}\n\n修正された回答：{}""".format(db_generation.sentence, db_generation.correct_sentence),
-                            sender="assistant",
-                            created_at=datetime.datetime.now(tz=JST),
-                            is_hint=False
-                        )
-                    ]
-
-                    # server-side processing
-                    generation_dict = {
-                        "id": db_generation.id,
-                        "at": db_generation.created_at,
-                    }
-
-                    if "IMG" in db_program.feedback and "AWS" in db_program.feedback:
-                        chain_interpretation = celery_app.chain(
-                            celery_app.group(
-                                generate_interpretation2.s(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at),
-                            ),
-                            celery_app.group(
-                                calculate_score_gpt.s(),
-                            ),
-                        )
-                        chain_result = await chain_interpretation.apply_asyncx()
-                    elif "IMG" in db_program.feedback:
-                        chain_interpretation = celery_app.chain(
-                            celery_app.group(
-                                generate_interpretation2.s(generation_id=db_generation.id, sentence=db_generation.sentence, at=db_generation.created_at),
-                            )
-                        )
-                        chain_result = await chain_interpretation.apply_asyncx()
-                    elif "AWS" in db_program.feedback:
-                        chain_interpretation = celery_app.chain(
-                            celery_app.group(
-                                calculate_score_gpt.s(items=generation_dict),
-                            ),
-                        )
-                        chain_result = await chain_interpretation.apply_asyncx()
-                    else:
-                        chain_result = None
-
-
-                elif status == 1:
-                    messages = [
-                        schemas.MessageBase(
-                            content="ブー！英語で答えてください。",
-                            sender="assistant",
-                            created_at=datetime.datetime.now(tz=JST),
-                            is_hint=False
-                        )
-                    ]
-
-                elif status == 2:
-                    messages = [
-                        schemas.MessageBase(
-                            content="ブー！不適切な言葉が含まれています。",
-                            sender="assistant",
-                            created_at=datetime.datetime.now(tz=JST),
-                            is_hint=False
-                        )
-                    ]
-
-                elif status == 3:
-                    messages = [
-                        schemas.MessageBase(
-                            content="ブー！同じ回答がすでに提出されています。新しいアイデアを試してみましょう！",
-                            sender="assistant",
-                            created_at=datetime.datetime.now(tz=JST),
-                            is_hint=False
-                        )
-                    ]
-                else:
-                    messages = []
-
-                db_messages = []
-
-                for message in messages:
-                    db_messages.append(
-                        crud.create_message(
-                            db=db,
-                            message=message,
-                            chat_id=db_round.chat_history
-                        )['message']
-                    )
-
-                # prepare data to send
-                send_data = {
-                    "leaderboard": {
-                        "id": leaderboard_id,
-                        "image": db_round.leaderboard.original_image.image,
-                    },
-                    "round": {
-                        "id": db_round.id,
-                        "display_name": db_round.display_name,
-                        "generated_time":generated_time,
-                    },
-                    "chat": {
-                        "id": db_round.chat_history,
-                        "messages" : [
-                            {
-                                'id': db_message.id,
-                                'sender': db_message.sender,
-                                'content': db_message.content,
-                                'created_at': db_message.created_at.isoformat(),
-                                'is_hint': db_message.is_hint
-                            }
-                            for db_message in db_messages
-                        ]
-                    },
-                    "generation": {
-                        "id": db_generation.id,
-                        "correct_sentence": db_generation.correct_sentence if status == 0 else None,
-                        "duration": duration,
-                    }
-                }
-
-            elif user_action["action"] == "evaluate" and (db_generation.correct_sentence is None or db_generation.correct_sentence == ""):
-                send_data = {}
-            elif user_action["action"] == "evaluate":
-
-                if "IMG" in db_program.feedback and db_generation.interpreted_image is None:
-                    # If the interpreted image is not generated, log an error
-                    logger1.error(f"Interpreted image not found for generation {db_generation.id}")
-
-                if "AWS" in db_program.feedback:
-                    db_score = db_generation.score
-                    if db_score is not None:
-                        image_similarity = db_score.image_similarity
-                        scores_dict = {
-                            'grammar_score': db_score.grammar_score,
-                            'spelling_score': db_score.spelling_score,
-                            'vividness_score': db_score.vividness_score,
-                            'convention': db_score.convention,
-                            'structure_score': db_score.structure_score,
-                            'content_score': db_score.content_score,
-                            'total_score': db_generation.total_score,
-                        }
-                    elif locals().get('chain_result'):
-                        # Get the result from the chain
-                        chain_score_result = [
-                            json.loads(result) for result in chain_result.result
-                        ]
-                        scores_dict = {
-                            'grammar_score': chain_score_result[1].get('grammar_score', 0),
-                            'spelling_score': chain_score_result[1].get('spelling_score', 0),
-                            'vividness_score': chain_score_result[1].get('vividness_score', 0),
-                            'convention': chain_score_result[1].get('convention', 0),
-                            'structure_score': chain_score_result[1].get('structure_score', 0),
-                            'content_score': chain_score_result[1].get('content_score', 0),
-                            'total_score': chain_score_result[0].get('total_score', 0),
-                        }
-                        image_similarity = chain_score_result[1].get('image_similarity', 0)
-                    else:
-                        raise HTTPException(status_code=500, detail="No score found")
-                else:
-                    scores_dict = None
-                    image_similarity = None
-
-                if not db_generation.is_completed:
-                    # initialize start_time for duration calculation
-                    start_time = datetime.datetime.now(tz=JST)
-                    duration = 0
-
-                    generation_com = schemas.GenerationComplete(
-                        id=db_generation.id,
-                        is_completed=True
-                    )
-                    crud.update_generation3(
-                        db=db,
-                        generation=generation_com
-                    )
-
-                    descriptions = crud.get_description(db, leaderboard_id=db_round.leaderboard_id, model_name=db_round.model)
-                    descriptions = [des.content for des in descriptions]
-
-                    # Set messages for score and evaluation
-                    db_messages = []
-
-                    if "AWS" in db_program.feedback:
-                        score_message = """あなたの回答（評価対象）：{user_sentence}
-
-修正された回答　　　　 ：{correct_sentence}
-
-
-| 　　          | 得点   | 満点       |
-|---------------|--------|------|
-| 文法得点      |{:>5}|  3  |
-| スペリング得点|{:>5}|  1  |
-| 鮮明さ        |{:>5}|  1  |
-| 自然さ        |{:>5}|  1  |
-| 構造性        |{:>5}|  1  |
-| 内容得点      |{:>5}|  3  |
-| 合計点        |{:>5}| 100 |
-| ランク        |{:>5}|(A-最高, B-上手, C-良い, D-普通, E-もう少し, F-頑張ろう)|""".format(
-                            round(scores_dict['grammar_score'],2),
-                            round(scores_dict['spelling_score'],2),
-                            round(scores_dict['vividness_score'],2),
-                            scores_dict['convention'],
-                            scores_dict['structure_score'],
-                            scores_dict['content_score'],
-                            scores_dict['total_score'],
-                            db_generation.rank,
-                            user_sentence=db_generation.sentence,
-                            correct_sentence=db_generation.correct_sentence,
-                        )
-
-                        db_messages.append(crud.create_message(
-                            db=db,
-                            message=schemas.MessageBase(
-                                content=score_message,
-                                sender="assistant",
-                                created_at=datetime.datetime.now(tz=JST),
-                                is_hint=False,
-                                is_evaluation=True,
-                            ),
-                            chat_id=db_round.chat_history
-                        )['message'])
-
-                    if "AWE" in db_program.feedback:
-                        evaluation = await asyncio.to_thread(
-                            chatbot_obj.get_result,
-                            db_generation.sentence,
-                            db_generation.correct_sentence,
-                            db_round.leaderboard.original_image.image,
-                            db_generation.grammar_errors,
-                            db_generation.spelling_errors,
-                            descriptions
-                        )
-                    else:
-                        evaluation = None
-                        db_evaluate_msg = None
-
-
-                    if evaluation:
-                        recommended_vocab = ""
-                        if len(db_round.generations) > 2:
-                            recommended_vocabs = db_round.leaderboard.vocabularies
-                            recommended_vocabs = [vocab.word for vocab in recommended_vocabs]
-                            if recommended_vocabs:
-                                recommended_vocab = "\n\n**おすすめの単語**\n" + ", ".join(recommended_vocabs)
-
-                        evaluation_message = """**文法**
-{grammar_feedback}
-**スペル**
-{spelling_feedback}
-**スタイル**
-{style_feedback}
-**内容**
-{content_feedback}
-
-**総合評価**
-{overall_feedback}{recommended_vocab}""". \
-                        format(
-                            grammar_feedback=evaluation['grammar_evaluation'],
-                            spelling_feedback=evaluation['spelling_evaluation'],
-                            style_feedback=evaluation['style_evaluation'],
-                            content_feedback=evaluation['content_evaluation'],
-                            overall_feedback=evaluation['overall_evaluation'],
-                            recommended_vocab=recommended_vocab
-                        )
-
-                        db_evaluate_msg = crud.create_message(
-                            db=db,
-                            message=schemas.MessageBase(
-                                content=evaluation_message,
-                                sender="assistant",
-                                created_at=datetime.datetime.now(tz=JST),
-                                is_hint=False,
-
-                                is_evaluation=True,
-                                responses_id=chatbot_obj.prev_res_id
-                            ),
-                            chat_id=db_round.chat_history
-                        )['message']
-
-                        db_messages.append(db_evaluate_msg)
-
-                    generation_com = schemas.GenerationComplete(
-                        id=db_generation.id,
-                        is_completed=True,
-                        evaluation_id=db_evaluate_msg.id if db_evaluate_msg else None
-                    )
-
-                    db_generation = crud.update_generation3(
-                        db=db,
-                        generation=generation_com,
-                    )
-
-                # prepare data to send
-                send_data = {
-                    "leaderboard": {
-                        "id": leaderboard_id,
-                        "image": db_leaderboard.original_image.image,
-                    },
-                    "round": {
-                        "id": db_round.id,
-                        "display_name": db_round.display_name,
-                        "generated_time":generated_time,
-                    },
-                    "chat": {
-                        "id": db_round.chat_history,
-                        "messages" : [
-                            {
-                                'id': db_message.id,
-                                'sender': db_message.sender,
-                                'content': db_message.content,
-                                'created_at': db_message.created_at.isoformat(),
-                                'is_hint': db_message.is_hint
-                            }
-                            for db_message in db_messages
-                        ]
-                    },
-                    "generation": {
-                        "id": db_generation.id,
-                        "interpreted_image": db_generation.interpreted_image.image if db_generation.interpreted_image else None,
-                        "image_similarity": image_similarity,
-                        "evaluation_msg": db_evaluate_msg.content if 'AWE' in db_program.feedback else None
-                    }
-                }
-
-            # if user requests to end the round
-            elif user_action["action"] == "end":
-                duration = np.sum([g.duration for g in db_round.generations if g.is_completed])
-
-                db_round = crud.complete_round(
-                    db=db,
-                    round_id=db_round.id,
-                    round=schemas.RoundComplete(
-                        id=db_round.id,
-                        last_generation_id=db_generation.id,
-                        is_completed=True,
-                        duration=duration,
-                    )
-                )
-
-                # prepare data to send
-                send_data = {
-                    "leaderboard": {
-                        "id": leaderboard_id,
-                        "image": db_leaderboard.original_image.image,
-                    },
-                    "round": {
-                        "id": db_round.id,
-                        "generated_time":generated_time,
-                    },
-                    "chat": {
-                        "id": db_round.chat_history,
-                        "messages" : []
-                    },
-                }
-
-                chatbot_obj.kill()
-            else:
-                send_data = {}
-                logger1.error(f"Unknown action received: {user_action['action']}")
-            # send details to the user
-            await websocket.send_json(send_data)
-
-            crud.update_user_action(
-                db=db,
-                user_action=schemas.UserActionUpdate(
-                    id=db_user_action.id,
-                    related_id=db_generation.id if db_generation else None,
-                    sent_at=datetime.datetime.now(tz=JST),
-                )
-            )
-
-    except WebSocketDisconnect:
-        disconnect_time = datetime.datetime.now(tz=JST)
-
-        # record disconnect time
-        crud.create_user_action(
-            db=db,
-            user_action=schemas.UserActionBase(
-                user_id=player_id,
-                action="disconnect websocket",
-                sent_at=disconnect_time,
-                received_at=disconnect_time,
-            )
-        )
-        logger1.info(f"WebSocket disconnected for user {player_id}")
-    except Exception as e:
-        logger1.error(f"Error in websocket: {str(e)}")
-        try:
-            await websocket.close(code=1011, reason=str(e))
-        except:
-            pass
-    finally:
-        disconnect_time = datetime.datetime.now(tz=JST)
-        if start_time and db_generation and not db_generation.is_completed:
-            duration += (disconnect_time - start_time).total_seconds()
-            crud.update_generation_duration(
-                db=db,
-                generation_id=db_generation.id,
-                duration=duration
-            )
 
 @app.post("/user_actions/", tags=["User Action"], status_code=201)
 async def create_user_action(

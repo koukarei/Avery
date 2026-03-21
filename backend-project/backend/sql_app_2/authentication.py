@@ -63,9 +63,11 @@ def create_access_token(data: dict, expires_delta: Union[timedelta, None] = None
 
     return encoded_jwt
 
-def create_refresh_token(username: str) -> str:
+def create_refresh_token(username: str, course_id: Optional[int] = None) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=REFRESH_TOKEN_EXPIRE_MINUTES)
     to_encode = {"sub": username, "exp": expire}
+    if course_id is not None:
+        to_encode["course_id"] = course_id
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 

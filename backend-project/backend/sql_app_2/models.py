@@ -57,8 +57,10 @@ class SceneSchool(Base):
     id = Column(Integer, primary_key=True)
     scene_id = Column(Integer, ForeignKey("scenes.id"))
     school = Column(String(100), index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=True)
 
     scene = relationship("Scene", back_populates="schools", foreign_keys=[scene_id])
+    course = relationship("Course", back_populates="scene_schools")
 
 class Story(Base):
     __tablename__ = "stories"
@@ -79,9 +81,11 @@ class StorySchool(Base):
 
     id = Column(Integer, primary_key=True)
     story_id = Column(Integer, ForeignKey("stories.id"))
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=True)
     school = Column(String(100), index=True)
 
     story = relationship("Story", back_populates="schools", foreign_keys=[story_id])
+    course = relationship("Course", back_populates="story_schools", foreign_keys=[course_id])
 
 class Leaderboard(Base):
     __tablename__ = "leaderboards"
@@ -137,8 +141,10 @@ class ProgramSchool(Base):
     id = Column(Integer, primary_key=True)
     program_id = Column(Integer, ForeignKey("programs.id"))
     school = Column(String(100), index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=True)
 
     program = relationship("Program", back_populates="schools", foreign_keys=[program_id])
+    course = relationship("Course", back_populates="program_schools", foreign_keys=[course_id])
 
 class ProgramUser(Base):
     __tablename__ = "program_users"
@@ -148,6 +154,15 @@ class ProgramUser(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
 
     program = relationship("Program", back_populates="users", foreign_keys=[program_id])
+
+class CourseUser(Base):
+    __tablename__ = "course_users"
+
+    id = Column(Integer, primary_key=True)
+    course_id = Column(Integer, ForeignKey("courses.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+
+    course = relationship("Course", back_populates="users", foreign_keys=[course_id])
 
 class Round(Base): 
     __tablename__ = "rounds"
@@ -313,11 +328,26 @@ class GoodRound(Base):
     player = Column(Integer, ForeignKey("users.id"),primary_key=True)
     round = Column(Integer, ForeignKey("rounds.id"),primary_key=True)
 
+class Course(Base):
+    __tablename__ = "courses"
+
+    id = Column(Integer, primary_key=True)
+    course_id = Column(String(100), index=True)
+    course_label = Column(String(100), index=True)
+    course_title = Column(String(150), index=True)
+    school = Column(String(100), index=True)
+
+    program_schools = relationship("ProgramSchool", back_populates="course")
+    users = relationship("CourseUser", back_populates="course")
+    scene_schools = relationship("SceneSchool", back_populates="course")
+    story_schools = relationship("StorySchool", back_populates="course")
+
 class School_Leaderboard(Base):
     __tablename__ = "school_leaderboards"
 
     id = Column(Integer, primary_key=True)
     school = Column(String(100))
+    course_id = Column(Integer, ForeignKey("courses.id"))
     leaderboard_id = Column(Integer, ForeignKey("leaderboards.id"))
 
 class Task(Base):

@@ -171,6 +171,7 @@ def delete_user(db: Session, user_id: int):
 def get_leaderboards(
         db: Session,
         school_name: str = None,
+        course_id: int = None,
         skip: int = 0,
         limit: int = 100,
         published_at_start: datetime.datetime = None,
@@ -194,6 +195,8 @@ def get_leaderboards(
 
     if school_name:
         query = query.filter(models.School_Leaderboard.school == school_name)
+    if course_id:
+        query = query.filter(models.School_Leaderboard.course_id == course_id)
     if is_public is not None:
         query = query.filter(models.Leaderboard.is_public == is_public)
     if created_by_id is not None:
@@ -218,6 +221,7 @@ def get_leaderboards(
 def get_leaderboards_stats(
         db: Session,
         school_name: str = None,
+        course_id: int = None,
         published_at_start: datetime.datetime = None,
         published_at_end: datetime.datetime = None,
         user_id: int = None,
@@ -232,6 +236,8 @@ def get_leaderboards_stats(
 
     if school_name:
         query = query.filter(models.School_Leaderboard.school == school_name)
+    if course_id:
+        query = query.filter(models.School_Leaderboard.course_id == course_id)
     if is_public is not None:
         query = query.filter(models.Leaderboard.is_public == is_public)
     if owner_id is not None:
@@ -353,45 +359,58 @@ def update_leaderboard(
 
 def add_leaderboard_school(
         db: Session,
-        leaderboard: schemas.LeaderboardUpdate
+        leaderboard: schemas.LeaderboardSchoolUpdate,
 ):
-    db_leaderboard = db.query(models.Leaderboard).filter(models.Leaderboard.id == leaderboard.id).first()
+    db_leaderboard = db.query(models.Leaderboard).filter(models.Leaderboard.id == leaderboard.leaderboard_id).first()
     if db_leaderboard is None:
         raise ValueError("Leaderboard not found")
+    
+    db_course = db.query(models.Course).filter(models.Course.id == leaderboard.course_id).first() if leaderboard.course_id else None
+    if leaderboard.course_id and db_course is None:
+        raise ValueError("Course not found")
+    
+    db_school = db.query(models.School_Leaderboard).filter(models.School_Leaderboard.leaderboard_id == db_leaderboard.id)
+    db_school = db_school.filter(models.School_Leaderboard.school == leaderboard.school)
 
-    school = leaderboard.school
-    for school_name in school:
-        db_school = db.query(models.School_Leaderboard).filter(models.School_Leaderboard.leaderboard_id == db_leaderboard.id).filter(models.School_Leaderboard.school == school_name).first()
-        if db_school is None:
-            db_school = models.School_Leaderboard(
-                school=school_name,
-                leaderboard_id=db_leaderboard.id
-            )
-            db.add(db_school)
-            db.commit()
-    db_schools = db.query(models.School_Leaderboard).filter(models.School_Leaderboard.leaderboard_id == db_leaderboard.id).all()
-    return db_schools
+    if leaderboard.course_id is not None:
+        db_school = db_school.filter(models.School_Leaderboard.course_id == leaderboard.course_id)
+
+    db_school = db_school.first()
+    if db_school is None:
+        db_school = models.School_Leaderboard(
+            school=leaderboard.school,
+            leaderboard_id=db_leaderboard.id,
+            course_id=leaderboard.course_id
+        )
+        db.add(db_school)
+        db.commit()
+
+    return db_school
 
 def remove_leaderboard_school(
         db: Session,
-        leaderboard: schemas.LeaderboardUpdate
+        leaderboard: schemas.LeaderboardSchoolUpdate
 ):
-    db_leaderboard = db.query(models.Leaderboard).filter(models.Leaderboard.id == leaderboard.id).first()
+    db_leaderboard = db.query(models.Leaderboard).filter(models.Leaderboard.id == leaderboard.leaderboard_id).first()
     if db_leaderboard is None:
         raise ValueError("Leaderboard not found")
+    
+    db_course = db.query(models.Course).filter(models.Course.id == leaderboard.course_id).first() if leaderboard.course_id else None
+    if leaderboard.course_id and db_course is None:
+        raise ValueError("Course not found")
+    
+    db_school = db.query(models.School_Leaderboard).filter(models.School_Leaderboard.leaderboard_id == db_leaderboard.id)
+    db_school = db_school.filter(models.School_Leaderboard.school == leaderboard.school)
 
-    school = leaderboard.school
+    if leaderboard.course_id is not None:
+        db_school = db_school.filter(models.School_Leaderboard.course_id == leaderboard.course_id)
 
-    db_schools = db.query(models.School_Leaderboard).filter(models.School_Leaderboard.leaderboard_id == db_leaderboard.id).all()
+    db_school = db_school.first()
+    if db_school is not None:
+        db.delete(db_school)
+        db.commit()
 
-    for db_school in db_schools:
-        if db_school.school in school:
-            db.delete(db_school)
-            db.commit()
-
-    db_schools = db.query(models.School_Leaderboard).filter(models.School_Leaderboard.leaderboard_id == db_leaderboard.id).all()
-
-    return db_schools
+    return db_school
 
 def add_leaderboard_vocab(
         db: Session,
@@ -651,8 +670,11 @@ def create_program(db: Session, program: schemas.ProgramBase):
 def get_programs(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Program).offset(skip).limit(limit).all()
 
-def get_programs_by_school(db: Session, school_name: str, skip: int = 0, limit: int = 50):
-    return db.query(models.ProgramSchool).filter(models.ProgramSchool.school == school_name).offset(skip).limit(limit).all()
+def get_programs_by_school(db: Session, school_name: str, course_id: str = None, skip: int = 0, limit: int = 50):
+    query = db.query(models.ProgramSchool).filter(models.ProgramSchool.school == school_name)
+    if course_id:
+        query = query.filter(models.ProgramSchool.course_id == course_id)
+    return query.offset(skip).limit(limit).all()
 
 def get_programs_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 50):
     return db.query(models.ProgramUser).filter(models.ProgramUser.user_id == user_id).offset(skip).limit(limit).all()
@@ -703,6 +725,16 @@ def delete_program_user(db: Session, program_id: int, user_id: int):
         db.delete(db_program_user)
         db.commit()
     return db_program_user
+
+def get_course(db: Session, course_id: int):
+    return db.query(models.Course).filter(models.Course.id == course_id).first()
+
+def create_course(db: Session, course: schemas.CourseBase):
+    db_course = models.Course(**course.model_dump())
+    db.add(db_course)
+    db.commit()
+    db.refresh(db_course)
+    return db_course
 
 def update_round_display_name(db: Session, round_update: schemas.RoundUpdateName):
     db_round = db.query(models.Round).filter(models.Round.id == round_update.id).first()

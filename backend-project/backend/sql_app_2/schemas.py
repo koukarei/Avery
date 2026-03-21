@@ -58,6 +58,17 @@ class Chat(ChatBase):
     class Config:
         orm_mode = True
 
+class CourseBase(BaseModel):
+    course_id: str
+    course_label: str
+    course_title: str
+
+class Course(CourseBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
 class ProgramBase(BaseModel):
     name: str
     description: str
@@ -72,6 +83,7 @@ class Program(ProgramBase):
 class ProgramSchoolUpdate(BaseModel):
     program_id: int
     school: str
+    course_id: Optional[int]=None
 
 class ProgramUserUpdate(BaseModel):
     program_id: int
@@ -368,6 +380,7 @@ class User(UserBase):
     id: int
     is_active: bool
     school: Optional[str]=None
+    course_id: Optional[int]=None
     profiles: UserProfile
 
     class Config:
@@ -488,6 +501,7 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+    course_id: Optional[int] = None
 
 class WSToken(BaseModel):
     ws_token: str
@@ -513,6 +527,11 @@ class LeaderboardUpdate(BaseModel):
     school: list[str]=[]
     vocabularies: list[VocabularyBase]=[]
     story_extract: Optional[str]=None
+
+class LeaderboardSchoolUpdate(BaseModel):
+    leaderboard_id: int
+    school: str
+    course_id: Optional[int]=None
 
 class LeaderboardUpdateInternal(LeaderboardUpdate):
     response_id: Optional[str]=None
@@ -648,3 +667,5 @@ class RevisionUpdate(BaseModel):
     name: str
     checked: bool
     
+class InterpretationResponse(BaseModel):
+    interpretation: str

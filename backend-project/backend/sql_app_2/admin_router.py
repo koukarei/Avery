@@ -1,17 +1,20 @@
 import logging.config
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, responses, Security, status, Request
 from sqlalchemy.orm import Session
-from tasks import generateDescription2
 import pandas as pd
+import util
 
 from . import crud, schemas
 from .database import SessionLocal2, engine2
 
 from .dependencies import wordcloud, sentence
+from .dependencies.gen_image import generate_interpretion
 from collections import Counter
 
-from typing import Tuple, List, Annotated, Optional, Union, Literal
-from datetime import timezone, timedelta
+from tasks import app as celery_app
+from tasks import generateDescription2, generate_interpretation2, calculate_score_gpt
+
+from typing import Literal
 from contextlib import asynccontextmanager
 import logging
 
@@ -78,3 +81,29 @@ async def generate_descriptions(
         model_name="gpt-4o-mini"
     )
     return responses.JSONResponse(content={"result": t})
+
+@router.post("/generate_interpretation", tags=["Interpretation"])
+async def test_generate_interpretation(
+    sentence: str = Form(...),
+    style: str = Form("in the style of Japanese Anime"),
+    model: Literal['gemini', 'gpt-5','dall-e-3','gpt-image-1.5'] = Form('gemini'),
+)->responses.Response:
+    if not sentence:
+        raise HTTPException(status_code=400, detail="Sentence is required")
+    
+    interpretation = generate_interpretion(
+        sentence=sentence,
+        style=style,
+        model=model
+    )
+    
+    if interpretation is None:
+        raise HTTPException(status_code=500, detail="Failed to generate interpretation")
+    
+    imgdata=util.decode_image(interpretation)
+
+    # Convert the image to bytes
+    return responses.Response(
+        content=imgdata,
+        media_type="image/png"  # Adjust this based on your image type (jpeg, png, etc.)
+    )
