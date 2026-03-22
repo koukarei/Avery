@@ -99,9 +99,21 @@ class Scene(SceneBase):
     class Config:
         orm_mode = True
 
+class CourseUserBase(BaseModel):
+    course_id: int
+    user_id: int
+
+class CourseUser(CourseUserBase):
+    id: int
+    course: Course
+
+    class Config:
+        orm_mode = True
+
 class SceneSchoolUpdate(BaseModel):
     scene_id: int
     school: str
+    course_id: Optional[int]=None
 
 class UserBase(BaseModel):
     username: str
@@ -386,6 +398,9 @@ class User(UserBase):
     class Config:
         orm_mode = True
 
+class UserOutWithCurrentCourse(User):
+    current_course: Optional[Course]=None
+
 class StoryBase(BaseModel):
     title: str
     scene_id: int
@@ -413,6 +428,7 @@ class StoryOut(BaseModel):
 class StorySchoolUpdate(BaseModel):
     story_id: int
     school: str
+    course_id: Optional[int]=None
 
 class PersonalDictionaryId(BaseModel):
     player: int

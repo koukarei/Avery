@@ -29,19 +29,30 @@ def get_users_stats(db: Session):
         "n_active_users": n_active_users
     }
 
-def get_users_stats_by_school(db: Session, school: str):
+def get_users_stats_by_school(db: Session, school: str, course_id: int = None):
     n_users = db.query(models.User).filter(models.User.school == school).count()
     n_active_users = db.query(models.User).filter(models.User.school == school).filter(models.User.is_active == True).count()
+    n_course_users = db.query(models.User).\
+        join(models.CourseUser, models.User.id == models.CourseUser.user_id).\
+            filter(models.User.school == school).\
+                filter(models.CourseUser.course_id == course_id)\
+                    .count() if course_id else n_users
+    
     return {
         "n_users": n_users,
-        "n_active_users": n_active_users
+        "n_active_users": n_active_users,
+        "n_course_users": n_course_users
     }
 
 def get_users(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.User).offset(skip).limit(limit).all()
 
-def get_users_by_school(db: Session, school: str = "public", skip: int = 0, limit: int = 100):
-    return db.query(models.User).filter(models.User.school == school).offset(skip).limit(limit).all()
+def get_users_by_school(db: Session, school: str = "public", course_id: int = None, skip: int = 0, limit: int = 100):
+    query = db.query(models.User).filter(models.User.school == school)
+    if course_id is not None:
+        query = query.join(models.CourseUser, models.User.id == models.CourseUser.user_id).\
+            filter(models.CourseUser.course_id == course_id)
+    return query.offset(skip).limit(limit).all()
 
 def create_random_user(db: Session, user: schemas.UserCreate):
     hashed_password = get_password_hash(user.password)
@@ -735,6 +746,32 @@ def create_course(db: Session, course: schemas.CourseBase):
     db.commit()
     db.refresh(db_course)
     return db_course
+
+def get_courses_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 50):
+    return db.query(models.CourseUser).filter(models.CourseUser.user_id == user_id).offset(skip).limit(limit).all()
+
+def add_course_user(db: Session, course_user: schemas.CourseUserBase):
+    db_course_user = db.query(models.CourseUser).\
+        filter(models.CourseUser.course_id == course_user.course_id).\
+            filter(models.CourseUser.user_id == course_user.user_id).first()
+    
+    if db_course_user is None:
+        db_course_user = models.CourseUser(**course_user.model_dump())
+        db.add(db_course_user)
+        db.commit()
+        db.refresh(db_course_user)
+    return db_course_user
+
+def delete_course_user(db: Session, course_user: schemas.CourseUserBase):
+    db_course_user = db.query(models.CourseUser).\
+        filter(models.CourseUser.course_id == course_user.course_id).\
+            filter(models.CourseUser.user_id == course_user.user_id).first()
+    
+    if db_course_user is not None:
+        db_course_user = models.CourseUser(**course_user.model_dump())
+        db.delete(db_course_user)
+        db.commit()
+    return db_course_user
 
 def update_round_display_name(db: Session, round_update: schemas.RoundUpdateName):
     db_round = db.query(models.Round).filter(models.Round.id == round_update.id).first()

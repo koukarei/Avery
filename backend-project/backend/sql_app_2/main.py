@@ -578,6 +578,14 @@ async def lti_login(request: Request):
                     user_id=db_user.id,
                 )
 
+        # add course user association
+        crud.add_course_user(
+            db=next(get_db()),
+            course_user=schemas.CourseUserBase(
+                course_id=db_course.id,
+                user_id=user.id,
+            )
+        )
 
         return templates.TemplateResponse(
             "avery.html",
@@ -854,14 +862,19 @@ async def update_user(
     invalidate_user_cache(db_user.username)
     return updated_user
 
-@app.get("/users/me", tags=["User"], response_model=schemas.User)
+@app.get("/users/me", tags=["User"], response_model=schemas.UserOutWithCurrentCourse)
 async def read_user_me(current_user: Annotated[schemas.User, Depends(get_current_user)], db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to read user")
-    return current_user
+    user_out = schemas.UserOutWithCurrentCourse.model_validate(current_user, from_attributes=True)
+    if current_user.course_id:
+        course = crud.get_course(db, course_id=current_user.course_id)
+        if course:
+            user_out.current_course = course
+    return user_out
 
 @app.get("/users/stats", tags=["User", "Stats"], response_model=schemas.UsersStats)
-async def read_users_stats(current_user: Annotated[schemas.User, Depends(get_current_user)], db: Session = Depends(get_db)):
+async def read_users_stats(current_user: Annotated[schemas.User, Depends(get_current_user)], course_id: Optional[int] = None, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to delete user")
 
@@ -875,12 +888,16 @@ async def read_users_stats(current_user: Annotated[schemas.User, Depends(get_cur
             school_name = current_user.school
         else:
             school_name = "public"
-        stats = crud.get_users_stats_by_school(db, school=school_name)
+        stats = crud.get_users_stats_by_school(db, school=school_name, course_id=course_id)
 
     return stats
 
 @app.get("/users/", tags=["User"], response_model=list[schemas.User])
-async def read_users(current_user: Annotated[schemas.User, Depends(get_current_user)], skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+async def read_users(
+    current_user: Annotated[schemas.User, Depends(get_current_user)], 
+    skip: int = 0, limit: int = 100, course_id: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to delete user")
 
@@ -894,7 +911,7 @@ async def read_users(current_user: Annotated[schemas.User, Depends(get_current_u
             school_name = current_user.school
         else:
             school_name = "public"
-        users = crud.get_users_by_school(db, school=school_name, skip=skip, limit=limit)
+        users = crud.get_users_by_school(db, school=school_name, course_id=course_id, skip=skip, limit=limit)
 
     return users
 
@@ -1376,7 +1393,7 @@ async def create_leaderboard(
         crud.add_leaderboard_school(
             db=db, 
             leaderboard=schemas.LeaderboardSchoolUpdate(
-                id=result.id, 
+                leaderboard_id=result.id, 
                 school=current_user.school,
                 course_id=db_course.id if db_course else None
                 )
@@ -1384,7 +1401,7 @@ async def create_leaderboard(
     else:
         crud.add_leaderboard_school(
             db=db, 
-            leaderboard=schemas.LeaderboardSchoolUpdate(id=result.id, school=["public"])
+            leaderboard=schemas.LeaderboardSchoolUpdate(leaderboard_id=result.id, school=["public"])
         )
 
     crud.create_task(
@@ -1749,6 +1766,25 @@ async def read_schools(current_user: Annotated[schemas.User, Depends(get_current
     )
     return schools
 
+@app.get("/courses/", tags=["Course"], response_model=list[schemas.Course])
+async def read_courses(current_user: Annotated[schemas.User, Depends(get_current_user)], db: Session = Depends(get_db)):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to view schools")
+    
+    courses = crud.get_courses_by_user(db, user_id=current_user.id)
+
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="view_courses",
+            related_id=current_user.id,
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
+        )
+    )
+    return [course.course for course in courses]
+
 @app.put("/leaderboards/{leaderboard_id}", tags=["Leaderboard"], response_model=schemas.LeaderboardOut)
 async def update_leaderboard(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
@@ -1803,7 +1839,9 @@ async def update_leaderboard_school(
             received_at=datetime.datetime.now(tz=JST),
         )
     )
-    schools = crud.add_leaderboard_school(db=db, leaderboard=leaderboard)
+    crud.add_leaderboard_school(db=db, leaderboard=leaderboard)
+    schools = crud.get_school_leaderboard(db, leaderboard_id=leaderboard_id)
+
     invalidate_leaderboard_cache()
     return schools
 
@@ -1832,7 +1870,8 @@ async def delete_leaderboard_school(
             received_at=datetime.datetime.now(tz=JST),
         )
     )
-    schools = crud.remove_leaderboard_school(db=db, leaderboard=leaderboard)
+    crud.remove_leaderboard_school(db=db, leaderboard=leaderboard)
+    schools = crud.get_school_leaderboard(db, leaderboard_id=leaderboard_id)
     invalidate_leaderboard_cache()
     return schools
 
