@@ -1794,7 +1794,7 @@ async def update_leaderboard(
 ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to update leaderboard")
-    if not current_user.user_type == "instructor" or not current_user.is_admin:
+    if not current_user.user_type == "instructor" and not current_user.is_admin:
         raise HTTPException(status_code=401, detail="You are not an instructor")
     db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
     if db_leaderboard is None:
