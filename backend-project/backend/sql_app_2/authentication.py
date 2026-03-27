@@ -44,7 +44,7 @@ def authenticate_user(
 
 def authenticate_user_2(
         db,
-        lti_user_id: int,
+        lti_user_id: str,
         school: str
 ):
     user = crud.get_user_by_lti(db, lti_user_id, school)
