@@ -18,7 +18,7 @@ def get_user_by_email(db: Session, email: str):
 def get_user_by_username(db: Session, username: str):
     return db.query(models.User).filter(models.User.username == username).first()
 
-def get_user_by_lti(db: Session, lti_user_id: int, school: str):
+def get_user_by_lti(db: Session, lti_user_id: str, school: str):
     return db.query(models.User).filter(models.User.lti_user_id == lti_user_id).filter(models.User.school == school).first()
 
 def get_users_stats(db: Session):
