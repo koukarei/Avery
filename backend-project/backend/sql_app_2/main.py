@@ -805,7 +805,7 @@ async def create_user_lti(user: schemas.UserLti, db: Session = Depends(get_db)):
     )
     return new_user
 
-@app.delete("/users/{user_id}", tags=["User"], response_model=schemas.UserBase)
+@app.delete("/users/{user_id}", tags=["User"])
 async def delete_user(current_user: Annotated[schemas.User, Depends(get_current_user)], user_id: int, db: Session = Depends(get_db), ):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to delete user")
@@ -816,7 +816,7 @@ async def delete_user(current_user: Annotated[schemas.User, Depends(get_current_
         raise HTTPException(status_code=404, detail="User not found")
     deleted_user = crud.delete_user(db=db, user_id=user_id)
     invalidate_user_cache(db_user.username)
-    return deleted_user
+    return "Deleted"
 
 @app.put("/users/{user_id}/password", tags=["User"], response_model=schemas.User)
 async def update_user_password(
