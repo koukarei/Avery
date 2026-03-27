@@ -1750,10 +1750,11 @@ async def read_leaderboard(current_user: Annotated[schemas.User, Depends(get_cur
 async def read_schools(current_user: Annotated[schemas.User, Depends(get_current_user)], leaderboard_id: int, db: Session = Depends(get_db)):
     if not current_user:
         raise HTTPException(status_code=401, detail="Login to view schools")
-    if not current_user.is_admin:
-        raise HTTPException(status_code=401, detail="You are not an admin")
-    schools = crud.get_school_leaderboard(db, leaderboard_id=leaderboard_id)
-
+    if current_user.is_admin:
+        schools = crud.get_school_leaderboard(db, leaderboard_id=leaderboard_id)
+    else:
+        schools = crud.get_course_leaderboard(db, leaderboard_id=leaderboard_id, school=current_user.school)
+    
     crud.create_user_action(
         db=db,
         user_action=schemas.UserActionBase(

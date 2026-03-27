@@ -325,6 +325,13 @@ def get_leaderboard(db: Session, leaderboard_id: int):
 def get_school_leaderboard(db: Session, leaderboard_id: int):
     return db.query(models.School_Leaderboard).filter(models.School_Leaderboard.leaderboard_id == leaderboard_id).all()
 
+def get_course_leaderboard(
+        db: Session, leaderboard_id: int, school: str
+):
+    return db.query(models.School_Leaderboard).\
+        filter(models.School_Leaderboard.leaderboard_id == leaderboard_id).\
+            filter(models.School_Leaderboard.school == school).all()
+
 def create_leaderboard(
         db: Session,
         leaderboard: schemas.LeaderboardCreate,
