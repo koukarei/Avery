@@ -12,7 +12,7 @@ class User(Base):
 
     id = Column(Integer, primary_key=True)
     lti = Column(Boolean, default=False)
-    lti_user_id = Column(Integer, nullable=True)
+    lti_user_id = Column(String(50), nullable=True)
     lti_username = Column(String(100), nullable=True)
     school = Column(String(100), nullable=True)
     email = Column(String(255), index=True)

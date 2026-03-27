@@ -145,7 +145,7 @@ class UserRandomCreateIn(BaseModel):
     password: str
 
 class UserLti(BaseModel):
-    user_id: int
+    user_id: str
     username: str
     display_name: str
     roles: str
