@@ -486,7 +486,7 @@ async def lti_login(request: Request):
     # Extracting additional fields from the form data
     form_data = await request.form()
 
-    user_id = str(form_data.get('user_id'))
+    user_id = form_data.get('user_id')
     oauth_consumer_key = form_data.get('oauth_consumer_key')
 
     if user_id:

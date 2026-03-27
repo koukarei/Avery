@@ -145,12 +145,19 @@ class UserRandomCreateIn(BaseModel):
     password: str
 
 class UserLti(BaseModel):
-    user_id: str
+    user_id: str | int
     username: str
     display_name: str
     roles: str
     email: str
     school: str
+
+    @field_validator("user_id", mode="before")
+    @classmethod
+    def normalize_user_id(cls, value):
+        if value is None:
+            raise ValueError("user_id is required")
+        return str(value)
 
 class UserProfileBase(BaseModel):
     display_name: str
