@@ -535,6 +535,8 @@ async def lti_login(request: Request):
 
         if "instructor" in form_data.get('roles', '').lower():
             role = "instructor"
+        elif "teacher" in form_data.get('roles', '').lower():
+            role = "instructor"
         elif "learner" in form_data.get('roles', '').lower():
             role = "student"
         else:
