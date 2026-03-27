@@ -544,7 +544,7 @@ async def lti_login(request: Request):
 
         username = form_data.get('ext_user_username')
         user_login = schemas.UserLti(
-            user_id=form_data.get('user_id'),
+            user_id=user_id,
             username=username,
             display_name=form_data.get('lis_person_name_full', 'Unknown User'),
             roles=role,
