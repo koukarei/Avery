@@ -498,6 +498,7 @@ class LeaderboardOut(LeaderboardBase):
 
 class SchoolOut(BaseModel):
     school: str
+    course_id: int
 
 class DescriptionBase(BaseModel):
     content: str
