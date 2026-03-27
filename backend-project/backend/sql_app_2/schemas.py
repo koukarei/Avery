@@ -59,9 +59,9 @@ class Chat(ChatBase):
         orm_mode = True
 
 class CourseBase(BaseModel):
-    course_id: str
-    course_label: str
-    course_title: str
+    course_id: Optional[str]=None
+    course_label: Optional[str]=None
+    course_title: Optional[str]=None
 
 class Course(CourseBase):
     id: int
