@@ -491,20 +491,6 @@ async def lti_login(request: Request):
 
     if user_id:
         login_method = "lti"
-        context_id = form_data.get('context_id')
-        context_label = form_data.get('context_label')
-        context_title = form_data.get('context_title')
-
-        db_course = crud.get_course(db=next(get_db()), course_id=context_id)
-        if not db_course:
-            # Create the course if it doesn't exist
-            course_data = schemas.CourseBase(
-                course_id=context_id,
-                course_label=context_label,
-                course_title=context_title
-            )
-            db_course = crud.create_course(db=next(get_db()), course=course_data)
-
         school = "School not provided"
         program = form_data.get('custom_program', 'none')
         if oauth_consumer_key == "saikyo_consumer_key":
@@ -532,6 +518,22 @@ async def lti_login(request: Request):
         elif oauth_consumer_key == "ishibe_consumer_key":
             school = "ishibe"
             program = "student_2_sem"
+
+        context_id = form_data.get('context_id')
+        context_label = form_data.get('context_label')
+        context_title = form_data.get('context_title')
+
+        db_course = crud.get_course(db=next(get_db()), course_id=context_id)
+        if not db_course:
+            # Create the course if it doesn't exist
+            course_data = schemas.CourseBase(
+                course_id=context_id,
+                course_label=context_label,
+                course_title=context_title,
+                school=school
+            )
+            db_course = crud.create_course(db=next(get_db()), course=course_data)
+
 
         if "instructor" in form_data.get('roles', '').lower():
             role = "instructor"
@@ -1814,11 +1816,74 @@ async def update_leaderboard(
         )
     )
     updated_leaderboard = crud.update_leaderboard(db=db, leaderboard=leaderboard)
+
+    # update courses
+    
     invalidate_leaderboard_cache()
     return updated_leaderboard
 
-@app.put("/leaderboards/{leaderboard_id}/school", tags=["Leaderboard"], response_model=list[schemas.SchoolOut])
+@app.post("/leaderboards/{leaderboard_id}/school", tags=["Leaderboard"], response_model=list[schemas.SchoolOut])
 async def update_leaderboard_school(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    leaderboard_id: int,
+    leaderboard: schemas.LeaderboardCourseUpdate,
+    db: Session = Depends(get_db),
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to update leaderboard")
+    if not current_user.user_type == "instructor":
+        raise HTTPException(status_code=401, detail="You are not an instructor")
+    
+    db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
+    if db_leaderboard is None:
+        raise HTTPException(status_code=404, detail="Leaderboard not found")
+
+    crud.create_user_action(
+        db=db,
+        user_action=schemas.UserActionBase(
+            user_id=current_user.id,
+            action="update_leaderboard_school",
+            related_id=leaderboard_id,
+            sent_at=datetime.datetime.now(tz=JST),
+            received_at=datetime.datetime.now(tz=JST),
+        )
+    )
+    course_users = crud.get_courses_by_user(db, user_id=current_user.id)
+
+    add_courses = [
+        course_user.course for course_user in course_users if course_user.course.id in leaderboard.course_ids
+    ]
+
+    for course in add_courses:
+        crud.add_leaderboard_school(
+            db=db, leaderboard=schemas.LeaderboardSchoolUpdate(leaderboard_id=leaderboard_id, school=course.school, course_id=course.id)
+        )
+
+    remove_courses = [
+        course_user.course for course_user in course_users if course_user.course.id not in leaderboard.course_ids
+    ]
+    for course in remove_courses:
+        crud.remove_leaderboard_school(
+            db=db, leaderboard=schemas.LeaderboardSchoolUpdate(leaderboard_id=leaderboard_id, school=course.school, course_id=course.id)
+        )
+    
+    if current_user.is_admin:
+        schools = crud.get_school_leaderboard(
+            db, leaderboard_id=leaderboard_id
+        )
+    elif current_user.school:
+        schools = crud.get_course_leaderboard(
+            db, leaderboard_id=leaderboard_id,
+            school=current_user.school
+        )
+    else:
+        schools = []
+
+    invalidate_leaderboard_cache()
+    return schools
+
+@app.put("/leaderboards/{leaderboard_id}/school", tags=["Leaderboard"], response_model=list[schemas.SchoolOut])
+async def add_leaderboard_school(
     current_user: Annotated[schemas.User, Depends(get_current_user)],
     leaderboard_id: int,
     leaderboard: schemas.LeaderboardSchoolUpdate,
@@ -1836,7 +1901,7 @@ async def update_leaderboard_school(
         db=db,
         user_action=schemas.UserActionBase(
             user_id=current_user.id,
-            action="update_leaderboard_school",
+            action="add_leaderboard_school",
             related_id=leaderboard_id,
             sent_at=datetime.datetime.now(tz=JST),
             received_at=datetime.datetime.now(tz=JST),

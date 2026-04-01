@@ -62,6 +62,7 @@ class CourseBase(BaseModel):
     course_id: Optional[str]=None
     course_label: Optional[str]=None
     course_title: Optional[str]=None
+    school: Optional[str]=None
 
 class Course(CourseBase):
     id: int
@@ -556,6 +557,10 @@ class LeaderboardSchoolUpdate(BaseModel):
     leaderboard_id: int
     school: str
     course_id: Optional[int]=None
+
+class LeaderboardCourseUpdate(BaseModel):
+    leaderboard_id: int
+    course_ids: List[int] = []
 
 class LeaderboardUpdateInternal(LeaderboardUpdate):
     response_id: Optional[str]=None
