@@ -2504,6 +2504,16 @@ async def create_user_action(
 
     return {"detail": "User action created"}
 
+@app.post("/writing_traces/", tags=["Writing Trace"], response_model=schemas.WritingTrace, status_code=201)
+async def create_writing_trace(
+    current_user: Annotated[schemas.User, Depends(get_current_user)],
+    writing_trace: schemas.WritingTraceBase,
+    db: Session = Depends(get_db)
+):
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Login to create writing trace")
+    return crud.create_writing_trace(db=db, writing_trace=writing_trace, user_id=current_user.id)
+
 @app.get("/vocabulary/{vocabulary}", tags=["Vocabulary"], response_model=list[schemas.Vocabulary])
 async def read_vocabulary(current_user: Annotated[schemas.User, Depends(get_current_user)], vocabulary: str, pos: str=None, db: Session = Depends(get_db)):
     if not current_user:

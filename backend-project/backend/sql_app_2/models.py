@@ -369,6 +369,15 @@ class User_Action(Base):
     received_at = Column(DateTime, default=datetime.datetime.now())
     responded_at = Column(DateTime, nullable=True)
 
+class WritingTrace(Base):
+    __tablename__ = "writing_traces"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    round_id = Column(Integer, ForeignKey("rounds.id"))
+    generation_id = Column(Integer, ForeignKey("generations.id"))
+    sentence = Column(MEDIUMTEXT, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.now())
 
 # Analytics related models
 # These models are used to store items for vite app

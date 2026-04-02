@@ -107,3 +107,11 @@ async def test_generate_interpretation(
         content=imgdata,
         media_type="image/png"  # Adjust this based on your image type (jpeg, png, etc.)
     )
+
+@router.get("/writing_traces/{generation_id}", tags=["Writing Trace"], response_model=list[schemas.WritingTrace])
+async def get_writing_traces(
+    generation_id: int,
+    db: Session = Depends(get_db)
+):
+    traces = crud.get_writing_traces(db, generation_id=generation_id)
+    return traces

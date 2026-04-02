@@ -70,6 +70,18 @@ class Course(CourseBase):
     class Config:
         orm_mode = True
 
+class WritingTraceBase(BaseModel):
+    round_id: int
+    generation_id: int
+    sentence: Optional[str]=None
+    created_at: datetime.datetime
+
+class WritingTrace(WritingTraceBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
 class ProgramBase(BaseModel):
     name: str
     description: str

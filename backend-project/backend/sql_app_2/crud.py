@@ -1523,6 +1523,19 @@ def read_user_action(
     else:
         return db.query(models.User_Action).offset(skip).limit(limit).all()
 
+def create_writing_trace(db: Session, writing_trace: schemas.WritingTraceBase, user_id: int):
+    db_writing_trace = models.WritingTrace(
+        user_id=user_id,
+        **writing_trace.model_dump()
+    )
+    db.add(db_writing_trace)
+    db.commit()
+    db.refresh(db_writing_trace)
+    return db_writing_trace
+
+def get_writing_traces(db: Session, generation_id: int):
+    return db.query(models.WritingTrace).filter(models.WritingTrace.generation_id == generation_id).all()
+
 # CRUD operations for analytics
 def create_word_cloud(
         db: Session,
