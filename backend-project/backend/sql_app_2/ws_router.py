@@ -821,7 +821,7 @@ async def round_websocket(
 
                     if "AWE" in db_program.feedback:
                         evaluation = await asyncio.to_thread(
-                            chatbot_obj.get_result,
+                            chatbot_obj.get_short_result,
                             db_generation.sentence,
                             db_generation.correct_sentence,
                             db_round.leaderboard.original_image.image,
