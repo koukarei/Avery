@@ -567,8 +567,8 @@ async def round_websocket(
                         logger1.error(f"Error in get_user_answer: {str(e)}")
                         raise HTTPException(status_code=400, detail=str(e))
 
-
-                if status == 0:
+                # Allow Romaji temporary
+                if status == 0 or status == 1:
                     crud.update_generation3(
                         db=db,
                         generation=schemas.GenerationComplete(
