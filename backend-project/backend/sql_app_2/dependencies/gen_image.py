@@ -101,7 +101,7 @@ def gen_image_gemini(prompt):
 def generate_interpretion(
     sentence, 
     style="in the style of Japanese Anime", 
-    model="gemini"
+    model="gpt-image-1.5"
 ) -> str | None:
     
     # This function generates an image based on the input sentence and style using the specified model.

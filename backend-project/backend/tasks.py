@@ -250,7 +250,7 @@ def generate_interpretation2(
         try:
             image = gen_image2.generate_interpretion(
                 sentence=sentence, 
-                model="gemini",
+                model="gpt-image-1.5",
                 style=db_leaderboard.scene.prompt
             )
             t.stop_timer()
