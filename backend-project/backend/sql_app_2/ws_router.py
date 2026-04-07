@@ -842,23 +842,9 @@ async def round_websocket(
                             if recommended_vocabs:
                                 recommended_vocab = "\n\n**おすすめの単語**\n" + ", ".join(recommended_vocabs)
 
-                        evaluation_message = """**文法**
-{grammar_feedback}
-**スペル**
-{spelling_feedback}
-**スタイル**
-{style_feedback}
-**内容**
-{content_feedback}
-
-**総合評価**
-{overall_feedback}{recommended_vocab}""". \
+                        evaluation_message = """{feedback}{recommended_vocab}""". \
                         format(
-                            grammar_feedback=evaluation['grammar_evaluation'],
-                            spelling_feedback=evaluation['spelling_evaluation'],
-                            style_feedback=evaluation['style_evaluation'],
-                            content_feedback=evaluation['content_evaluation'],
-                            overall_feedback=evaluation['overall_evaluation'],
+                            feedback=evaluation['feedback'],
                             recommended_vocab=recommended_vocab
                         )
 
