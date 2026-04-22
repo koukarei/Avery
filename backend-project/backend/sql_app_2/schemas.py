@@ -518,7 +518,7 @@ class LeaderboardOut(LeaderboardBase):
 
 class SchoolOut(BaseModel):
     school: str
-    course_id: int
+    course_id: Optional[int]=None
 
 class DescriptionBase(BaseModel):
     content: str
