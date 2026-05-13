@@ -86,7 +86,7 @@ async def generate_descriptions(
 async def test_generate_interpretation(
     sentence: str = Form(...),
     style: str = Form("in the style of Japanese Anime"),
-    model: Literal['gemini', 'gpt-5','dall-e-3','gpt-image-1.5'] = Form('gemini'),
+    model: Literal['gemini', 'gpt-5','dall-e-3','gpt-image-1.5', 'gpt-image-2'] = Form('gemini'),
 )->responses.Response:
     if not sentence:
         raise HTTPException(status_code=400, detail="Sentence is required")
