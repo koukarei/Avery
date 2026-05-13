@@ -7,7 +7,7 @@ import util
 from . import crud, schemas
 from .database import SessionLocal2, engine2
 
-from .dependencies import wordcloud, sentence
+from .dependencies import wordcloud, sentence, openai_chatbot
 from .dependencies.gen_image import generate_interpretion
 from collections import Counter
 
@@ -30,7 +30,7 @@ router = APIRouter(
     prefix="/Admin",
 )
 
-@router.post("/test_frequency", tags=["Frequency"])
+@router.post("/test_frequency", tags=["Admin", "Frequency"])
 async def test_frequency(
     text: str = Form(...),
     lang: Literal['en', 'ja'] = Form('en'),
@@ -55,7 +55,7 @@ async def test_frequency(
         "frequency": frequency
     }
 
-@router.get("/generate_descriptions", tags=["Description"])
+@router.get("/generate_descriptions", tags=["Admin", "Description"])
 async def generate_descriptions(
     leaderboard_id: int,
     db: Session = Depends(get_db),
@@ -82,7 +82,7 @@ async def generate_descriptions(
     )
     return responses.JSONResponse(content={"result": t})
 
-@router.post("/generate_interpretation", tags=["Interpretation"])
+@router.post("/generate_interpretation", tags=["Admin", "Interpretation"])
 async def test_generate_interpretation(
     sentence: str = Form(...),
     style: str = Form("in the style of Japanese Anime"),
@@ -108,7 +108,37 @@ async def test_generate_interpretation(
         media_type="image/png"  # Adjust this based on your image type (jpeg, png, etc.)
     )
 
-@router.get("/writing_traces/{generation_id}", tags=["Writing Trace"], response_model=list[schemas.WritingTrace])
+@router.post("/generate_evaluation", tags=["Admin", "Evaluation"])
+async def test_generate_evaluation(
+    sentence: str = Form(...),
+    leaderboard_id: int = Form(...),
+    db: Session = Depends(get_db)
+):
+    cb = openai_chatbot.Hint_Chatbot(
+        model_name="gpt-4o-mini",
+    )
+    db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
+    if not db_leaderboard:
+        raise HTTPException(status_code=404, detail="Leaderboard not found")
+    db_original_image = crud.get_original_image(db, image_id=db_leaderboard.original_image_id)
+
+    evaluation = cb.get_short_result(
+        sentence=sentence,
+        correct_sentence=sentence,
+        base64_image=db_original_image.image,
+        grammar_errors="",
+        spelling_errors="",
+        descriptions=[]
+    )
+
+    if evaluation:
+        evaluation_message = """{feedback}""". \
+        format(
+            feedback=evaluation['feedback']
+        )
+    return responses.JSONResponse(content={"evaluation": evaluation_message})
+
+@router.get("/writing_traces/{generation_id}", tags=["Admin", "Writing Trace"], response_model=list[schemas.WritingTrace])
 async def get_writing_traces(
     generation_id: int,
     db: Session = Depends(get_db)
