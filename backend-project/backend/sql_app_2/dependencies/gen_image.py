@@ -46,6 +46,23 @@ def gen_image_gpt_image_1_5(prompt):
             continue
     return result.data[0].b64_json
 
+def gen_image_gpt_image_2(prompt):
+    client = OpenAI()
+    while True:
+        try:
+            result = client.images.generate(
+                model="gpt-image-2",
+                prompt=prompt,
+                quality="low"
+            )
+
+            if result and result.data and result.data[0].b64_json:
+                break
+        except Exception as e:
+            print(f"Error: {e}")
+            continue
+    return result.data[0].b64_json
+
 def gen_image_gpt_5(prompt):
     client = OpenAI()
     while True:
@@ -101,11 +118,11 @@ def gen_image_gemini(prompt):
 def generate_interpretion(
     sentence, 
     style="in the style of Japanese Anime", 
-    model="gpt-image-1.5"
+    model="gpt-image-2"
 ) -> str | None:
     
     # This function generates an image based on the input sentence and style using the specified model.
-    # model: "dall-e-3", "gpt-image-1.5","gpt-5", "gemini"
+    # model: "dall-e-3", "gpt-image-2", "gpt-image-1.5","gpt-5", "gemini"
 
     if model == "dall-e-3":
         prompt="""
@@ -121,6 +138,10 @@ def generate_interpretion(
     elif model == "gpt-image-1.5":
         prompt = "Hi, please create an image {style} to show that {passage}".format(passage=sentence, style=style)
         base64_image = gen_image_gpt_image_1_5(prompt)
+        return base64_image
+    elif model == "gpt-image-2":
+        prompt = "Hi, please create an image {style} to show that {passage}".format(passage=sentence, style=style)
+        base64_image = gen_image_gpt_image_2(prompt)
         return base64_image
     elif model == "gpt-5":
         prompt = "Generate an image {style} to show that {passage}".format(passage=sentence, style=style)
