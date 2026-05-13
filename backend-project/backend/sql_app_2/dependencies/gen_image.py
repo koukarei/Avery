@@ -36,7 +36,8 @@ def gen_image_gpt_image_1_5(prompt):
         try:
             result = client.images.generate(
                 model="gpt-image-1.5",
-                prompt=prompt
+                prompt=prompt,
+                size='1024x1024'
             )
 
             if result and result.data and result.data[0].b64_json:
@@ -53,7 +54,8 @@ def gen_image_gpt_image_2(prompt):
             result = client.images.generate(
                 model="gpt-image-2",
                 prompt=prompt,
-                quality="low"
+                quality="low",
+                size='1024x1024'
             )
 
             if result and result.data and result.data[0].b64_json:
