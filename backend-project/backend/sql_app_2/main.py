@@ -577,7 +577,7 @@ async def lti_login(request: Request):
             token = await login_for_access_token_lti(user=user_login, course_id=db_course.id if db_course else None, db=next(get_db()))
             db_program = crud.get_program_by_name(next(get_db()), program_name=program)
             if db_program:
-                db_user = crud.get_user_by_lti(
+                user = crud.get_user_by_lti(
                     db=next(get_db()),
                     lti_user_id=user_login.user_id,
                     school=school,
@@ -585,7 +585,7 @@ async def lti_login(request: Request):
                 crud.add_program_user(
                     db=next(get_db()),
                     program_id=db_program.id,
-                    user_id=db_user.id,
+                    user_id=user.id,
                 )
 
         # add course user association
