@@ -744,8 +744,10 @@ def delete_program_user(db: Session, program_id: int, user_id: int):
         db.commit()
     return db_program_user
 
-def get_course(db: Session, course_id: int):
-    return db.query(models.Course).filter(models.Course.id == course_id).first()
+def get_course(db: Session, school: str, context_id: str):
+    return db.query(models.Course).\
+        filter(models.Course.school == school).\
+            filter(models.Course.course_id == context_id).first()
 
 def create_course(db: Session, course: schemas.CourseBase):
     db_course = models.Course(**course.model_dump())

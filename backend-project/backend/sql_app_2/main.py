@@ -523,7 +523,10 @@ async def lti_login(request: Request):
         context_label = form_data.get('context_label')
         context_title = form_data.get('context_title')
 
-        db_course = crud.get_course(db=next(get_db()), course_id=context_id)
+        db_course = crud.get_course(
+            db=next(get_db()), school=school, context_id=context_id
+        )
+
         if not db_course:
             # Create the course if it doesn't exist
             course_data = schemas.CourseBase(
@@ -532,6 +535,7 @@ async def lti_login(request: Request):
                 course_title=context_title,
                 school=school
             )
+
             db_course = crud.create_course(db=next(get_db()), course=course_data)
 
 
@@ -562,7 +566,9 @@ async def lti_login(request: Request):
 
         if user:
             try:
-                token = await login_for_access_token_lti(user=user_login, course_id=db_course.id if db_course else None, db=next(get_db()))
+                token = await login_for_access_token_lti(
+                    user=user_login, course_id=db_course.id if db_course else None, db=next(get_db())
+                )
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Failed to login: {str(e)}")
         else:
