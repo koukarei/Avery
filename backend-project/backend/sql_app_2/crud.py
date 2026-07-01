@@ -326,11 +326,12 @@ def get_school_leaderboard(db: Session, leaderboard_id: int):
     return db.query(models.School_Leaderboard).filter(models.School_Leaderboard.leaderboard_id == leaderboard_id).all()
 
 def get_course_leaderboard(
-        db: Session, leaderboard_id: int, school: str
+        db: Session, leaderboard_id: int, school: str, course_id: int
 ):
     return db.query(models.School_Leaderboard).\
         filter(models.School_Leaderboard.leaderboard_id == leaderboard_id).\
-            filter(models.School_Leaderboard.school == school).all()
+            filter(models.School_Leaderboard.course_id == course_id).\
+                filter(models.School_Leaderboard.school == school).all()
 
 def create_leaderboard(
         db: Session,
@@ -743,6 +744,10 @@ def delete_program_user(db: Session, program_id: int, user_id: int):
         db.delete(db_program_user)
         db.commit()
     return db_program_user
+
+def get_course_by_id(db: Session, course_id: int):
+    return db.query(models.Course).\
+        filter(models.Course.id == course_id).first()
 
 def get_course(db: Session, school: str, context_id: str):
     return db.query(models.Course).\
