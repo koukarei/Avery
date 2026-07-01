@@ -878,7 +878,7 @@ async def read_user_me(current_user: Annotated[schemas.User, Depends(get_current
         raise HTTPException(status_code=401, detail="Login to read user")
     user_out = schemas.UserOutWithCurrentCourse.model_validate(current_user, from_attributes=True)
     if current_user.course_id:
-        course = crud.get_course(db, course_id=current_user.course_id)
+        course = crud.get_course_by_id(db, course_id=current_user.course_id)
         if course:
             user_out.current_course = course
     return user_out
@@ -1395,7 +1395,7 @@ async def create_leaderboard(
         model_name="gpt-4o-mini"
     )
     if current_user.school:
-        db_course = crud.get_course(
+        db_course = crud.get_course_by_id(
             db=db,
             course_id=current_user.course_id
         )
@@ -1763,7 +1763,7 @@ async def read_schools(current_user: Annotated[schemas.User, Depends(get_current
     if current_user.is_admin:
         schools = crud.get_school_leaderboard(db, leaderboard_id=leaderboard_id)
     else:
-        schools = crud.get_course_leaderboard(db, leaderboard_id=leaderboard_id, school=current_user.school)
+        schools = crud.get_course_leaderboard(db, leaderboard_id=leaderboard_id, school=current_user.school, course_id=current_user.course_id)
     
     crud.create_user_action(
         db=db,
@@ -1880,7 +1880,8 @@ async def update_leaderboard_school(
     elif current_user.school:
         schools = crud.get_course_leaderboard(
             db, leaderboard_id=leaderboard_id,
-            school=current_user.school
+            school=current_user.school,
+            course_id=current_user.course_id
         )
     else:
         schools = []
