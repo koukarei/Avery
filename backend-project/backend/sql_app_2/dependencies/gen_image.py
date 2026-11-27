@@ -13,7 +13,10 @@ def save_image(url, filename):
     urllib.request.urlretrieve(url, filename)
 
 def gen_image(sentence,size="1024x1024",quality="standard",n=1):
-    client = OpenAI()
+    client = OpenAI(
+        base_url=os.getenv("AI_BASE_URL"),
+        api_key=os.getenv("OPENAI_API_KEY")
+    )
 
     while True:
         try:
@@ -31,11 +34,14 @@ def gen_image(sentence,size="1024x1024",quality="standard",n=1):
     return response.data[0].url
 
 def gen_image_gpt_image_1_5(prompt):
-    client = OpenAI()
+    client = OpenAI(
+        base_url=os.getenv("AI_BASE_URL"),
+        api_key=os.getenv("OPENAI_API_KEY")
+    )
     while True:
         try:
             result = client.images.generate(
-                model="gpt-image-1.5",
+                model="openai/gpt-image-1.5",
                 prompt=prompt,
                 size='1024x1024'
             )
@@ -48,11 +54,14 @@ def gen_image_gpt_image_1_5(prompt):
     return result.data[0].b64_json
 
 def gen_image_gpt_image_2(prompt):
-    client = OpenAI()
+    client = OpenAI(
+        base_url=os.getenv("AI_BASE_URL"),
+        api_key=os.getenv("OPENAI_API_KEY")
+    )
     while True:
         try:
             result = client.images.generate(
-                model="gpt-image-2",
+                model="openai/gpt-image-2",
                 prompt=prompt,
                 quality="low",
                 size='1024x1024'
@@ -66,11 +75,14 @@ def gen_image_gpt_image_2(prompt):
     return result.data[0].b64_json
 
 def gen_image_gpt_5(prompt):
-    client = OpenAI()
+    client = OpenAI(
+        base_url=os.getenv("AI_BASE_URL"),
+        api_key=os.getenv("OPENAI_API_KEY")
+    )
     while True:
         try:
             response = client.responses.create(
-                model="gpt-5",
+                model="openai/gpt-5",
                 input=prompt,
                 tools=[{"type": "image_generation"}],
             )
@@ -89,7 +101,10 @@ def gen_image_gpt_5(prompt):
     return image_data[0]
        
 def gen_image_gemini(prompt):
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    client = genai.Client(
+        base_url=os.getenv("AI_BASE_URL")
+        api_key=os.environ["GEMINI_API_KEY"]
+    )
 
     while True:
         try:
@@ -120,11 +135,11 @@ def gen_image_gemini(prompt):
 def generate_interpretion(
     sentence, 
     style="in the style of Japanese Anime", 
-    model="gpt-image-2"
+    model="openai/gpt-image-2"
 ) -> str | None:
     
     # This function generates an image based on the input sentence and style using the specified model.
-    # model: "dall-e-3", "gpt-image-2", "gpt-image-1.5","gpt-5", "gemini"
+    # model: "dall-e-3", "openai/gpt-image-2", "openai/gpt-image-1.5","openai/gpt-5", "gemini"
 
     if model == "dall-e-3":
         prompt="""
@@ -137,15 +152,15 @@ def generate_interpretion(
         b_interpreted_image = BytesIO(requests.get(url).content)
         image = encode_image(image_file=b_interpreted_image)
         return image
-    elif model == "gpt-image-1.5":
+    elif model == "openai/gpt-image-1.5":
         prompt = "Hi, please create an image {style} to show that {passage}".format(passage=sentence, style=style)
         base64_image = gen_image_gpt_image_1_5(prompt)
         return base64_image
-    elif model == "gpt-image-2":
+    elif model == "openai/gpt-image-2":
         prompt = "Hi, please create an image {style} to show that {passage}".format(passage=sentence, style=style)
         base64_image = gen_image_gpt_image_2(prompt)
         return base64_image
-    elif model == "gpt-5":
+    elif model == "openai/gpt-5":
         prompt = "Generate an image {style} to show that {passage}".format(passage=sentence, style=style)
         base64_image = gen_image_gpt_5(prompt)
         return base64_image

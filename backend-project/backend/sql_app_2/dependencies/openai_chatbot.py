@@ -7,6 +7,7 @@ import base64
 import PIL.Image
 from PIL.PngImagePlugin import PngImageFile
 from PIL.JpegImagePlugin import JpegImageFile
+from os import getenv
 
 def convert_image(img):
     if img:
@@ -18,8 +19,11 @@ def convert_image(img):
     return None 
 
 class Hint_Chatbot:
-    def __init__(self, model_name="gpt-4o", vocabularies=None, first_res_id=None, prev_res_id=None, prev_res_ids=[]):
-        self.client=OpenAI()
+    def __init__(self, model_name="openai/gpt-4o", vocabularies=None, first_res_id=None, prev_res_id=None, prev_res_ids=[]):
+        self.client=OpenAI(
+            base_url=getenv("AI_BASE_URL"),
+            api_key=getenv("OPENAI_API_KEY")
+        )
         self.first_res_id=first_res_id
         self.prev_res_ids = prev_res_ids
         self.prev_res_id=prev_res_id
