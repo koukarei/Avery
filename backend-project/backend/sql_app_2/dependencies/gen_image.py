@@ -14,8 +14,8 @@ def save_image(url, filename):
 
 def gen_image(sentence,size="1024x1024",quality="standard",n=1):
     client = OpenAI(
-        base_url=os.getenv("AI_BASE_URL"),
-        api_key=os.getenv("OPENAI_API_KEY")
+        base_url=os.environ["AI_BASE_URL"],
+        api_key=os.environ["OPENAI_API_KEY"]
     )
 
     while True:
@@ -35,8 +35,8 @@ def gen_image(sentence,size="1024x1024",quality="standard",n=1):
 
 def gen_image_gpt_image_1_5(prompt):
     client = OpenAI(
-        base_url=os.getenv("AI_BASE_URL"),
-        api_key=os.getenv("OPENAI_API_KEY")
+        base_url=os.environ["AI_BASE_URL"],
+        api_key=os.environ["OPENAI_API_KEY"]
     )
     while True:
         try:
@@ -55,8 +55,8 @@ def gen_image_gpt_image_1_5(prompt):
 
 def gen_image_gpt_image_2(prompt):
     client = OpenAI(
-        base_url=os.getenv("AI_BASE_URL"),
-        api_key=os.getenv("OPENAI_API_KEY")
+        base_url=os.environ["AI_BASE_URL"],
+        api_key=os.environ["OPENAI_API_KEY"]
     )
     while True:
         try:
@@ -76,8 +76,8 @@ def gen_image_gpt_image_2(prompt):
 
 def gen_image_gpt_5(prompt):
     client = OpenAI(
-        base_url=os.getenv("AI_BASE_URL"),
-        api_key=os.getenv("OPENAI_API_KEY")
+        base_url=os.environ["AI_BASE_URL"],
+        api_key=os.environ["OPENAI_API_KEY"]
     )
     while True:
         try:
@@ -102,7 +102,7 @@ def gen_image_gpt_5(prompt):
        
 def gen_image_gemini(prompt):
     client = genai.Client(
-        base_url=os.getenv("AI_BASE_URL")
+        base_url=os.environ["AI_BASE_URL"]
         api_key=os.environ["GEMINI_API_KEY"]
     )
 
