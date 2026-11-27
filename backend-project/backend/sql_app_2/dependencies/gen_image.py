@@ -102,7 +102,7 @@ def gen_image_gpt_5(prompt):
        
 def gen_image_gemini(prompt):
     client = genai.Client(
-        base_url=os.environ["AI_BASE_URL"]
+        base_url=os.environ["AI_BASE_URL"],
         api_key=os.environ["GEMINI_API_KEY"]
     )
 
