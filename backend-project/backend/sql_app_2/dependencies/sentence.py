@@ -1,6 +1,6 @@
 from openai import OpenAI
 from pydantic import BaseModel
-import json
+import json, os
 
 class Description(BaseModel):
    details: list[str]
@@ -25,7 +25,10 @@ def str_to_list(s: str):
 
 def generateSentence(base64_image,story: str=None, model_name="openai/gpt-4o"):
   
-  client=OpenAI()
+  client=OpenAI(
+    base_url=os.environ["AI_BASE_URL"],
+    api_key=os.environ["OPENAI_API_KEY"]
+  )
   system_prompt = """
 # Role
 Image Describer
@@ -118,7 +121,10 @@ def genSentences(image,story,amt=3):
     return response_id, gen_Sentences
 
 def checkSentence(passage,temp=1):
-  client=OpenAI()
+  client=OpenAI(
+    base_url=os.environ["AI_BASE_URL"],
+    api_key=os.environ["OPENAI_API_KEY"]
+  )
   completion = client.beta.chat.completions.parse(
     model="openai/gpt-4o",
     messages=[
