@@ -23,7 +23,7 @@ class Passage(BaseModel):
 def str_to_list(s: str):
    return eval(s)
 
-def generateSentence(base64_image,story: str=None, model_name="gpt-4o"):
+def generateSentence(base64_image,story: str=None, model_name="openai/gpt-4o"):
   
   client=OpenAI()
   system_prompt = """
@@ -120,7 +120,7 @@ def genSentences(image,story,amt=3):
 def checkSentence(passage,temp=1):
   client=OpenAI()
   completion = client.beta.chat.completions.parse(
-    model="gpt-4o",
+    model="openai/gpt-4o",
     messages=[
       {"role": "system", "content": """
 # Role

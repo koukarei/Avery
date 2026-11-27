@@ -106,7 +106,7 @@ with gr.Blocks(title="AVERY") as avery_gradio:
         # Obtain original image
         response = await play_round_ws.start_resume(
             new_round=models.RoundStart(
-                model="gpt-4o-mini",
+                model="openai/gpt-4o-mini",
                 program=program,
                 leaderboard_id=leaderboard_id,
                 created_at=datetime.datetime.now(tz=zoneinfo.ZoneInfo("Asia/Tokyo")),

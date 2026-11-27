@@ -105,7 +105,7 @@ class Round(BaseModel):
     generations: list[IdOnly]=[]
 
 class RoundStart(BaseModel):
-    model: Optional[str]="gpt-4o-mini"
+    model: Optional[str]="openai/gpt-4o-mini"
     program: Optional[str]="none"
     leaderboard_id: int
     created_at: datetime

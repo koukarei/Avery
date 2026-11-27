@@ -913,7 +913,7 @@ def get_rounds_full_count(
     else:
         return rounds.count()
 
-def create_round(db: Session, leaderboard_id:int, user_id: int, created_at: datetime.datetime, model_name: str="gpt-4o-mini", program_id: Optional[int]=None):
+def create_round(db: Session, leaderboard_id:int, user_id: int, created_at: datetime.datetime, model_name: str="openai/gpt-4o-mini", program_id: Optional[int]=None):
     db_chat=models.Chat()
     db.add(db_chat)
     db.commit()

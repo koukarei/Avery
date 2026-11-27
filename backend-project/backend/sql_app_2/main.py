@@ -1392,7 +1392,7 @@ async def create_leaderboard(
         leaderboard_id=result.id,
         image=db_original_image.image,
         story=story,
-        model_name="gpt-4o-mini"
+        model_name="openai/gpt-4o-mini"
     )
     if current_user.school:
         db_course = crud.get_course_by_id(
@@ -1676,7 +1676,7 @@ async def create_leaderboards(
                 leaderboard_id=db_leaderboard.id,
                 image=img.image,
                 story=story_extract,
-                model_name="gpt-4o-mini",
+                model_name="openai/gpt-4o-mini",
             )
             crud.create_task(
                 db=db,

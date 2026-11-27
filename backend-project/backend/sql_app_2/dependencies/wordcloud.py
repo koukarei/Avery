@@ -21,7 +21,7 @@ def translate_text(text: str, target_lang: str = 'en') -> str:
     
     if target_lang == 'en':
         response = client.chat.completions.create(
-            model="gpt-4.1-nano-2025-04-14",
+            model="openai/gpt-4.1-nano-2025-04-14",
             messages=[
                 {"role": "system", "content": f"Translate the following text to English."},
                 {"role": "user", "content": text}
@@ -29,7 +29,7 @@ def translate_text(text: str, target_lang: str = 'en') -> str:
         )
     elif target_lang == 'ja':
         response = client.chat.completions.create(
-            model="gpt-4.1-nano-2025-04-14",
+            model="openai/gpt-4.1-nano-2025-04-14",
             messages=[
                 {"role": "system", "content": f"以下の内容を日本語に翻訳してください。"},
                 {"role": "user", "content": text}

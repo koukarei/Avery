@@ -34,7 +34,7 @@ class TestPlay:
                     "obj": {
                         "leaderboard_id": leaderboard_id,
                         "program": "inlab_test",
-                        "model": "gpt-4o-mini",
+                        "model": "openai/gpt-4o-mini",
                         "created_at": "2025-04-06T00:00:00Z",
                     }
                 }

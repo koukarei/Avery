@@ -92,7 +92,7 @@ class AlchemyEncoder(json.JSONEncoder):
 
 @app.task(name='tasks.generateDescription2', ignore_result=False, track_started=True)
 def generateDescription2(
-    leaderboard_id: int, image: str, story: Optional[str], model_name: str="gpt-4o-mini"
+    leaderboard_id: int, image: str, story: Optional[str], model_name: str="openai/gpt-4o-mini"
 ):
     
     try:
@@ -250,7 +250,7 @@ def generate_interpretation2(
         try:
             image = gen_image2.generate_interpretion(
                 sentence=sentence, 
-                model="gpt-image-2",
+                model="openai/gpt-image-2",
                 style=db_leaderboard.scene.prompt
             )
             t.stop_timer()

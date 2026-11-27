@@ -78,7 +78,7 @@ async def generate_descriptions(
         leaderboard_id=leaderboard_id,
         image=db_original_image.image,
         story=story,
-        model_name="gpt-4o-mini"
+        model_name="openai/gpt-4o-mini"
     )
     return responses.JSONResponse(content={"result": t})
 
@@ -115,7 +115,7 @@ async def test_generate_evaluation(
     db: Session = Depends(get_db)
 ):
     cb = openai_chatbot.Hint_Chatbot(
-        model_name="gpt-4o-mini",
+        model_name="openai/gpt-4o-mini",
     )
     db_leaderboard = crud.get_leaderboard(db, leaderboard_id=leaderboard_id)
     if not db_leaderboard:

@@ -259,7 +259,7 @@ class LeaderboardDescriptionUpdate(BaseModel):
 class RoundCreate(BaseModel):
     leaderboard_id: int
     program: Optional[str]="none"
-    model: str="gpt-4o-mini"
+    model: str="openai/gpt-4o-mini"
     created_at: datetime.datetime
 
 class RoundBase(BaseModel):
